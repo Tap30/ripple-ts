@@ -102,19 +102,19 @@ importers:
         specifier: ^4.0.15
         version: 4.0.15(@types/node@24.10.1)(jsdom@27.2.0)(tsx@4.21.0)
 
-  internals: {}
+  core: {}
 
   packages/browser:
     devDependencies:
-      '@repo/internals':
+      '@repo/core':
         specifier: workspace:*
-        version: link:../../playground
+        version: link:../../core
 
   packages/node:
     devDependencies:
-      '@repo/internals':
+      '@repo/core':
         specifier: workspace:*
-        version: link:../../playground
+        version: link:../../core
 
   playground:
     dependencies:
