@@ -1,0 +1,73 @@
+{
+  "name": "@repo/root",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Official Ripple SDKs for TypeScript.",
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "volta": {
+    "node": "24.10.0",
+    "pnpm": "10.22.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tap30/ripple-ts.git"
+  },
+  "scripts": {
+    "clear:dist": "tsx scripts/clear dist **/**/dist !node_modules/**/dist !.wireit/**/dist",
+    "clear:node-modules": "tsx scripts/clear node_modules **/**/node_modules !node_modules/**/node_modules !.wireit/**/node_modules",
+    "clear:cache": "tsx scripts/clear **/**/.wireit .prettiercache .eslintcache tsconfig.tsbuildinfo",
+    "clear:all": "run-p clear:cache clear:node-modules clear:dist",
+    "changesets:empty": "changeset add --empty",
+    "changesets:create": "changeset add",
+    "changesets:apply": "changeset version",
+    "changesets:status": "changeset status --since=main",
+    "release": "pnpm build && changeset publish --tag latest",
+    "test": "pnpm -r --parallel run test",
+    "test:dev": "pnpm -r --parallel run test:dev",
+    "build": "pnpm -r run build",
+    "dev": "pnpm --filter @repo/playground run dev",
+    "format": "prettier . --write --cache",
+    "check:cycles": "tsx scripts/check-cycles",
+    "check:format": "prettier . --check --cache --cache-location=.prettiercache",
+    "check:lint:ecma": "eslint --color --cache --config eslint.config.js --cache-location .eslintcache",
+    "check:lint:ts": "tsc --project ./tsconfig.json",
+    "check:lint": "run-p check:lint:ts check:lint:ecma check:format check:cycles"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
+    "@eslint/js": "^9.39.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/madge": "^5.0.3",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/eslint-plugin": "^1.5.1",
+    "del": "^8.0.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.5.0",
+    "jsdom": "^27.2.0",
+    "madge": "^8.0.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.7.4",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "shx": "^0.4.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.1",
+    "vite": "^7.2.6",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.15"
+  }
+}

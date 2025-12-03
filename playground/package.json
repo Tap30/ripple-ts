@@ -1,0 +1,18 @@
+{
+  "name": "@repo/playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:browser": "vite",
+    "dev:node": "tsx --watch ./node/index.ts",
+    "dev": "run-p --race dev:node dev:browser"
+  },
+  "devDependencies": {
+    "vite": "^7.2.6"
+  },
+  "dependencies": {
+    "@tapsioss/ripple-browser": "workspace:*",
+    "@tapsioss/ripple-node": "workspace:*"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "@tapsioss/ripple-browser",
+  "version": "0.1.0",
+  "description": "Official Ripple TypeScript SDK for browsers.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "./dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "keywords": [
+    "ripple",
+    "sdk",
+    "typescript",
+    "node",
+    "nodejs",
+    "event-tracking",
+    "event-logging"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tap30/ripple-ts.git",
+    "directory": "packages/browser"
+  },
+  "bugs": {
+    "url": "https://github.com/Tap30/ripple-ts/issues"
+  },
+  "devDependencies": {
+    "@repo/core": "workspace:*"
+  },
+  "scripts": {
+    "clear": "shx rm -rf dist",
+    "test": "vitest run",
+    "test:dev": "vitest",
+    "prebuild": "pnpm run clear",
+    "build": "tsup",
+    "release": "pnpm publish . --tag latest --access public --no-git-checks"
+  }
+}

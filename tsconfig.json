@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "node20",
+    "moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "allowJs": false,
+    "checkJs": false,
+
+    "noEmit": true,
+    "esModuleInterop": true,
+    "declaration": true,
+    "noEmitOnError": true,
+    "incremental": true,
+
+    "strict": true,
+    "pretty": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
+
+    "paths": {
+      // Browser package
+      "@tapsioss/ripple-browser": ["./packages/browser/src/index.ts"],
+      // Node package
+      "@tapsioss/ripple-node": ["./packages/node/src/index.ts"],
+      // Core internal package
+      "@repo/core": ["./core/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}
