@@ -22,8 +22,8 @@
     "ripple",
     "sdk",
     "typescript",
-    "node",
-    "nodejs",
+    "browser",
+    "web",
     "event-tracking",
     "event-logging"
   ],
