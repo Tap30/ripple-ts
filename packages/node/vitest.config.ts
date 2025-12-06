@@ -2,7 +2,7 @@ import { coverageConfigDefaults, defineConfig } from "vitest/config";
 
 const config = defineConfig({
   test: {
-    environment: "jsdom",
+    environment: "node",
     include: [
       "src/**/__tests__/**/*.[jt]s?(x)",
       "src/**/?(*.)+(spec|test).[jt]s?(x)",
