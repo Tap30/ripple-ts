@@ -17,6 +17,11 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 - [@tapsioss/ripple-browser](https://github.com/Tap30/ripple-ts/blob/main/packages/browser/README.md)
 - [@tapsioss/ripple-node](https://github.com/Tap30/ripple-ts/blob/main/packages/node/README.md)
 
+## Documentation
+
+- [AI Context](https://github.com/Tap30/ripple-ts/blob/main/AI_CONTEXT.md) -
+  Architecture, design principles, development guidelines, and AI onboarding
+
 ## Contributing
 
 Read the
