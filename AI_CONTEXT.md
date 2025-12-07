@@ -240,7 +240,7 @@ Interfaces:
 - **Purpose**: Base SDK client with common functionality
 - **Generic Type**: `Client<TContext>` - Type-safe context management
 - **Key Methods**:
-  - `track(name, payload, metadata?)` - Track an event with optional metadata
+  - `track(name, payload?, metadata?)` - Track an event with optional metadata (platform auto-detected)
   - `setContext<K>(key, value)` - Set global context (type-safe)
   - `flush()` - Force flush queued events
   - `init()` - Initialize and restore persisted events
@@ -400,6 +400,34 @@ type EventMetadata = {
 };
 ```
 
+#### Platform
+
+```typescript
+type PlatformInfo = {
+  name: string;
+  version: string;
+};
+
+type WebPlatform = {
+  type: "web";
+  browser: PlatformInfo;
+  device: PlatformInfo;
+  os: PlatformInfo;
+};
+
+type NativePlatform = {
+  type: "native";
+  device: PlatformInfo;
+  os: PlatformInfo;
+};
+
+type ServerPlatform = {
+  type: "server";
+};
+
+type Platform = WebPlatform | NativePlatform | ServerPlatform;
+```
+
 #### Event (Generic)
 
 ```typescript
@@ -410,6 +438,7 @@ type Event<TContext = Record<string, unknown>> = {
   context?: TContext;
   sessionId?: string | null;
   metadata?: EventMetadata;
+  platform?: Platform;
 };
 ```
 
@@ -473,6 +502,11 @@ await client.track("app_started");
 
 await client.flush();
 ```
+
+**Note**: Platform information is automatically detected by the runtime package:
+
+- **Browser**: Detects browser name/version, device type, and OS
+- **Node.js**: Sets platform type as "server"
 
 ### Event Metadata
 

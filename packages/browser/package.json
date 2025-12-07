@@ -38,6 +38,9 @@
   "devDependencies": {
     "@internals/core": "workspace:*"
   },
+  "dependencies": {
+    "ua-parser-js": "^2.0.1"
+  },
   "scripts": {
     "clear": "shx rm -rf dist",
     "test": "vitest run",

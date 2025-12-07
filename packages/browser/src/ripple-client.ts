@@ -2,8 +2,10 @@ import {
   Client,
   type ClientConfig,
   type HttpAdapter,
+  type Platform,
   type StorageAdapter,
 } from "@internals/core";
+import { UAParser } from "ua-parser-js";
 import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
 import { LocalStorageAdapter } from "./adapters/local-storage-adapter.ts";
 import { SessionManager } from "./session-manager.ts";
@@ -89,6 +91,37 @@ export class RippleClient<
    */
   public getSessionId(): string | null {
     return this._sessionManager.getSessionId();
+  }
+
+  /**
+   * Get platform information for browser environment.
+   *
+   * @returns Web platform information
+   */
+  protected _getPlatform(): Platform | undefined {
+    if (typeof navigator === "undefined") return undefined;
+
+    const parser = new UAParser(navigator.userAgent);
+
+    const browser = parser.getBrowser();
+    const device = parser.getDevice();
+    const os = parser.getOS();
+
+    return {
+      type: "web",
+      browser: {
+        name: browser.name?.toLowerCase() || "UNKNOWN",
+        version: browser.version?.toLowerCase() || "UNKNOWN",
+      },
+      device: {
+        name: device.type?.toLowerCase() || "desktop",
+        version: device.vendor?.toLowerCase() || "UNKNOWN",
+      },
+      os: {
+        name: os.name?.toLowerCase() || "UNKNOWN",
+        version: os.version?.toLowerCase() || "UNKNOWN",
+      },
+    };
   }
 
   /**

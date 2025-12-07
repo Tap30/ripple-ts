@@ -2,6 +2,7 @@ import {
   Client,
   type ClientConfig,
   type HttpAdapter,
+  type Platform,
   type StorageAdapter,
 } from "@internals/core";
 import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
@@ -42,5 +43,16 @@ export class RippleClient<
       adapters?.httpAdapter ?? new FetchHttpAdapter(),
       adapters?.storageAdapter ?? new FileStorageAdapter(),
     );
+  }
+
+  /**
+   * Get platform information for Node.js environment.
+   *
+   * @returns Server platform information
+   */
+  protected _getPlatform(): Platform | undefined {
+    return {
+      type: "server",
+    };
   }
 }

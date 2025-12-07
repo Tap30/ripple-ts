@@ -144,6 +144,9 @@ await client.track(
 await client.track("api_request", { endpoint: "/api/users" });
 ```
 
+**Note**: Platform information (server type) is automatically attached to all
+events.
+
 **Use Cases**:
 
 - Schema versioning for backward compatibility
@@ -279,7 +282,8 @@ events.
 #### `async track(name: string, payload?: EventPayload, metadata?: EventMetadata): Promise<void>`
 
 Tracks an event with optional payload data and metadata. Metadata includes
-schemaVersion for event versioning.
+schemaVersion for event versioning. Platform information (server) is
+automatically attached.
 
 #### `setContext<K>(key: K, value: TContext[K]): void`
 

@@ -8,6 +8,7 @@ import type {
   Event,
   EventMetadata,
   EventPayload,
+  Platform,
 } from "./types.ts";
 
 /**
@@ -60,8 +61,8 @@ export abstract class Client<
    */
   public async track(
     name: string,
-    payload: EventPayload = {},
-    metadata: EventMetadata = {},
+    payload?: EventPayload,
+    metadata?: EventMetadata,
   ): Promise<void> {
     const event: Event<TContext> = {
       name,
@@ -70,6 +71,7 @@ export abstract class Client<
       context: this._contextManager.getAll() as TContext,
       sessionId: this._sessionId,
       metadata,
+      platform: this._getPlatform(),
     };
 
     await this._dispatcher.enqueue(event);
@@ -104,6 +106,14 @@ export abstract class Client<
   public async init(): Promise<void> {
     await this._dispatcher.restore();
   }
+
+  /**
+   * Get platform information for the current runtime.
+   * Must be implemented by runtime-specific clients.
+   *
+   * @returns Platform information or undefined
+   */
+  protected abstract _getPlatform(): Platform | undefined;
 
   /**
    * Dispose the client and clean up resources.

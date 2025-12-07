@@ -151,6 +151,9 @@ await client.track(
 await client.track("button_click", { button: "submit" });
 ```
 
+**Note**: Platform information (browser, device, OS) is automatically detected
+and attached to all events.
+
 **Use Cases**:
 
 - Schema versioning for backward compatibility
@@ -291,7 +294,8 @@ events.
 #### `async track(name: string, payload?: EventPayload, metadata?: EventMetadata): Promise<void>`
 
 Tracks an event with optional payload data and metadata. Metadata includes
-schemaVersion for event versioning.
+schemaVersion for event versioning. Platform information (browser, device, OS)
+is automatically detected and attached.
 
 #### `setContext<K>(key: K, value: TContext[K]): void`
 

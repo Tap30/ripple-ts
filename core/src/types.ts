@@ -14,6 +14,75 @@ export type EventMetadata = {
 };
 
 /**
+ * Platform information with name and version.
+ */
+export type PlatformInfo = {
+  /**
+   * Platform name
+   */
+  name: string;
+  /**
+   * Platform version
+   */
+  version: string;
+};
+
+/**
+ * Web platform information.
+ */
+export type WebPlatform = {
+  /**
+   * Platform type
+   */
+  type: "web";
+  /**
+   * Browser information
+   */
+  browser: PlatformInfo;
+  /**
+   * Device information
+   */
+  device: PlatformInfo;
+  /**
+   * Operating system information
+   */
+  os: PlatformInfo;
+};
+
+/**
+ * Native platform information.
+ */
+export type NativePlatform = {
+  /**
+   * Platform type
+   */
+  type: "native";
+  /**
+   * Device information
+   */
+  device: PlatformInfo;
+  /**
+   * Operating system information
+   */
+  os: PlatformInfo;
+};
+
+/**
+ * Server platform information.
+ */
+export type ServerPlatform = {
+  /**
+   * Platform type
+   */
+  type: "server";
+};
+
+/**
+ * Platform discriminated union.
+ */
+export type Platform = WebPlatform | NativePlatform | ServerPlatform;
+
+/**
  * Represents a tracked event with metadata and context.
  *
  * @template TContext The type of context attached to events
@@ -43,6 +112,10 @@ export type Event<TContext = Record<string, unknown>> = {
    * Event-specific metadata
    */
   metadata?: EventMetadata;
+  /**
+   * Platform information
+   */
+  platform?: Platform;
 };
 
 /**
