@@ -4,6 +4,16 @@
 export type EventPayload = Record<string, unknown>;
 
 /**
+ * Event metadata containing schema version and other event-specific data.
+ */
+export type EventMetadata = {
+  /**
+   * Schema version for the event
+   */
+  schemaVersion?: string;
+};
+
+/**
  * Represents a tracked event with metadata and context.
  *
  * @template TContext The type of context attached to events
@@ -29,6 +39,10 @@ export type Event<TContext = Record<string, unknown>> = {
    * Session identifier (browser only)
    */
   sessionId?: string | null;
+  /**
+   * Event-specific metadata
+   */
+  metadata?: EventMetadata;
 };
 
 /**

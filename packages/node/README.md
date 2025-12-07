@@ -107,7 +107,45 @@ client.setContext("region", "us-east-1");
 
 // Context is automatically attached to all events
 await client.track("api_request", { endpoint: "/api/users" });
+
+// Track event with metadata (schema version)
+await client.track(
+  "order_created",
+  { orderId: "order-456", amount: 99.99 },
+  { schemaVersion: "2.1.0" },
+);
 ```
+
+### Event Metadata
+
+Track events with optional metadata for schema versioning:
+
+```typescript
+import { RippleClient } from "@tapsioss/ripple-node";
+
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+});
+
+await client.init();
+
+// Track with schema version
+await client.track(
+  "payment_processed",
+  { transactionId: "txn-456", amount: 149.99 },
+  { schemaVersion: "3.1.0" },
+);
+
+// Metadata is optional
+await client.track("api_request", { endpoint: "/api/users" });
+```
+
+**Use Cases**:
+
+- Schema versioning for backward compatibility
+- Event structure evolution tracking
+- Data migration identification
 
 ### Custom Storage Adapter
 
@@ -235,9 +273,10 @@ Creates a new RippleClient instance.
 Initializes the client and restores persisted events. Call this before tracking
 events.
 
-#### `async track(name: string, payload?: EventPayload): Promise<void>`
+#### `async track(name: string, payload?: EventPayload, metadata?: EventMetadata): Promise<void>`
 
-Tracks an event with optional payload data.
+Tracks an event with optional payload data and metadata. Metadata includes
+schemaVersion for event versioning.
 
 #### `setContext<K>(key: K, value: TContext[K]): void`
 

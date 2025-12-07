@@ -6,6 +6,7 @@ import type {
   ClientConfig,
   DispatcherConfig,
   Event,
+  EventMetadata,
   EventPayload,
 } from "./types.ts";
 
@@ -55,14 +56,20 @@ export abstract class Client<
    *
    * @param name Event name/identifier
    * @param payload Event data payload
+   * @param metadata Event-specific metadata
    */
-  public async track(name: string, payload: EventPayload = {}): Promise<void> {
+  public async track(
+    name: string,
+    payload: EventPayload = {},
+    metadata?: EventMetadata,
+  ): Promise<void> {
     const event: Event<TContext> = {
       name,
       payload,
       timestamp: Date.now(),
       context: this._contextManager.getAll() as TContext,
       sessionId: this._sessionId,
+      metadata,
     };
 
     await this._dispatcher.enqueue(event);

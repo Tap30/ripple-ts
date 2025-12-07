@@ -12,6 +12,7 @@ environments (Browser and Node.js).
 
 - **Type-Safe Context Management**: Generic context types with full TypeScript
   autocomplete
+- **Event Metadata**: Optional metadata support with schema versioning for events
 - **Automatic Batching**: Configurable batch size with auto-flush
 - **Scheduled Flushing**: Time-based automatic event dispatch
 - **Retry Logic**: Exponential backoff with jitter (1000ms × 2^attempt + random
@@ -239,7 +240,7 @@ Interfaces:
 - **Purpose**: Base SDK client with common functionality
 - **Generic Type**: `Client<TContext>` - Type-safe context management
 - **Key Methods**:
-  - `track(name, payload)` - Track an event
+  - `track(name, payload, metadata?)` - Track an event with optional metadata
   - `setContext<K>(key, value)` - Set global context (type-safe)
   - `flush()` - Force flush queued events
   - `init()` - Initialize and restore persisted events
@@ -391,6 +392,14 @@ The Dispatcher handles four critical race condition scenarios:
 
 ### Type Definitions
 
+#### EventMetadata
+
+```typescript
+type EventMetadata = {
+  schemaVersion?: string;
+};
+```
+
 #### Event (Generic)
 
 ```typescript
@@ -399,6 +408,8 @@ type Event<TContext = Record<string, unknown>> = {
   payload: Record<string, unknown>;
   timestamp: number;
   context?: TContext;
+  sessionId?: string | null;
+  metadata?: EventMetadata;
 };
 ```
 
@@ -449,8 +460,39 @@ const client = new RippleClient({
 
 await client.init();
 await client.track("page_view", { page: "/home" });
+
+// Track with metadata
+await client.track(
+  "user_action",
+  { action: "click", button: "submit" },
+  { schemaVersion: "1.0.0" },
+);
+
 await client.flush();
 ```
+
+### Event Metadata
+
+Events can include optional metadata for schema versioning and event-specific
+information:
+
+```typescript
+// Track event with metadata
+await client.track(
+  "user_signup",
+  { email: "user@example.com", plan: "premium" },
+  { schemaVersion: "1.0.0" },
+);
+
+// Metadata is optional
+await client.track("page_view", { page: "/home" });
+```
+
+**Use Cases**:
+
+- **Schema Versioning**: Track event schema versions for backward compatibility
+- **Event Evolution**: Manage breaking changes in event structure
+- **Data Migration**: Identify events that need transformation
 
 ### Type-Safe Context
 
