@@ -38,8 +38,8 @@
   "devDependencies": {
     "@internals/core": "workspace:*"
   },
-  "dependencies": {
-    "ua-parser-js": "^2.0.1"
+  "peerDependencies": {
+    "ua-parser-js": "^2"
   },
   "scripts": {
     "clear": "shx rm -rf dist",

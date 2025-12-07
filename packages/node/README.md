@@ -276,14 +276,16 @@ Creates a new RippleClient instance.
 
 #### `async init(): Promise<void>`
 
-Initializes the client and restores persisted events. Call this before tracking
-events.
+Initializes the client and restores persisted events. **Must be called before
+tracking events**, otherwise `track()` will throw an error to prevent data loss.
 
 #### `async track(name: string, payload?: EventPayload, metadata?: EventMetadata): Promise<void>`
 
 Tracks an event with optional payload data and metadata. Metadata includes
 schemaVersion for event versioning. Platform information (server) is
 automatically attached.
+
+**Throws**: Error if `init()` has not been called.
 
 #### `setContext<K>(key: K, value: TContext[K]): void`
 

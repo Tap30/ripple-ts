@@ -23,6 +23,7 @@ export abstract class Client<
   protected readonly _contextManager: ContextManager<TContext>;
   protected readonly _dispatcher: Dispatcher<TContext>;
   protected _sessionId: string | null = null;
+  private _initialized = false;
 
   /**
    * Create a new Client instance.
@@ -58,12 +59,19 @@ export abstract class Client<
    * @param name Event name/identifier
    * @param payload Event data payload
    * @param metadata Event-specific metadata
+   * @throws Error if client is not initialized
    */
   public async track(
     name: string,
     payload?: EventPayload,
     metadata?: EventMetadata,
   ): Promise<void> {
+    if (!this._initialized) {
+      throw new Error(
+        "Client not initialized. Call init() before tracking events.",
+      );
+    }
+
     const event: Event<TContext> = {
       name,
       payload,
@@ -101,10 +109,11 @@ export abstract class Client<
 
   /**
    * Initialize the client and restore persisted events.
-   * Should be called before tracking events.
+   * Must be called before tracking events.
    */
   public async init(): Promise<void> {
     await this._dispatcher.restore();
+    this._initialized = true;
   }
 
   /**

@@ -240,10 +240,10 @@ Interfaces:
 - **Purpose**: Base SDK client with common functionality
 - **Generic Type**: `Client<TContext>` - Type-safe context management
 - **Key Methods**:
-  - `track(name, payload?, metadata?)` - Track an event with optional metadata (platform auto-detected)
+  - `init()` - Initialize and restore persisted events (must be called first)
+  - `track(name, payload?, metadata?)` - Track an event (throws if not initialized)
   - `setContext<K>(key, value)` - Set global context (type-safe)
   - `flush()` - Force flush queued events
-  - `init()` - Initialize and restore persisted events
   - `dispose()` - Clean up resources and detach event listeners
 - **Dependencies**: ContextManager, Dispatcher
 - **DX**: Full TypeScript autocomplete for context keys/values
@@ -502,6 +502,9 @@ await client.track("app_started");
 
 await client.flush();
 ```
+
+**Important**: `init()` must be called before `track()`. Calling `track()`
+before initialization will throw an error to prevent data loss.
 
 **Note**: Platform information is automatically detected by the runtime package:
 
