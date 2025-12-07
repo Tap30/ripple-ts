@@ -61,7 +61,7 @@ export abstract class Client<
   public async track(
     name: string,
     payload: EventPayload = {},
-    metadata?: EventMetadata,
+    metadata: EventMetadata = {},
   ): Promise<void> {
     const event: Event<TContext> = {
       name,

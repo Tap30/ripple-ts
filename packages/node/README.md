@@ -82,6 +82,9 @@ await client.init();
 await client.track("user_signup", { userId: "user-123" });
 await client.track("database_query", { table: "users", duration: 45 });
 
+// Track without payload (just signal that something happened)
+await client.track("server_started");
+
 // Manually flush events
 await client.flush();
 ```

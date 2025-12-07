@@ -86,6 +86,9 @@ console.log("Session ID:", client.getSessionId());
 await client.track("button_click", { button: "signup" });
 await client.track("form_submit", { form: "contact" });
 
+// Track without payload (just signal that something happened)
+await client.track("page_loaded");
+
 // Manually flush events
 await client.flush();
 

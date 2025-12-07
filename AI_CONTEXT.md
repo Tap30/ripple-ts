@@ -405,7 +405,7 @@ type EventMetadata = {
 ```typescript
 type Event<TContext = Record<string, unknown>> = {
   name: string;
-  payload: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   timestamp: number;
   context?: TContext;
   sessionId?: string | null;
@@ -467,6 +467,9 @@ await client.track(
   { action: "click", button: "submit" },
   { schemaVersion: "1.0.0" },
 );
+
+// Track without payload (just signal that something happened)
+await client.track("app_started");
 
 await client.flush();
 ```

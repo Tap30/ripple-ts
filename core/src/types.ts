@@ -26,7 +26,7 @@ export type Event<TContext = Record<string, unknown>> = {
   /**
    * Event data payload
    */
-  payload: EventPayload;
+  payload?: EventPayload;
   /**
    * Unix timestamp in milliseconds
    */
