@@ -14,5 +14,9 @@
   "bumpVersionsWithWorkspaceProtocolOnly": true,
   "prettier": false,
   "updateInternalDependencies": "patch",
-  "ignore": ["@repo/playground"]
+  "ignore": ["@repo/playground"],
+  "privatePackages": {
+    "tag": false,
+    "version": false
+  }
 }
