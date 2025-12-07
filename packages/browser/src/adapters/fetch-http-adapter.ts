@@ -1,4 +1,4 @@
-import type { Event, HttpAdapter, HttpResponse } from "@repo/core";
+import type { Event, HttpAdapter, HttpResponse } from "@internals/core";
 
 /**
  * HTTP adapter implementation using the Fetch API with Beacon fallback.

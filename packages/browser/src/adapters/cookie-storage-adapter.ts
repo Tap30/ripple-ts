@@ -1,4 +1,4 @@
-import type { Event, StorageAdapter } from "@repo/core";
+import type { Event, StorageAdapter } from "@internals/core";
 
 /**
  * Storage adapter implementation using cookies.

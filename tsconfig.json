@@ -38,7 +38,7 @@
       // Node package
       "@tapsioss/ripple-node": ["./packages/node/src/index.ts"],
       // Core internal package
-      "@repo/core": ["./core/src/index.ts"]
+      "@internals/core": ["./core/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

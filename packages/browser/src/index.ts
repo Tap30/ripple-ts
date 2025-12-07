@@ -13,4 +13,4 @@ export type {
   HttpAdapter,
   HttpResponse,
   StorageAdapter,
-} from "@repo/core";
+} from "@internals/core";

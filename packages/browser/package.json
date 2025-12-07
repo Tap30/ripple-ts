@@ -36,7 +36,7 @@
     "url": "https://github.com/Tap30/ripple-ts/issues"
   },
   "devDependencies": {
-    "@repo/core": "workspace:*"
+    "@internals/core": "workspace:*"
   },
   "scripts": {
     "clear": "shx rm -rf dist",

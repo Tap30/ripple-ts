@@ -106,13 +106,13 @@ importers:
 
   packages/browser:
     devDependencies:
-      '@repo/core':
+      '@internals/core':
         specifier: workspace:*
         version: link:../../core
 
   packages/node:
     devDependencies:
-      '@repo/core':
+      '@internals/core':
         specifier: workspace:*
         version: link:../../core
 

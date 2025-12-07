@@ -1,4 +1,4 @@
-import type { Event, StorageAdapter } from "@repo/core";
+import type { Event, StorageAdapter } from "@internals/core";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 
 /**

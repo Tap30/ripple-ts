@@ -141,7 +141,7 @@ ripple-ts/
 ├── packages/
 │   ├── browser/          # Browser-specific SDK (@tapsioss/ripple-browser)
 │   └── node/             # Node.js-specific SDK (@tapsioss/ripple-node)
-├── core/                 # Shared internal package (@repo/core)
+├── core/                 # Shared internal package (@internals/core)
 ├── playground/           # Development playground
 │   ├── browser/          # Browser testing environment
 │   └── node/             # Node.js testing environment
@@ -179,7 +179,7 @@ ripple-ts/
   - Types: `HttpAdapter`, `StorageAdapter`, `ClientConfig`, `Event`,
     `EventPayload`, `HttpResponse`
 
-#### @repo/core
+#### @internals/core
 
 - **Purpose**: Shared internal utilities and types
 - **Entry**: `core/src/index.ts`
@@ -235,7 +235,7 @@ Interfaces:
 
 #### Client (Abstract Base Class)
 
-- **Location**: `@repo/core/client.ts`
+- **Location**: `@internals/core/client.ts`
 - **Purpose**: Base SDK client with common functionality
 - **Generic Type**: `Client<TContext>` - Type-safe context management
 - **Key Methods**:
@@ -249,7 +249,7 @@ Interfaces:
 
 #### ContextManager
 
-- **Location**: `@repo/core/context-manager.ts`
+- **Location**: `@internals/core/context-manager.ts`
 - **Purpose**: Manage global context attached to all events
 - **Generic Type**: `ContextManager<TContext>` - Type-safe context
 - **Key Methods**:
@@ -261,7 +261,7 @@ Interfaces:
 
 #### Dispatcher
 
-- **Location**: `@repo/core/dispatcher.ts`
+- **Location**: `@internals/core/dispatcher.ts`
 - **Purpose**: Queue management, batching, and retry logic
 - **Generic Type**: `Dispatcher<TContext>` - Type-safe events
 - **Constructor**: Accepts `DispatcherConfig` object (not ordered params)
@@ -286,7 +286,7 @@ Interfaces:
 
 #### Mutex
 
-- **Location**: `@repo/core/mutex.ts`
+- **Location**: `@internals/core/mutex.ts`
 - **Purpose**: Mutual exclusion lock for preventing race conditions
 - **Key Method**: `runAtomic(task)` - Execute task with exclusive lock
 - **Features**:
@@ -334,7 +334,7 @@ The Dispatcher handles four critical race condition scenarios:
 
 #### Queue
 
-- **Location**: `@repo/core/queue.ts`
+- **Location**: `@internals/core/queue.ts`
 - **Purpose**: Efficient FIFO data structure for event management
 - **Implementation**: Singly linked list
 - **Key Methods**:
@@ -349,7 +349,7 @@ The Dispatcher handles four critical race condition scenarios:
 
 #### HttpAdapter Interface
 
-- **Location**: `@repo/core/adapters/http-adapter.ts`
+- **Location**: `@internals/core/adapters/http-adapter.ts`
 - **Purpose**: Abstract HTTP communication for custom implementations
 - **Method**: `send(endpoint, events, headers?): Promise<HttpResponse>`
 - **Parameters**:
@@ -364,7 +364,7 @@ The Dispatcher handles four critical race condition scenarios:
 
 #### StorageAdapter Interface
 
-- **Location**: `@repo/core/adapters/storage-adapter.ts`
+- **Location**: `@internals/core/adapters/storage-adapter.ts`
 - **Purpose**: Abstract event persistence for custom implementations
 - **Methods**:
   - `save(events)` - Persist events
@@ -578,7 +578,7 @@ const client = new RippleClient(config, {
 ### 1. Runtime Separation
 
 - Browser and Node.js SDKs are separate packages
-- Shared code lives in `@repo/core`
+- Shared code lives in `@internals/core`
 - Each package has runtime-specific implementations
 
 ### 2. Type Safety

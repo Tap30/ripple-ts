@@ -3,7 +3,7 @@ import {
   type ClientConfig,
   type HttpAdapter,
   type StorageAdapter,
-} from "@repo/core";
+} from "@internals/core";
 import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
 import { FileStorageAdapter } from "./adapters/file-storage-adapter.ts";
 
