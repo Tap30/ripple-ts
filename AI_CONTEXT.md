@@ -435,12 +435,12 @@ type Platform = WebPlatform | NativePlatform | ServerPlatform;
 ```typescript
 type Event<TContext = Record<string, unknown>> = {
   name: string;
-  payload?: Record<string, unknown>;
-  timestamp: number;
+  payload: Record<string, unknown> | null;
+  issuedAt: number;
   context?: TContext;
-  sessionId?: string | null;
-  metadata?: EventMetadata;
-  platform?: Platform;
+  sessionId: string | null;
+  metadata: EventMetadata | null;
+  platform: Platform | null;
 };
 ```
 

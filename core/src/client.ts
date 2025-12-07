@@ -76,7 +76,7 @@ export abstract class Client<
       name,
       metadata: metadata ?? null,
       payload: payload ?? null,
-      timestamp: Date.now(),
+      issuedAt: Date.now(),
       context: this._contextManager.getAll() as TContext,
       sessionId: this._sessionId,
       platform: this._getPlatform(),

@@ -103,7 +103,7 @@ export type Event<TContext = Record<string, unknown>> = {
   /**
    * Unix timestamp in milliseconds
    */
-  timestamp: number;
+  issuedAt: number;
   /**
    * Global context attached to the event
    */
