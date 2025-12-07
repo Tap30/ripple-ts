@@ -24,7 +24,6 @@ for browsers.
   Cookies
 - 🔌 **Pluggable Adapters**: Custom HTTP and storage implementations
 - 📘 **Type-Safe**: Full TypeScript support with generics
-- 🎯 **Zero Dependencies**: No external dependencies
 - 🌐 **Offline Support**: Events persist across page reloads
 - ✅ **No Event Loss**: Events are preserved even during concurrent operations
 - 📋 **Event Ordering**: FIFO order maintained across all scenarios
@@ -36,16 +35,22 @@ for browsers.
 ## Installation
 
 ```sh
-npm install @tapsioss/ripple-browser
+npm install @tapsioss/ripple-browser ua-parser-js
 ```
 
 ```sh
-pnpm add @tapsioss/ripple-browser
+pnpm add @tapsioss/ripple-browser ua-parser-js
 ```
 
 ```sh
-yarn add @tapsioss/ripple-browser
+yarn add @tapsioss/ripple-browser ua-parser-js
 ```
+
+### Peer Dependencies
+
+This package requires `ua-parser-js` (v2.x) as a peer dependency for automatic
+platform detection (browser, device, and OS information). Make sure to install
+it alongside the SDK.
 
 ## Quick Start
 
@@ -225,6 +230,30 @@ const client = new RippleClient(config, {
 | **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | Temporary tracking         |
 | **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | Large event queues         |
 | **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Small queues, cross-domain |
+
+## Platform Detection
+
+The SDK automatically detects and attaches platform information to all events
+using [ua-parser-js](https://github.com/faisalman/ua-parser-js). This includes:
+
+- **Browser**: Name and version (e.g., Chrome 120.0, Firefox 121.0)
+- **Device**: Type and vendor (e.g., Desktop, Mobile, Tablet)
+- **OS**: Name and version (e.g., Windows 11, macOS 14.0, iOS 17.0)
+
+Platform data is automatically included in every event and requires no
+configuration. The `ua-parser-js` library is a peer dependency and must be
+installed alongside the SDK.
+
+**Example platform data:**
+
+```typescript
+{
+  type: "web",
+  browser: { name: "chrome", version: "120.0" },
+  device: { name: "desktop", version: "unknown" },
+  os: { name: "macos", version: "14.0" }
+}
+```
 
 ## Beacon API Support
 
