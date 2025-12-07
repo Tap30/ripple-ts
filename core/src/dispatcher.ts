@@ -73,7 +73,7 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
 
       this._queue.clear();
 
-      await this._sendWithRetry(batch, 0);
+      await this._sendWithRetry(batch);
     });
   }
 
@@ -85,8 +85,15 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
    */
   private async _sendWithRetry(
     events: Event<TContext>[],
-    attempt: number,
+    attempt: number = 0,
   ): Promise<void> {
+    const requeue = async () => {
+      const currentQueue = this._queue.toArray();
+
+      this._queue.fromArray([...events, ...currentQueue]);
+      await this._storageAdapter.save(this._queue.toArray());
+    };
+
     try {
       const response = await this._httpAdapter.send(
         this._config.endpoint,
