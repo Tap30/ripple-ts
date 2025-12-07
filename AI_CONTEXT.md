@@ -12,7 +12,8 @@ environments (Browser and Node.js).
 
 - **Type-Safe Context Management**: Generic context types with full TypeScript
   autocomplete
-- **Event Metadata**: Optional metadata support with schema versioning for events
+- **Event Metadata**: Optional metadata support with schema versioning for
+  events
 - **Automatic Batching**: Configurable batch size with auto-flush
 - **Scheduled Flushing**: Time-based automatic event dispatch
 - **Retry Logic**: Exponential backoff with jitter (1000ms × 2^attempt + random
@@ -241,7 +242,8 @@ Interfaces:
 - **Generic Type**: `Client<TContext>` - Type-safe context management
 - **Key Methods**:
   - `init()` - Initialize and restore persisted events (must be called first)
-  - `track(name, payload?, metadata?)` - Track an event (throws if not initialized)
+  - `track(name, payload?, metadata?)` - Track an event (throws if not
+    initialized)
   - `setContext<K>(key, value)` - Set global context (type-safe)
   - `flush()` - Force flush queued events
   - `dispose()` - Clean up resources and detach event listeners
