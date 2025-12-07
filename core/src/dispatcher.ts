@@ -87,13 +87,6 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
     events: Event<TContext>[],
     attempt: number = 0,
   ): Promise<void> {
-    const requeue = async () => {
-      const currentQueue = this._queue.toArray();
-
-      this._queue.fromArray([...events, ...currentQueue]);
-      await this._storageAdapter.save(this._queue.toArray());
-    };
-
     try {
       const response = await this._httpAdapter.send(
         this._config.endpoint,

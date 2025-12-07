@@ -74,11 +74,11 @@ export abstract class Client<
 
     const event: Event<TContext> = {
       name,
-      payload,
+      metadata: metadata ?? null,
+      payload: payload ?? null,
       timestamp: Date.now(),
       context: this._contextManager.getAll() as TContext,
       sessionId: this._sessionId,
-      metadata,
       platform: this._getPlatform(),
     };
 
@@ -122,7 +122,7 @@ export abstract class Client<
    *
    * @returns Platform information or undefined
    */
-  protected abstract _getPlatform(): Platform | undefined;
+  protected abstract _getPlatform(): Platform | null;
 
   /**
    * Dispose the client and clean up resources.

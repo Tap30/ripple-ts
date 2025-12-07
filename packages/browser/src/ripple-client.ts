@@ -98,8 +98,8 @@ export class RippleClient<
    *
    * @returns Web platform information
    */
-  protected _getPlatform(): Platform | undefined {
-    if (typeof navigator === "undefined") return undefined;
+  protected _getPlatform(): Platform | null {
+    if (typeof navigator === "undefined") return null;
 
     const parser = new UAParser(navigator.userAgent);
 

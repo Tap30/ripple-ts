@@ -95,7 +95,11 @@ export type Event<TContext = Record<string, unknown>> = {
   /**
    * Event data payload
    */
-  payload?: EventPayload;
+  payload: EventPayload | null;
+  /**
+   * Event-specific metadata
+   */
+  metadata: EventMetadata | null;
   /**
    * Unix timestamp in milliseconds
    */
@@ -107,15 +111,11 @@ export type Event<TContext = Record<string, unknown>> = {
   /**
    * Session identifier (browser only)
    */
-  sessionId?: string | null;
-  /**
-   * Event-specific metadata
-   */
-  metadata?: EventMetadata;
+  sessionId: string | null;
   /**
    * Platform information
    */
-  platform?: Platform;
+  platform: Platform | null;
 };
 
 /**

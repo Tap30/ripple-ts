@@ -50,7 +50,7 @@ export class RippleClient<
    *
    * @returns Server platform information
    */
-  protected _getPlatform(): Platform | undefined {
+  protected _getPlatform(): Platform | null {
     return {
       type: "server",
     };
