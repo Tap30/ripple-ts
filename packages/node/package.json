@@ -2,8 +2,7 @@
   "name": "@tapsioss/ripple-node",
   "version": "0.1.0",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "./dist",
@@ -13,8 +12,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "default": "./dist/index.js"
     }
   },
   "keywords": [
@@ -34,15 +32,12 @@
   "bugs": {
     "url": "https://github.com/Tap30/ripple-ts/issues"
   },
-  "devDependencies": {
-    "@repo/core": "workspace:*"
-  },
   "scripts": {
     "clear": "shx rm -rf dist",
     "test": "vitest run",
-    "test:dev": "vitest",
+    "test:watch": "vitest",
     "prebuild": "pnpm run clear",
-    "build": "tsup",
+    "build": "tsdown",
     "release": "pnpm publish . --tag latest --access public --no-git-checks"
   }
 }

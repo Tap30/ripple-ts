@@ -104,6 +104,86 @@ one.
 The core team is monitoring for Pull Requests. We will review your Pull Request
 and either merge it, request changes to it, or close it with an explanation.
 
+## Development Workflow
+
+### Project Structure
+
+For a comprehensive understanding of the project architecture, features, and
+design principles, see the
+[Onboarding Documentation](https://github.com/Tap30/ripple-ts/blob/main/ONBOARDING.md).
+
+### Running the Playground
+
+Start the development server to test the SDK in a browser environment:
+
+```sh
+pnpm dev
+```
+
+This runs the playground at `http://localhost:5173` with hot module replacement.
+
+### Building
+
+Build all packages:
+
+```sh
+pnpm build
+```
+
+### Testing
+
+Run all unit tests:
+
+```sh
+pnpm test:unit
+```
+
+Run unit tests in watch mode:
+
+```sh
+pnpm test:unit:watch
+```
+
+Run tests for specific packages:
+
+```sh
+pnpm test:unit:workspace   # Test workspace packages only
+pnpm test:unit:internals   # Test internals only
+```
+
+Run integration tests:
+
+```sh
+pnpm test:integration              # Run all integration tests
+pnpm test:integration:node         # Run Node.js integration tests only
+pnpm test:integration:browser      # Run browser integration tests only
+```
+
+### Linting and Formatting
+
+Check code quality:
+
+```sh
+pnpm check:lint     # Run all checks (TypeScript, ESLint, Prettier, circular dependencies)
+pnpm check:format   # Check formatting only
+```
+
+Auto-fix formatting:
+
+```sh
+pnpm format
+```
+
+### Cleaning
+
+Clean build artifacts and caches:
+
+```sh
+pnpm clear:dist         # Remove dist folders
+pnpm clear:cache        # Remove cache files
+pnpm clear:all          # Remove everything (dist, cache, node_modules)
+```
+
 ### Coding style
 
 Please follow the coding style of the project. We use `prettier` and `eslint`,
