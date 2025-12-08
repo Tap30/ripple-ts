@@ -143,10 +143,11 @@ ripple-ts/
 ├── packages/
 │   ├── browser/          # Browser-specific SDK (@tapsioss/ripple-browser)
 │   └── node/             # Node.js-specific SDK (@tapsioss/ripple-node)
-├── core/                 # Shared internal package (@internals/core)
+├── internals/            # Shared internal libs
+│   └── core/             # Core internals (@internals/core)
 ├── playground/           # Development playground
-│   ├── browser/          # Browser testing environment
-│   └── node/             # Node.js testing environment
+│   ├── browser/          # Browser dev environment
+│   └── node/             # Node.js dev environment
 └── scripts/              # Build and maintenance scripts
 ```
 
@@ -183,9 +184,9 @@ ripple-ts/
 
 #### @internals/core
 
-- **Purpose**: Shared internal utilities and types
+- **Purpose**: Shared core internal utilities and types
 - **Entry**: `core/src/index.ts`
-- **Status**: Private workspace package
+- **Status**: Private internal library
 - **Usage**: Shared code between browser and node packages
 
 ## Technology Stack

@@ -37,8 +37,8 @@
       "@tapsioss/ripple-browser": ["./packages/browser/src/index.ts"],
       // Node package
       "@tapsioss/ripple-node": ["./packages/node/src/index.ts"],
-      // Core internal package
-      "@internals/core": ["./core/src/index.ts"]
+      // Core internal lib
+      "@internals/core": ["./internals/core/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

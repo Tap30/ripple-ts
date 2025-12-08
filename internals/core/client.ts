@@ -120,7 +120,7 @@ export abstract class Client<
    * Get platform information for the current runtime.
    * Must be implemented by runtime-specific clients.
    *
-   * @returns Platform information or undefined
+   * @returns Platform information or null
    */
   protected abstract _getPlatform(): Platform | null;
 
