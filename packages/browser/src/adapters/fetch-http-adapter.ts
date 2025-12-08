@@ -28,16 +28,19 @@ export class FetchHttpAdapter implements HttpAdapter {
   /**
    * Send events using Beacon API or Fetch API.
    * Uses Beacon when page is unloading for guaranteed delivery.
+   * Note: Beacon API doesn't support custom headers, so apiKey is sent as query parameter.
    *
    * @param endpoint The API endpoint URL
    * @param events Array of events to send
-   * @param headers Optional custom headers
+   * @param headers Headers to include in the request
+   * @param apiKeyHeader The header name used for API key
    * @returns Promise resolving to HTTP response
    */
   public async send(
     endpoint: string,
     events: Event[],
-    headers: Record<string, string> = {},
+    headers: Record<string, string>,
+    apiKeyHeader: string,
   ): Promise<HttpResponse> {
     const body = JSON.stringify({ events });
 
@@ -46,8 +49,15 @@ export class FetchHttpAdapter implements HttpAdapter {
       typeof navigator !== "undefined" &&
       navigator.sendBeacon
     ) {
+      const url = new URL(endpoint);
+      const apiKey = headers[apiKeyHeader];
+
+      if (apiKey) {
+        url.searchParams.set("apiKey", apiKey);
+      }
+
       const blob = new Blob([body], { type: "application/json" });
-      const success = navigator.sendBeacon(endpoint, blob);
+      const success = navigator.sendBeacon(url.toString(), blob);
 
       return {
         ok: success,
@@ -58,7 +68,7 @@ export class FetchHttpAdapter implements HttpAdapter {
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+      headers,
       body,
       // This ensures request completes even if page is navigated away
       // Provides similar guarantees to Beacon but with response handling

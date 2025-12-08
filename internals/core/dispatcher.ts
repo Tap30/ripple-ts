@@ -91,6 +91,11 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
       const response = await this._httpAdapter.send(
         this._config.endpoint,
         events,
+        {
+          [this._config.apiKeyHeader]: this._config.apiKey,
+          "Content-Type": "application/json",
+        },
+        this._config.apiKeyHeader,
       );
 
       if (response.ok) {

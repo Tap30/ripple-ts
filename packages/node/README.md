@@ -260,6 +260,7 @@ application without worrying about race conditions.
 interface ClientConfig {
   apiKey: string; // Required: API authentication key
   endpoint: string; // Required: API endpoint URL
+  apiKeyHeader?: string; // Optional: Header name for API key (default: "X-API-Key")
   flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)

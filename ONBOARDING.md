@@ -116,6 +116,7 @@ The browser SDK uses a dual-transport strategy to ensure event delivery:
 {
   apiKey: string;           // Required: API authentication key
   endpoint: string;         // Required: API endpoint URL
+  apiKeyHeader?: string;    // Optional: Header name for API key (default: "X-API-Key")
   flushInterval?: number;   // Optional: Auto-flush interval (default: 5000ms)
   maxBatchSize?: number;    // Optional: Max events per batch (default: 10)
   maxRetries?: number;      // Optional: Max retry attempts (default: 3)
@@ -360,14 +361,16 @@ The Dispatcher handles four critical race condition scenarios:
 
 - **Location**: `@internals/core/adapters/http-adapter.ts`
 - **Purpose**: Abstract HTTP communication for custom implementations
-- **Method**: `send(endpoint, events, headers?): Promise<HttpResponse>`
+- **Method**:
+  `send(endpoint, events, headers, apiKeyHeader): Promise<HttpResponse>`
 - **Parameters**:
   - `endpoint` - API endpoint URL
   - `events` - Array of events to send
-  - `headers` - Optional custom headers (merged with defaults)
+  - `headers` - Headers to include in the request
+  - `apiKeyHeader` - Header name for API key (used for Beacon fallback)
 - **Implementations**:
   - `FetchHttpAdapter` (browser) - Uses browser Fetch API with Beacon fallback
-    for page unload
+    for page unload (sends apiKey as query param when using Beacon)
   - `FetchHttpAdapter` (node) - Uses Node.js fetch API
   - **Custom**: Implement for axios, gRPC, or any HTTP client
 
@@ -587,7 +590,8 @@ class AxiosHttpAdapter implements HttpAdapter {
   public async send(
     endpoint: string,
     events: Event[],
-    headers?: Record<string, string>,
+    headers: Record<string, string>,
+    apiKeyHeader: string,
   ): Promise<HttpResponse> {
     const response = await axios.post(endpoint, { events }, { headers });
     return {

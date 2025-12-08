@@ -64,6 +64,7 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 {
   apiKey: string;           // Required: API authentication key
   endpoint: string;         // Required: API endpoint URL
+  apiKeyHeader?: string;    // Optional: Header name for API key (default: "X-API-Key")
   flushInterval?: number;   // Optional: Auto-flush interval (default: 5000ms)
   maxBatchSize?: number;    // Optional: Max events per batch (default: 10)
   maxRetries?: number;      // Optional: Max retry attempts (default: 3)

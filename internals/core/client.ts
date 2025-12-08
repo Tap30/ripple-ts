@@ -40,7 +40,9 @@ export abstract class Client<
     this._contextManager = new ContextManager<TContext>();
 
     const dispatcherConfig: DispatcherConfig = {
+      apiKey: config.apiKey,
       endpoint: config.endpoint,
+      apiKeyHeader: config.apiKeyHeader ?? "X-API-Key",
       flushInterval: config.flushInterval ?? 5000,
       maxBatchSize: config.maxBatchSize ?? 10,
       maxRetries: config.maxRetries ?? 3,

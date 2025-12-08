@@ -10,12 +10,14 @@ export interface HttpAdapter {
    *
    * @param endpoint The API endpoint URL
    * @param events Array of events to send
-   * @param headers Optional custom headers to merge with defaults
+   * @param headers Headers to include in the request
+   * @param apiKeyHeader The header name used for API key
    * @returns Promise resolving to HTTP response
    */
   send(
     endpoint: string,
     events: Event[],
-    headers?: Record<string, string>,
+    headers: Record<string, string>,
+    apiKeyHeader: string,
   ): Promise<HttpResponse>;
 }

@@ -10,17 +10,18 @@ export class FetchHttpAdapter implements HttpAdapter {
    *
    * @param endpoint The API endpoint URL
    * @param events Array of events to send
-   * @param headers Optional custom headers
+   * @param headers Headers to include in the request
+   * @param apiKeyHeader The header name used for API key (unused in Node.js)
    * @returns Promise resolving to HTTP response
    */
   public async send(
     endpoint: string,
     events: Event[],
-    headers: Record<string, string> = {},
+    headers: Record<string, string>,
   ): Promise<HttpResponse> {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+      headers,
       body: JSON.stringify({ events }),
     });
 

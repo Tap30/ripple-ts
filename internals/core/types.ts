@@ -131,6 +131,10 @@ export type ClientConfig = {
    */
   endpoint: string;
   /**
+   * Header name for API key (default: "X-API-Key")
+   */
+  apiKeyHeader?: string;
+  /**
    * Interval in milliseconds between automatic flushes (default: 5000)
    */
   flushInterval?: number;
@@ -148,6 +152,14 @@ export type ClientConfig = {
  * Configuration for the Dispatcher.
  */
 export type DispatcherConfig = {
+  /**
+   * API key for authentication
+   */
+  apiKey: string;
+  /**
+   * Header name for API key
+   */
+  apiKeyHeader: string;
   /**
    * API endpoint URL
    */
