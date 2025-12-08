@@ -39,7 +39,7 @@
   "scripts": {
     "clear": "shx rm -rf dist",
     "test": "vitest run",
-    "test:dev": "vitest",
+    "test:watch": "vitest",
     "prebuild": "pnpm run clear",
     "build": "tsdown",
     "release": "pnpm publish . --tag latest --access public --no-git-checks"
