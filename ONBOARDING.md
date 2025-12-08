@@ -145,6 +145,11 @@ ripple-ts/
 │   └── node/             # Node.js-specific SDK (@tapsioss/ripple-node)
 ├── internals/            # Shared internal libs
 │   └── core/             # Core internals (@internals/core)
+├── __tests__/            # Integration tests
+│   ├── browser/          # Browser integration tests (jsdom)
+│   └── node/             # Node.js integration tests (node)
+├── __e2e__/              # End-to-end tests
+├── __mocks__/            # Mock implementations
 ├── playground/           # Development playground
 │   ├── browser/          # Browser dev environment
 │   └── node/             # Node.js dev environment
@@ -639,17 +644,42 @@ const client = new RippleClient(config, {
 ### Scripts
 
 - `pnpm build` - Build all packages
-- `pnpm test` - Run all tests
-- `pnpm test:dev` - Watch mode for tests
-- `pnpm check:lint` - Run all linting checks
 - `pnpm dev` - Start playground development server
+- `pnpm test:unit` - Run all unit tests
+- `pnpm test:unit:watch` - Run unit tests in watch mode
+- `pnpm test:integration` - Run all integration tests
+- `pnpm check:lint` - Run all linting checks
 
-### Testing Requirements
+### Testing Structure
 
+#### Unit Tests
+
+- **Location**: `src/**/__tests__/**` or `*.test.ts` / `*.spec.ts` within
+  packages
 - **Coverage**: 100% threshold enforced
-- **Environment**: jsdom for browser, node for Node.js
-- **Location**: `src/**/__tests__/**` or `*.test.ts` / `*.spec.ts`
 - **Exclusions**: `index.ts` and `types.ts` files
+- **Environments**:
+  - Browser package: jsdom
+  - Node.js package: node
+  - Internals: node
+
+#### Integration Tests
+
+- **Location**: `__tests__/` directory at project root
+- **Structure**:
+  - `__tests__/browser/` - Browser integration tests (jsdom environment)
+  - `__tests__/node/` - Node.js integration tests (node environment)
+- **Configuration**: Each subdirectory has its own `vitest.config.ts`
+
+#### End-to-End Tests
+
+- **Location**: `__e2e__/` directory at project root
+- **Configuration**: Test settings configured within namespace
+
+#### Mocks
+
+- **Location**: `__mocks__/` directory at project root
+- **Purpose**: Shared mock implementations for testing
 
 ### Build Output
 

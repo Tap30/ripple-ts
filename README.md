@@ -83,8 +83,12 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 
 ## Documentation
 
-- [AI Context](https://github.com/Tap30/ripple-ts/blob/main/AI_CONTEXT.md) -
-  Architecture, design principles, development guidelines, and AI onboarding
+- [Onboarding](https://github.com/Tap30/ripple-ts/blob/main/ONBOARDING.md) - To
+  learn about project's architecture, development guidelines, and Dev/AI
+  onboarding in depth.
+- [Design and API Contract Documentation](https://github.com/Tap30/ripple/blob/main/DESIGN_AND_CONTRACTS.md) -
+  To learn about the framework-agnostic design principles, architecture, and API
+  contract for SDKs.
 
 ## Contributing
 

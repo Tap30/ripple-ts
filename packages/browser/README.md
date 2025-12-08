@@ -348,7 +348,7 @@ Disposes the client and cleans up resources. Detaches event listeners and
 cancels scheduled flushes. Call this when you're done using the client to
 prevent memory leaks.
 
-## API Contract
+## Design and API Contract
 
 Read the
 [Design and API Contract Documentation](https://github.com/Tap30/ripple/blob/main/DESIGN_AND_CONTRACTS.md)

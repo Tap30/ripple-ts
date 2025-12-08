@@ -313,7 +313,7 @@ const client = new RippleClient(config, {
 });
 ```
 
-## API Contract
+## Design and API Contract
 
 Read the
 [Design and API Contract Documentation](https://github.com/Tap30/ripple/blob/main/DESIGN_AND_CONTRACTS.md)
