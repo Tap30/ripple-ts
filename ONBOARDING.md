@@ -1,4 +1,4 @@
-# AI Context
+# Onboarding Documentation
 
 ## Project Overview
 
