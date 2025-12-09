@@ -38,8 +38,8 @@
   },
   "scripts": {
     "clear": "shx rm -rf dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --root .",
+    "test:watch": "vitest  --root .",
     "prebuild": "pnpm run clear",
     "build": "tsdown",
     "release": "pnpm publish . --tag latest --access public --no-git-checks"
