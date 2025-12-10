@@ -143,14 +143,21 @@ The browser SDK uses a dual-transport strategy to ensure event delivery:
 ripple-ts/
 ├── packages/
 │   ├── browser/          # Browser-specific SDK (@tapsioss/ripple-browser)
+│   │   └── src/
+│   │       ├── adapters/ # Browser adapters with tests
+│   │       ├── *.test.ts # Unit tests co-located with source
+│   │       └── index.ts  # Package entry point
 │   └── node/             # Node.js-specific SDK (@tapsioss/ripple-node)
+│       └── src/
+│           ├── adapters/ # Node.js adapters with tests
+│           ├── *.test.ts # Unit tests co-located with source
+│           └── index.ts  # Package entry point
 ├── internals/            # Shared internal libs
 │   └── core/             # Core internals (@internals/core)
-├── __tests__/            # Integration tests
-│   ├── browser/          # Browser integration tests (jsdom)
-│   └── node/             # Node.js integration tests (node)
-├── __e2e__/              # End-to-end tests
-├── __mocks__/            # Mock implementations
+│       └── src/
+│           ├── adapters/ # Adapter interfaces
+│           ├── *.ts      # Core implementations
+│           └── index.ts  # Internal exports
 ├── playground/           # Development playground
 │   ├── browser/          # Browser dev environment
 │   └── node/             # Node.js dev environment
@@ -201,11 +208,64 @@ ripple-ts/
 
 - **Package Manager**: pnpm (v10.22.0) with workspaces
 - **Node Version**: 24.10.0 (managed via Volta)
-- **Bundler**: tsup (esbuild-based)
+- **Bundler**: tsdown (rolldown-based, fast TypeScript bundler)
 - **TypeScript**: 5.9.3 with strict mode
 - **Testing**: Vitest with 100% coverage requirement
 - **Linting**: ESLint 9 + Prettier
 - **Versioning**: Changesets for version management
+
+### Build System
+
+#### Build Configuration (tsdown)
+
+Each package uses tsdown for building with the following configuration:
+
+- **Entry Points**: `src/index.ts`
+- **Output Format**: ESM only (`.js` files)
+- **TypeScript Declarations**: `.d.ts` files generated automatically
+- **Minification**: Enabled for production builds
+- **Source Maps**: Generated (`.js.map` files for debugging)
+- **Tree Shaking**: Enabled via ESM format
+- **External Dependencies**: All dependencies marked as external (not bundled)
+- **Platform-Specific**: Browser and Node.js builds configured separately
+
+#### Build Outputs
+
+```sh
+packages/browser/dist/
+├── index.js          # ESM bundle (minified)
+├── index.js.map      # Source map for debugging
+└── index.d.ts        # TypeScript declarations
+
+packages/node/dist/
+├── index.js          # ESM bundle (minified)
+├── index.js.map      # Source map for debugging
+└── index.d.ts        # TypeScript declarations
+```
+
+#### Package.json Exports
+
+Both packages use modern ESM-only exports:
+
+```json
+{
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
+```
+
+This ensures:
+- ESM-only distribution (Node.js 18+ and modern browsers)
+- Proper TypeScript type definitions
+- Tree shaking works correctly
+- Smaller bundle sizes
 
 ### TypeScript Configuration
 
@@ -647,50 +707,103 @@ const client = new RippleClient(config, {
 
 ### Scripts
 
-- `pnpm build` - Build all packages
+- `pnpm build` - Build all packages (browser + node)
 - `pnpm dev` - Start playground development server
-- `pnpm test:unit` - Run all unit tests
-- `pnpm test:unit:watch` - Run unit tests in watch mode
-- `pnpm test:integration` - Run all integration tests
-- `pnpm check:lint` - Run all linting checks
+- `pnpm test` - Run all tests with coverage (alias for test:coverage)
+- `pnpm test:coverage` - Run tests with coverage report
+- `pnpm test:watch` - Run tests in watch mode
+- `pnpm check:lint` - Run ESLint on all packages
+- `pnpm check:types` - Run TypeScript type checking
+- `pnpm format` - Format code with Prettier
+- `pnpm clean` - Remove all build artifacts and node_modules
 
 ### Testing Structure
 
-#### Unit Tests
+#### Test Organization
 
-- **Location**: `src/**/__tests__/**` or `*.test.ts` / `*.spec.ts` within
-  packages
-- **Coverage**: 100% threshold enforced
-- **Exclusions**: `index.ts` and `types.ts` files
-- **Environments**:
-  - Browser package: jsdom
-  - Node.js package: node
-  - Internals: node
+All tests are co-located with source files using the pattern `*.test.ts`:
 
-#### Integration Tests
+```sh
+packages/browser/src/
+├── adapters/
+│   ├── fetch-http-adapter.ts
+│   ├── fetch-http-adapter.test.ts      # 20 tests
+│   ├── indexed-db-adapter.ts
+│   ├── indexed-db-adapter.test.ts      # 19 tests
+│   ├── local-storage-adapter.ts
+│   ├── local-storage-adapter.test.ts   # 12 tests
+│   ├── session-storage-adapter.ts
+│   ├── session-storage-adapter.test.ts # 12 tests
+│   ├── cookie-storage-adapter.ts
+│   └── cookie-storage-adapter.test.ts  # 15 tests
+├── ripple-client.ts
+├── ripple-client.test.ts               # 21 tests
+├── session-manager.ts
+└── session-manager.test.ts             # 17 tests
 
-- **Location**: `__tests__/` directory at project root
-- **Structure**:
-  - `__tests__/browser/` - Browser integration tests (jsdom environment)
-  - `__tests__/node/` - Node.js integration tests (node environment)
-- **Configuration**: Each subdirectory has its own `vitest.config.ts`
+packages/node/src/
+├── adapters/
+│   ├── fetch-http-adapter.ts
+│   ├── fetch-http-adapter.test.ts      # 7 tests
+│   ├── file-storage-adapter.ts
+│   └── file-storage-adapter.test.ts    # 14 tests
+├── ripple-client.ts
+└── ripple-client.test.ts               # 12 tests
+```
 
-#### End-to-End Tests
+#### Test Coverage
 
-- **Location**: `__e2e__/` directory at project root
-- **Configuration**: Test settings configured within namespace
+**Browser Package** (116 tests):
+- ✅ 100% statements, branches, functions, and lines
+- All adapters: fetch-http, indexed-db, local-storage, session-storage, cookie-storage
+- Core: ripple-client, session-manager
 
-#### Mocks
+**Node Package** (33 tests):
+- ✅ 100% statements, branches, functions, and lines
+- All adapters: fetch-http, file-storage
+- Core: ripple-client
 
-- **Location**: `__mocks__/` directory at project root
-- **Purpose**: Shared mock implementations for testing
+**Total**: 149 tests across both runtimes
 
-### Build Output
+#### Test Configuration
 
-- **Formats**: ESM (`.js`) and CommonJS (`.cjs`)
-- **TypeScript**: Declaration files (`.d.ts`)
-- **Minification**: Enabled
-- **Source Maps**: Disabled
+Each package has its own `vitest.config.ts`:
+
+```typescript
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom', // or 'node' for node package
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/types.ts'],
+      thresholds: {
+        statements: 100,
+        branches: 100,
+        functions: 100,
+        lines: 100,
+      },
+    },
+  },
+});
+```
+
+#### Test Environments
+
+- **Browser Package**: Uses `jsdom` to simulate browser APIs (DOM, localStorage, IndexedDB, fetch, etc.)
+- **Node Package**: Uses `node` environment for native Node.js APIs (fs, fetch)
+- **Internals**: Uses `node` environment (no browser-specific code)
+
+#### Testing Best Practices
+
+1. **No `any` Types**: All tests use proper TypeScript types
+2. **No Private Access**: Tests only use public APIs (no `as any` to access private methods)
+3. **Co-located Tests**: Tests live next to source files for easy maintenance
+4. **Comprehensive Coverage**: 100% coverage requirement enforced
+5. **Mock Properly**: Use proper type assertions (`as unknown as Type`) instead of `any`
+6. **Test Behavior**: Focus on public API behavior, not implementation details
 
 ## Design Principles
 
@@ -715,9 +828,12 @@ const client = new RippleClient(config, {
 
 ### 4. Distribution
 
-- Dual module format (ESM + CJS)
-- Tree-shakeable exports
-- Minimal bundle size (minified)
+- **ESM-Only Format**: Modern `.js` files for Node.js 18+ and modern browsers
+- **Tree-Shakeable**: ESM format enables dead code elimination
+- **Minimal Bundle Size**: Minified output, external dependencies not bundled
+- **Type Definitions**: Full TypeScript support with `.d.ts` files
+- **Modern Exports**: Uses `exports` field for proper module resolution
+- **Zero Runtime Dependencies**: Core has no external dependencies (only dev dependencies)
 
 ## API Contract
 

@@ -154,9 +154,7 @@ pnpm test:unit:internals   # Test internals only
 Run integration tests:
 
 ```sh
-pnpm test:integration              # Run all integration tests
-pnpm test:integration:node         # Run Node.js integration tests only
-pnpm test:integration:browser      # Run browser integration tests only
+pnpm test:integration      # Run all integration tests
 ```
 
 ### Linting and Formatting

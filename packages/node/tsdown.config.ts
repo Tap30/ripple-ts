@@ -7,10 +7,9 @@ export default defineConfig({
   format: "esm",
   outDir: "dist",
   minify: true,
+  sourcemap: true,
   platform: "node",
-  dts: {
-    resolve: [/^@internals\//],
-  },
+  dts: true,
   outExtensions: () => ({
     js: ".js",
     dts: ".d.ts",
