@@ -24,10 +24,7 @@ const server = createServer((req, res) => {
   }
 
   if (req.method === "POST" && req.url?.startsWith("/events")) {
-    const url = new URL(req.url, `http://localhost:${PORT}`);
-    const apiKeyFromQuery = url.searchParams.get("apiKey");
-    const apiKeyFromHeader = req.headers["x-api-key"];
-    const apiKey = apiKeyFromQuery || apiKeyFromHeader;
+    const apiKey = req.headers["x-api-key"];
 
     console.log("🔑 API Key:", apiKey || "Not provided");
 

@@ -1,7 +1,6 @@
 import {
   FetchHttpAdapter,
   IndexedDBAdapter,
-  LocalStorageAdapter,
   RippleClient,
 } from "@tapsioss/ripple-browser";
 
@@ -9,7 +8,6 @@ const client = new RippleClient(
   {
     endpoint: "http://localhost:3000/events",
     apiKey: "test-api-key",
-    apiKeyHeader: "X-Ripple-API",
     maxBatchSize: 5,
     maxRetries: 3,
     flushInterval: 5000,
@@ -21,27 +19,6 @@ const client = new RippleClient(
 );
 
 await client.init();
-
-type AppContext = {
-  userId: string;
-  sessionId: string;
-  environment: string;
-};
-
-const typedClient = new RippleClient<AppContext>(
-  {
-    endpoint: "http://localhost:3000/events",
-    apiKey: "test-api-key",
-  },
-  {
-    storageAdapter: new LocalStorageAdapter(),
-  },
-);
-
-await typedClient.init();
-typedClient.setContext("userId", "user-123");
-typedClient.setContext("sessionId", "session-abc");
-typedClient.setContext("environment", "development");
 
 const createButton = (props: {
   label: string;
@@ -134,9 +111,9 @@ const trackSimpleBtn = createButton({
   label: "Track Simple Event",
   onClick: () => {
     void (async () => {
-      await client.track("button_click", { button: "simple" });
+      await client.track("button_click");
       logger.log("Tracked: button_click");
-    });
+    })();
   },
 });
 
@@ -150,7 +127,7 @@ const trackWithPayloadBtn = createButton({
         timestamp: Date.now(),
       });
       logger.log("Tracked: user_action with payload");
-    });
+    })();
   },
 });
 
@@ -164,7 +141,7 @@ const trackWithMetadataBtn = createButton({
         { schemaVersion: "1.0.0" },
       );
       logger.log("Tracked: form_submit with metadata");
-    });
+    })();
   },
 });
 
@@ -190,9 +167,9 @@ const trackWithContextBtn = createButton({
   label: "Track with Context",
   onClick: () => {
     void (async () => {
-      await typedClient.track("context_test", { test: true });
-      logger.log("Tracked event with typed context");
-    });
+      await client.track("context_test");
+      logger.log("Tracked event with context");
+    })();
   },
 });
 
@@ -212,7 +189,7 @@ const trackMultipleBtn = createButton({
       }
 
       logger.log("Tracked 10 events (should auto-flush at batch size 5)");
-    });
+    })();
   },
 });
 
@@ -222,7 +199,7 @@ const manualFlushBtn = createButton({
     void (async () => {
       await client.flush();
       logger.log("Manually flushed events");
-    });
+    })();
   },
   variant: "secondary",
 });
@@ -230,21 +207,9 @@ const manualFlushBtn = createButton({
 batchSection.appendChild(trackMultipleBtn);
 batchSection.appendChild(manualFlushBtn);
 
-const unloadSection = createSection("Page Unload (Beacon API)");
+const unloadSection = createSection("Page Unload");
 
 document.body.appendChild(unloadSection);
-
-const testBeaconBtn = createButton({
-  label: "Track & Hide Tab (Test Beacon)",
-  onClick: () => {
-    void (async () => {
-      await client.track("beacon_test", { willUseBeacon: true });
-      logger.log(
-        "Tracked event. Now switch tabs to trigger Beacon API (check Network tab)",
-      );
-    });
-  },
-});
 
 const testRefreshBtn = createButton({
   label: "Track & Refresh Page",
@@ -255,11 +220,10 @@ const testRefreshBtn = createButton({
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-    });
+    })();
   },
 });
 
-unloadSection.appendChild(testBeaconBtn);
 unloadSection.appendChild(testRefreshBtn);
 
 const errorSection = createSection("Error Handling");
@@ -281,7 +245,7 @@ const testRetryBtn = createButton({
       logger.log(
         "Tracked event to invalid endpoint (check console for retries)",
       );
-    });
+    })();
   },
 });
 

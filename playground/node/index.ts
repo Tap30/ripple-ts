@@ -23,7 +23,6 @@ const client = new RippleClient(
   {
     endpoint: "http://localhost:3000/events",
     apiKey: "test-api-key",
-    apiKeyHeader: "X-Ripple-API",
     maxBatchSize: 5,
     maxRetries: 3,
     flushInterval: 5000,
@@ -163,17 +162,17 @@ const errorClient = new RippleClient({
 });
 
 await errorClient.init();
-await errorClient.track("error_test", { shouldFail: true });
-log("✓ Tracked event to invalid endpoint (check console for retry logs)");
+// await errorClient.track("error_test", { shouldFail: true });
+// log("✓ Tracked event to invalid endpoint (check console for retry logs)");
 
-await new Promise(resolve => {
-  setTimeout(resolve, 5000);
-});
+// await new Promise(resolve => {
+//   setTimeout(resolve, 5000);
+// });
 
 separator();
 log("Test Case 10: High Volume (100 events)");
 
-const startTime = Date.now();
+const startTime = performance.now();
 
 for (let i = 0; i < 100; i++) {
   await client.track("high_volume_event", {
@@ -182,7 +181,7 @@ for (let i = 0; i < 100; i++) {
   });
 }
 
-const duration = Date.now() - startTime;
+const duration = performance.now() - startTime;
 
 log(`✓ Tracked 100 events in ${duration}ms`);
 
