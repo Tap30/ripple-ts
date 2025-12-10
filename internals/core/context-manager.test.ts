@@ -117,6 +117,40 @@ describe("ContextManager", () => {
     });
   });
 
+  describe("isEmpty", () => {
+    it("should return true for empty context", () => {
+      const manager = new ContextManager<TestContext>();
+
+      expect(manager.isEmpty()).toBe(true);
+    });
+
+    it("should return false when context has values", () => {
+      const manager = new ContextManager<TestContext>();
+
+      manager.set("userId", "123");
+
+      expect(manager.isEmpty()).toBe(false);
+    });
+
+    it("should return true after clear", () => {
+      const manager = new ContextManager<TestContext>();
+
+      manager.set("userId", "123");
+      manager.clear();
+
+      expect(manager.isEmpty()).toBe(true);
+    });
+
+    it("should return false with multiple values", () => {
+      const manager = new ContextManager<TestContext>();
+
+      manager.set("userId", "123");
+      manager.set("sessionId", "abc");
+
+      expect(manager.isEmpty()).toBe(false);
+    });
+  });
+
   describe("clear", () => {
     it("should clear empty context", () => {
       const manager = new ContextManager<TestContext>();

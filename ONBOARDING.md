@@ -262,6 +262,7 @@ Both packages use modern ESM-only exports:
 ```
 
 This ensures:
+
 - ESM-only distribution (Node.js 18+ and modern browsers)
 - Proper TypeScript type definitions
 - Tree shaking works correctly
@@ -326,7 +327,10 @@ Interfaces:
   - `set<K>(key, value)` - Set context value (type-safe key/value)
   - `get<K>(key)` - Get context value (type-safe return)
   - `getAll()` - Get all context as `Partial<TContext>`
+  - `isEmpty()` - Check if context is empty (returns boolean)
   - `clear()` - Clear all context
+- **Behavior**: Events with no context will have `context: null` instead of
+  empty object
 - **DX**: Full TypeScript autocomplete and type checking
 
 #### Dispatcher
@@ -506,12 +510,15 @@ type Event<TContext = Record<string, unknown>> = {
   name: string;
   payload: Record<string, unknown> | null;
   issuedAt: number;
-  context?: TContext;
+  context: TContext | null;
   sessionId: string | null;
   metadata: EventMetadata | null;
   platform: Platform | null;
 };
 ```
+
+**Note**: The `context` field is `null` when no context values are set, rather
+than an empty object. This reduces payload size for events without context.
 
 #### ClientConfig
 
@@ -754,11 +761,14 @@ packages/node/src/
 #### Test Coverage
 
 **Browser Package** (116 tests):
+
 - ✅ 100% statements, branches, functions, and lines
-- All adapters: fetch-http, indexed-db, local-storage, session-storage, cookie-storage
+- All adapters: fetch-http, indexed-db, local-storage, session-storage,
+  cookie-storage
 - Core: ripple-client, session-manager
 
 **Node Package** (33 tests):
+
 - ✅ 100% statements, branches, functions, and lines
 - All adapters: fetch-http, file-storage
 - Core: ripple-client
@@ -773,12 +783,12 @@ Each package has its own `vitest.config.ts`:
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'jsdom', // or 'node' for node package
+    environment: "jsdom", // or 'node' for node package
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
-      include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/types.ts'],
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/**/index.ts", "src/**/types.ts"],
       thresholds: {
         statements: 100,
         branches: 100,
@@ -792,17 +802,20 @@ export default defineConfig({
 
 #### Test Environments
 
-- **Browser Package**: Uses `jsdom` to simulate browser APIs (DOM, localStorage, IndexedDB, fetch, etc.)
+- **Browser Package**: Uses `jsdom` to simulate browser APIs (DOM, localStorage,
+  IndexedDB, fetch, etc.)
 - **Node Package**: Uses `node` environment for native Node.js APIs (fs, fetch)
 - **Internals**: Uses `node` environment (no browser-specific code)
 
 #### Testing Best Practices
 
 1. **No `any` Types**: All tests use proper TypeScript types
-2. **No Private Access**: Tests only use public APIs (no `as any` to access private methods)
+2. **No Private Access**: Tests only use public APIs (no `as any` to access
+   private methods)
 3. **Co-located Tests**: Tests live next to source files for easy maintenance
 4. **Comprehensive Coverage**: 100% coverage requirement enforced
-5. **Mock Properly**: Use proper type assertions (`as unknown as Type`) instead of `any`
+5. **Mock Properly**: Use proper type assertions (`as unknown as Type`) instead
+   of `any`
 6. **Test Behavior**: Focus on public API behavior, not implementation details
 
 ## Design Principles
@@ -833,7 +846,8 @@ export default defineConfig({
 - **Minimal Bundle Size**: Minified output, external dependencies not bundled
 - **Type Definitions**: Full TypeScript support with `.d.ts` files
 - **Modern Exports**: Uses `exports` field for proper module resolution
-- **Zero Runtime Dependencies**: Core has no external dependencies (only dev dependencies)
+- **Zero Runtime Dependencies**: Core has no external dependencies (only dev
+  dependencies)
 
 ## API Contract
 

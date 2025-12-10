@@ -38,6 +38,15 @@ export class ContextManager<TContext extends Record<string, unknown>> {
   }
 
   /**
+   * Check if context is empty.
+   *
+   * @returns True if no context values are set
+   */
+  public isEmpty(): boolean {
+    return Object.keys(this._context).length === 0;
+  }
+
+  /**
    * Clear all context values.
    */
   public clear(): void {

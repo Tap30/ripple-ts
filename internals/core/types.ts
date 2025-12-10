@@ -105,9 +105,9 @@ export type Event<TContext = Record<string, unknown>> = {
    */
   issuedAt: number;
   /**
-   * Global context attached to the event
+   * Global context attached to the event (null if no context is set)
    */
-  context?: TContext;
+  context: TContext | null;
   /**
    * Session identifier (browser only)
    */
