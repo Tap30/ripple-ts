@@ -1,14 +1,15 @@
+import tsconfigPaths from "vite-tsconfig-paths";
 import { coverageConfigDefaults, defineConfig } from "vitest/config";
 
 const config = defineConfig({
+  plugins: [tsconfigPaths()],
   test: {
     environment: "node",
-    include: ["src/**/?(*.)+test.[jt]s?(x)"],
+    include: ["src/**/*.test.ts"],
     coverage: {
       enabled: true,
       provider: "v8",
       reporter: ["text"],
-      include: ["src/**/*.ts?(x)"],
       exclude: [
         ...coverageConfigDefaults.exclude,
         "src/**/index.ts",
