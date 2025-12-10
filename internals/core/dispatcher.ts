@@ -142,6 +142,10 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
     const stored = await this._storageAdapter.load();
 
     this._queue.fromArray(stored as Event<TContext>[]);
+
+    if (this._queue.size() > 0) {
+      this._scheduleFlush();
+    }
   }
 
   /**

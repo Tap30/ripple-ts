@@ -408,6 +408,61 @@ describe("Dispatcher", () => {
 
       expect(httpAdapter.send).not.toHaveBeenCalled();
     });
+
+    it("should schedule flush after restoring events", async () => {
+      vi.useFakeTimers();
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const persistedEvents = [createEvent("persisted")];
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue(
+        persistedEvents,
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ flushInterval: 5000 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.restore();
+
+      expect(httpAdapter.send).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(httpAdapter.send).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({ name: "persisted" }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+
+      vi.useRealTimers();
+    });
+
+    it("should not schedule flush when no events restored", async () => {
+      vi.useFakeTimers();
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const dispatcher = new Dispatcher(
+        createConfig({ flushInterval: 5000 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.restore();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(httpAdapter.send).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
   });
 
   describe("dispose", () => {
