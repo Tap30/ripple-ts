@@ -6,9 +6,15 @@ import { createServer } from "node:http";
 const PORT = 3000;
 
 const server = createServer((req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin || "http://localhost:5173";
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-API-Key, X-Ripple-API",
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
