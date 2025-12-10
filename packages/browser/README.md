@@ -27,10 +27,8 @@ for browsers.
 - 🌐 **Offline Support**: Events persist across page reloads
 - ✅ **No Event Loss**: Events are preserved even during concurrent operations
 - 📋 **Event Ordering**: FIFO order maintained across all scenarios
-- 🚦 **Beacon API**: Guaranteed event delivery during page unload using
-  `navigator.sendBeacon()`
-- 🔄 **Auto-Flush on Unload**: Automatically sends events when page visibility
-  changes
+- 🚀 **Keepalive Support**: Reliable event delivery using fetch with `keepalive`
+  flag
 
 ## Installation
 

@@ -32,77 +32,11 @@ environments (Browser and Node.js).
   - SessionStorage (5-10MB, session-only)
   - IndexedDB (50MB-1GB+, high performance)
   - Cookies (4KB, cross-domain capable)
-- **Beacon API Support**: Guaranteed event delivery during page unload using
-  `navigator.sendBeacon()`
-- **Fetch API**: Native browser HTTP support with `keepalive` flag
+- **Fetch API with Keepalive**: Native browser HTTP support with `keepalive`
+  flag for reliable event delivery
 - **Offline Support**: Events persist across page reloads
 - **Session Lifecycle**: Session ID cleared on tab/window close (matches
   sessionStorage behavior)
-- **Auto-Flush on Unload**: Automatically flushes events when page visibility
-  changes to hidden
-
-#### Beacon API Flow
-
-The browser SDK uses a dual-transport strategy to ensure event delivery:
-
-**Normal Operations:**
-
-- Uses `fetch` with `keepalive: true` for better error handling and response
-  processing
-- Provides reliability similar to Beacon while maintaining full HTTP control
-
-**Page Unload Scenarios:**
-
-- Automatically switches to `navigator.sendBeacon()` when page is unloading
-- Triggered by `visibilitychange` (hidden) and `pagehide` events
-- Guarantees event delivery even if page closes immediately
-
-**Event Flow Examples:**
-
-1. **Tab Switch:**
-
-   ```txt
-   User switches to another tab
-     ↓
-   visibilitychange (hidden) → flush() → Beacon sends events
-     ↓
-   User switches back
-     ↓
-   visibilitychange (visible) → resets to fetch mode
-   ```
-
-2. **Page Refresh:**
-
-   ```txt
-   User refreshes page
-     ↓
-   visibilitychange (hidden) → flush() → Beacon sends queued events
-     ↓
-   pagehide → flush() → Beacon sends any remaining events
-     ↓
-   Page unloads
-     ↓
-   Page reloads → client.init() → restores persisted events (if any failed)
-   ```
-
-3. **Navigation/Close:**
-
-   ```txt
-   User navigates away or closes tab
-     ↓
-   visibilitychange (hidden) → flush() → Beacon sends events
-     ↓
-   pagehide → flush() → Beacon sends remaining events
-     ↓
-   Page removed from memory
-   ```
-
-**Reliability Guarantees:**
-
-- Events sent via Beacon before page unloads (guaranteed delivery)
-- Failed events persisted in storage (LocalStorage by default)
-- On next page load, `init()` restores and retries persisted events
-- No events lost during refresh, navigation, or tab close
 
 ### Node.js-Specific Features
 
@@ -170,11 +104,11 @@ ripple-ts/
 
 - **Purpose**: Event tracking SDK for browser environments
 - **Entry**: `packages/browser/src/index.ts`
-- **Build**: Dual format (ESM + CJS) with TypeScript declarations
+- **Build**: ESM-only with TypeScript declarations
 - **Environment**: Browser (jsdom for testing)
 - **Exports**:
   - `RippleClient` - Main client class
-  - `FetchHttpAdapter` - Default HTTP adapter with Beacon API support
+  - `FetchHttpAdapter` - Default HTTP adapter with keepalive support
   - `LocalStorageAdapter` - Default storage adapter
   - `SessionStorageAdapter` - Session-only storage
   - `IndexedDBAdapter` - Large-capacity storage
@@ -431,10 +365,9 @@ The Dispatcher handles four critical race condition scenarios:
   - `endpoint` - API endpoint URL
   - `events` - Array of events to send
   - `headers` - Headers to include in the request
-  - `apiKeyHeader` - Header name for API key (used for Beacon fallback)
+  - `apiKeyHeader` - Header name for API key (kept for interface compatibility)
 - **Implementations**:
-  - `FetchHttpAdapter` (browser) - Uses browser Fetch API with Beacon fallback
-    for page unload (sends apiKey as query param when using Beacon)
+  - `FetchHttpAdapter` (browser) - Uses browser Fetch API with `keepalive` flag
   - `FetchHttpAdapter` (node) - Uses Node.js fetch API
   - **Custom**: Implement for axios, gRPC, or any HTTP client
 

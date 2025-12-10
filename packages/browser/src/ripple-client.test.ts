@@ -102,17 +102,9 @@ describe("RippleClient", () => {
   });
 
   describe("init", () => {
-    it("should initialize session and setup unload handlers", async () => {
+    it("should initialize session and load events", async () => {
       await client.init();
 
-      expect(window.addEventListener).toHaveBeenCalledWith(
-        "visibilitychange",
-        expect.any(Function),
-      );
-      expect(window.addEventListener).toHaveBeenCalledWith(
-        "pagehide",
-        expect.any(Function),
-      );
       expect(mockStorageAdapter.load).toHaveBeenCalled();
     });
 
@@ -148,123 +140,6 @@ describe("RippleClient", () => {
     });
   });
 
-  describe("unload handlers", () => {
-    it("should flush on visibility change to hidden", async () => {
-      const flushSpy = vi.spyOn(client, "flush").mockResolvedValue();
-
-      await client.init();
-
-      const visibilityHandler = vi
-        .mocked(window.addEventListener)
-        .mock.calls.find(
-          call => call[0] === "visibilitychange",
-        )?.[1] as () => void;
-
-      Object.defineProperty(document, "visibilityState", {
-        value: "hidden",
-        writable: true,
-      });
-
-      visibilityHandler();
-
-      expect(flushSpy).toHaveBeenCalled();
-    });
-
-    it("should flush on pagehide", async () => {
-      const flushSpy = vi.spyOn(client, "flush").mockResolvedValue();
-
-      await client.init();
-
-      const pagehideHandler = vi
-        .mocked(window.addEventListener)
-        .mock.calls.find(call => call[0] === "pagehide")?.[1] as () => void;
-
-      pagehideHandler();
-
-      expect(flushSpy).toHaveBeenCalled();
-    });
-
-    it("should not flush on visibility change to visible", async () => {
-      const flushSpy = vi.spyOn(client, "flush").mockResolvedValue();
-
-      await client.init();
-
-      const visibilityHandler = vi
-        .mocked(window.addEventListener)
-        .mock.calls.find(
-          call => call[0] === "visibilitychange",
-        )?.[1] as () => void;
-
-      Object.defineProperty(document, "visibilityState", {
-        value: "visible",
-        writable: true,
-      });
-
-      visibilityHandler();
-
-      expect(flushSpy).not.toHaveBeenCalled();
-    });
-
-    it("should handle flush errors gracefully", async () => {
-      const flushSpy = vi
-        .spyOn(client, "flush")
-        .mockRejectedValue(new Error("Flush error"));
-
-      await client.init();
-
-      const visibilityHandler = vi
-        .mocked(window.addEventListener)
-        .mock.calls.find(
-          call => call[0] === "visibilitychange",
-        )?.[1] as () => void;
-
-      Object.defineProperty(document, "visibilityState", {
-        value: "hidden",
-        writable: true,
-      });
-
-      expect(() => visibilityHandler()).not.toThrow();
-      expect(flushSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("dispose", () => {
-    it("should remove event listeners and call super dispose", async () => {
-      await client.init();
-
-      const superDisposeSpy = vi.spyOn(
-        Object.getPrototypeOf(Object.getPrototypeOf(client)),
-        "dispose",
-      );
-
-      client.dispose();
-
-      expect(window.removeEventListener).toHaveBeenCalledWith(
-        "visibilitychange",
-        expect.any(Function),
-      );
-      expect(window.removeEventListener).toHaveBeenCalledWith(
-        "pagehide",
-        expect.any(Function),
-      );
-      expect(superDisposeSpy).toHaveBeenCalled();
-    });
-
-    it("should handle missing window object", () => {
-      const originalWindow = global.window;
-
-      delete (global as { window?: Window }).window;
-
-      expect(() => client.dispose()).not.toThrow();
-
-      global.window = originalWindow;
-    });
-
-    it("should handle missing handlers", () => {
-      expect(() => client.dispose()).not.toThrow();
-    });
-  });
-
   describe("type safety", () => {
     it("should support typed context", async () => {
       interface AppContext extends Record<string, unknown> {
@@ -293,7 +168,7 @@ describe("RippleClient", () => {
       await client.init();
       await client.init();
 
-      expect(window.addEventListener).toHaveBeenCalledTimes(4);
+      expect(mockStorageAdapter.load).toHaveBeenCalledTimes(2);
     });
 
     it("should handle dispose before init", () => {
@@ -306,7 +181,7 @@ describe("RippleClient", () => {
       client.dispose();
       client.dispose();
 
-      expect(window.removeEventListener).toHaveBeenCalledTimes(4);
+      expect(mockStorageAdapter.load).toHaveBeenCalled();
     });
   });
 
