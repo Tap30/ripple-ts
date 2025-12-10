@@ -109,7 +109,10 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
         this._queue.fromArray([...events, ...currentQueue]);
         await this._storageAdapter.save(this._queue.toArray());
       }
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[Ripple-SDK][ERR]:", { err });
+
       if (attempt < this._config.maxRetries) {
         await delay(calculateBackoff(attempt));
         await this._sendWithRetry(events, attempt + 1);

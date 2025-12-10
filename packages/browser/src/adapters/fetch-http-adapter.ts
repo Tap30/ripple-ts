@@ -31,7 +31,7 @@ export class FetchHttpAdapter implements HttpAdapter {
     return {
       ok: response.ok,
       status: response.status,
-      data: await response.json().catch(() => undefined),
+      data: await response.json(),
     };
   }
 }
