@@ -4,10 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:server": "tsx ./server.ts",
+    "dev:server": "tsx --watch ./server.ts",
     "dev:browser": "vite",
-    "dev:node": "tsx ./node/index.ts",
-    "dev": "run-s dev:server dev:node dev:browser"
+    "dev:node": "tsx ./node/index.ts"
   },
   "devDependencies": {
     "vite": "^7.2.6"
