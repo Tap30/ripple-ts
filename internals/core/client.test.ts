@@ -101,7 +101,7 @@ describe("Client", () => {
             httpAdapter: createMockHttpAdapter(),
             storageAdapter: createMockStorageAdapter(),
           },
-        } as any);
+        } as ClientConfig);
       }).toThrow("`apiKey` must be provided in `config`.");
     });
 
@@ -113,7 +113,7 @@ describe("Client", () => {
             httpAdapter: createMockHttpAdapter(),
             storageAdapter: createMockStorageAdapter(),
           },
-        } as any);
+        } as ClientConfig);
       }).toThrow("`endpoint` must be provided in `config`.");
     });
   });
