@@ -21,7 +21,12 @@ export class SessionManager {
    * @returns A unique session identifier
    */
   private _generateSessionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join(
+      "",
+    );
+
+    return `${Date.now()}-${hex}`;
   }
 
   /**
