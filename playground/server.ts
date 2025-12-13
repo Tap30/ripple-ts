@@ -6,16 +6,25 @@ import { createServer } from "node:http";
 const PORT = 3000;
 
 const server = createServer((req, res) => {
-  const origin = req.headers.origin || "http://localhost:5173";
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    // Add other trusted origins as needed:
+    // "https://your-production-domain.com",
+  ];
+  const requestOrigin = req.headers.origin;
 
-  res.setHeader("Access-Control-Allow-Origin", origin);
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  // If there's no origin or it's untrusted, don't set Allow-Origin or Allow-Credentials.
+
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, X-API-Key, X-Ripple-API",
   );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
