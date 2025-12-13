@@ -1,6 +1,6 @@
-export { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
-export { FileStorageAdapter } from "./adapters/file-storage-adapter.ts";
-export { RippleClient, type RippleClientAdapters } from "./ripple-client.ts";
+export * from "./adapters/fetch-http-adapter.ts";
+export * from "./adapters/file-storage-adapter.ts";
+export * from "./ripple-client.ts";
 
 export type {
   ClientConfig,

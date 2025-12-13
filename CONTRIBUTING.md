@@ -151,12 +151,6 @@ pnpm test:unit:workspace   # Test workspace packages only
 pnpm test:unit:internals   # Test internals only
 ```
 
-Run integration tests:
-
-```sh
-pnpm test:integration      # Run all integration tests
-```
-
 ### Linting and Formatting
 
 Check code quality:
