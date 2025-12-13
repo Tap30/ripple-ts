@@ -1,10 +1,6 @@
-import type {
-  ClientConfig,
-  HttpAdapter,
-  StorageAdapter,
-} from "@internals/core";
+import type { HttpAdapter, StorageAdapter } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RippleClient } from "./ripple-client.ts";
+import { RippleClient, type NodeClientConfig } from "./ripple-client.ts";
 
 const mockHttpAdapter: HttpAdapter = {
   send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
@@ -16,7 +12,7 @@ const mockStorageAdapter: StorageAdapter = {
   clear: vi.fn().mockResolvedValue(undefined),
 };
 
-const mockConfig: ClientConfig = {
+const mockConfig: NodeClientConfig = {
   apiKey: "test-key",
   endpoint: "https://api.test.com/events",
 };
@@ -27,9 +23,12 @@ describe("RippleClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    client = new RippleClient(mockConfig, {
-      httpAdapter: mockHttpAdapter,
-      storageAdapter: mockStorageAdapter,
+    client = new RippleClient({
+      ...mockConfig,
+      adapters: {
+        httpAdapter: mockHttpAdapter,
+        storageAdapter: mockStorageAdapter,
+      },
     });
   });
 
@@ -45,8 +44,11 @@ describe("RippleClient", () => {
     });
 
     it("should create instance with partial adapters", () => {
-      const partialClient = new RippleClient(mockConfig, {
-        httpAdapter: mockHttpAdapter,
+      const partialClient = new RippleClient({
+        ...mockConfig,
+        adapters: {
+          httpAdapter: mockHttpAdapter,
+        },
       });
 
       expect(partialClient).toBeInstanceOf(RippleClient);
@@ -104,9 +106,12 @@ describe("RippleClient", () => {
         appVersion: string;
       }
 
-      const typedClient = new RippleClient<AppContext>(mockConfig, {
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
+      const typedClient = new RippleClient<AppContext>({
+        ...mockConfig,
+        adapters: {
+          httpAdapter: mockHttpAdapter,
+          storageAdapter: mockStorageAdapter,
+        },
       });
 
       await typedClient.init();

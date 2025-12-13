@@ -4,19 +4,17 @@ import {
   RippleClient,
 } from "@tapsioss/ripple-browser";
 
-const client = new RippleClient(
-  {
-    endpoint: "http://localhost:3000/events",
-    apiKey: "test-api-key",
-    maxBatchSize: 5,
-    maxRetries: 3,
-    flushInterval: 5000,
-  },
-  {
+const client = new RippleClient({
+  endpoint: "http://localhost:3000/events",
+  apiKey: "test-api-key",
+  maxBatchSize: 5,
+  maxRetries: 3,
+  flushInterval: 5000,
+  adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new IndexedDBAdapter(),
   },
-);
+});
 
 await client.init();
 

@@ -1,3 +1,6 @@
+import type { HttpAdapter } from "./adapters/http-adapter.ts";
+import type { StorageAdapter } from "./adapters/storage-adapter.ts";
+
 /**
  * Event payload containing arbitrary key-value pairs.
  */
@@ -146,6 +149,19 @@ export type ClientConfig = {
    * Maximum retry attempts for failed requests (default: 3)
    */
   maxRetries?: number;
+  /**
+   * Custom adapters for HTTP and storage
+   */
+  adapters: {
+    /**
+     * HTTP adapter for sending events
+     */
+    httpAdapter: HttpAdapter;
+    /**
+     * Storage adapter for persisting events
+     */
+    storageAdapter: StorageAdapter;
+  };
 };
 
 /**

@@ -174,19 +174,20 @@ import {
 } from "@tapsioss/ripple-browser";
 
 // Use IndexedDB for large event queues
-const client = new RippleClient(
-  {
-    apiKey: "your-api-key",
-    endpoint: "https://api.example.com/events",
-  },
-  {
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  adapters: {
     storageAdapter: new IndexedDBAdapter(),
   },
-);
+});
 
 // Or use sessionStorage for temporary tracking
-const sessionClient = new RippleClient(config, {
-  storageAdapter: new SessionStorageAdapter(),
+const sessionClient = new RippleClient({
+  ...config,
+  adapters: {
+    storageAdapter: new SessionStorageAdapter(),
+  },
 });
 ```
 
@@ -216,8 +217,11 @@ class AxiosHttpAdapter implements HttpAdapter {
   }
 }
 
-const client = new RippleClient(config, {
-  httpAdapter: new AxiosHttpAdapter(),
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    httpAdapter: new AxiosHttpAdapter(),
+  },
 });
 ```
 
@@ -297,24 +301,35 @@ application without worrying about race conditions.
 
 ## Configuration
 
-```ts
-interface ClientConfig {
+The RippleClient uses `BrowserClientConfig` for configuration:
+
+```typescript
+type BrowserClientConfig = {
   apiKey: string; // Required: API authentication key
   endpoint: string; // Required: API endpoint URL
   apiKeyHeader?: string; // Optional: Header name for API key (default: "X-API-Key")
   flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)
-}
+  adapters?: {
+    // Optional: Custom adapters (defaults provided)
+    httpAdapter?: HttpAdapter; // Optional: Custom HTTP adapter
+    storageAdapter?: StorageAdapter; // Optional: Custom storage adapter
+  };
+};
 ```
 
 ## API Reference
 
 ### `RippleClient`
 
-#### `constructor(config: ClientConfig, adapters?: RippleClientAdapters)`
+#### `constructor(config: BrowserClientConfig)`
 
 Creates a new RippleClient instance.
+
+**Parameters:**
+
+- `config: BrowserClientConfig` - Client configuration with optional adapters
 
 #### `async init(): Promise<void>`
 

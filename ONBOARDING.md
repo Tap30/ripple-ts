@@ -571,8 +571,11 @@ client.setContext("sessionId", "abc");
 import { RippleClient, IndexedDBAdapter } from "@tapsioss/ripple-browser";
 
 // Use IndexedDB for large event queues
-const client = new RippleClient(config, {
-  storageAdapter: new IndexedDBAdapter(),
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    storageAdapter: new IndexedDBAdapter(),
+  },
 });
 ```
 
@@ -602,8 +605,11 @@ class AxiosHttpAdapter implements HttpAdapter {
 }
 
 // Usage
-const client = new RippleClient(config, {
-  httpAdapter: new AxiosHttpAdapter(),
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    httpAdapter: new AxiosHttpAdapter(),
+  },
 });
 ```
 
@@ -628,17 +634,23 @@ class RedisStorageAdapter implements StorageAdapter {
 }
 
 // Usage
-const client = new RippleClient(config, {
-  storageAdapter: new RedisStorageAdapter(),
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    storageAdapter: new RedisStorageAdapter(),
+  },
 });
 ```
 
 #### Using Multiple Custom Adapters
 
 ```typescript
-const client = new RippleClient(config, {
-  httpAdapter: new AxiosHttpAdapter(),
-  storageAdapter: new RedisStorageAdapter(),
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    httpAdapter: new AxiosHttpAdapter(),
+    storageAdapter: new RedisStorageAdapter(),
+  },
 });
 ```
 
@@ -865,19 +877,3 @@ Ripple repository. See:
 - `eslint.config.js` - ESLint configuration
 - `pnpm-workspace.yaml` - Workspace definition
 - `.changeset/config.json` - Changesets configuration
-
-## Future Considerations
-
-### Potential Enhancements
-
-- Middleware/plugin system
-- Optional Event validation and schema enforcement (via `zod`)
-- Performance monitoring and metrics
-- Debug mode with detailed logging
-
-### Scalability
-
-- Queue management for high-volume events
-- Configurable flush intervals
-- Memory-efficient event buffering
-- Graceful degradation on errors

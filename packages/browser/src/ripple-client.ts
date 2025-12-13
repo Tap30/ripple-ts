@@ -1,32 +1,21 @@
-import {
-  Client,
-  type ClientConfig,
-  type HttpAdapter,
-  type Platform,
-  type StorageAdapter,
-} from "@internals/core";
+import { Client, type ClientConfig, type Platform } from "@internals/core";
 import { UAParser } from "ua-parser-js";
 import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
-import { LocalStorageAdapter } from "./adapters/local-storage-adapter.ts";
+import { IndexedDBAdapter } from "./adapters/indexed-db-adapter.ts";
 import { SessionManager } from "./session-manager.ts";
 
 /**
- * Optional adapters for customizing RippleClient behavior.
+ * Browser-specific client configuration with optional adapters
  */
-export type RippleClientAdapters = {
-  /**
-   * Custom HTTP adapter (default: FetchHttpAdapter)
-   */
-  httpAdapter?: HttpAdapter;
-  /**
-   * Custom storage adapter (default: LocalStorageAdapter)
-   */
-  storageAdapter?: StorageAdapter;
+export type BrowserClientConfig = Omit<ClientConfig, "adapters"> & {
+  adapters?: {
+    httpAdapter?: ClientConfig["adapters"]["httpAdapter"];
+    storageAdapter?: ClientConfig["adapters"]["storageAdapter"];
+  };
 };
 
 /**
  * Ripple SDK client for browser environments.
- * Supports custom HTTP and storage adapters for flexibility.
  * Automatically tracks user sessions tied to browser session lifecycle.
  *
  * @template TContext The type definition for global context
@@ -39,15 +28,19 @@ export class RippleClient<
   /**
    * Create a new RippleClient instance.
    *
-   * @param config Client configuration
-   * @param adapters Optional custom adapters
+   * @param config Client configuration including optional adapters
    */
-  constructor(config: ClientConfig, adapters?: RippleClientAdapters) {
-    super(
-      config,
-      adapters?.httpAdapter ?? new FetchHttpAdapter(),
-      adapters?.storageAdapter ?? new LocalStorageAdapter(),
-    );
+  constructor(config: BrowserClientConfig) {
+    const finalConfig: ClientConfig = {
+      ...config,
+      adapters: {
+        httpAdapter: config.adapters?.httpAdapter ?? new FetchHttpAdapter(),
+        storageAdapter:
+          config.adapters?.storageAdapter ?? new IndexedDBAdapter(),
+      },
+    };
+
+    super(finalConfig);
 
     this._sessionManager = new SessionManager();
   }

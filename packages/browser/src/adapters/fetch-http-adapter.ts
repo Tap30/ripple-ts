@@ -28,10 +28,19 @@ export class FetchHttpAdapter implements HttpAdapter {
       keepalive: true,
     });
 
+    let data: unknown;
+
+    try {
+      data = (await response.json()) as unknown;
+    } catch {
+      // Ignore JSON parsing errors
+      data = undefined;
+    }
+
     return {
       ok: response.ok,
       status: response.status,
-      data: await response.json(),
+      data,
     };
   }
 }

@@ -1,5 +1,3 @@
-import type { HttpAdapter } from "./adapters/http-adapter.ts";
-import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { ContextManager } from "./context-manager.ts";
 import { Dispatcher } from "./dispatcher.ts";
 import type {
@@ -22,21 +20,30 @@ export abstract class Client<
 > {
   protected readonly _contextManager: ContextManager<TContext>;
   protected readonly _dispatcher: Dispatcher<TContext>;
+
   protected _sessionId: string | null = null;
   private _initialized = false;
 
   /**
    * Create a new Client instance.
    *
-   * @param config Client configuration
-   * @param httpAdapter HTTP adapter for sending events
-   * @param storageAdapter Storage adapter for persisting events
+   * @param config Client configuration including adapters
    */
-  constructor(
-    config: ClientConfig,
-    httpAdapter: HttpAdapter,
-    storageAdapter: StorageAdapter,
-  ) {
+  constructor(config: ClientConfig) {
+    if (!config.adapters?.httpAdapter || !config.adapters?.storageAdapter) {
+      throw new Error(
+        "Both `httpAdapter` and `storageAdapter` must be provided in `config.adapters`.",
+      );
+    }
+
+    if (!config.apiKey) {
+      throw new Error("`apiKey` must be provided in `config`.");
+    }
+
+    if (!config.endpoint) {
+      throw new Error("`endpoint` must be provided in `config`.");
+    }
+
     this._contextManager = new ContextManager<TContext>();
 
     const dispatcherConfig: DispatcherConfig = {
@@ -50,8 +57,8 @@ export abstract class Client<
 
     this._dispatcher = new Dispatcher<TContext>(
       dispatcherConfig,
-      httpAdapter,
-      storageAdapter,
+      config.adapters.httpAdapter,
+      config.adapters.storageAdapter,
     );
   }
 

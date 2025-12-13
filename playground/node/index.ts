@@ -19,19 +19,17 @@ const separator = (): void => {
 log("Starting Node.js Playground...");
 separator();
 
-const client = new RippleClient(
-  {
-    endpoint: "http://localhost:3000/events",
-    apiKey: "test-api-key",
-    maxBatchSize: 5,
-    maxRetries: 3,
-    flushInterval: 5000,
-  },
-  {
+const client = new RippleClient({
+  endpoint: "http://localhost:3000/events",
+  apiKey: "test-api-key",
+  maxBatchSize: 5,
+  maxRetries: 3,
+  flushInterval: 5000,
+  adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter(".ripple_events.json"),
   },
-);
+});
 
 await client.init();
 log("✓ Client initialized with FileStorage");
@@ -46,15 +44,13 @@ type AppContext = {
   serverVersion: string;
 };
 
-const typedClient = new RippleClient<AppContext>(
-  {
-    endpoint: "http://localhost:3000/events",
-    apiKey: "test-api-key",
-  },
-  {
+const typedClient = new RippleClient<AppContext>({
+  endpoint: "http://localhost:3000/events",
+  apiKey: "test-api-key",
+  adapters: {
     storageAdapter: new FileStorageAdapter(".ripple_typed_events.json"),
   },
-);
+});
 
 await typedClient.init();
 typedClient.setContext("userId", "user-123");
@@ -137,15 +133,13 @@ log("✓ Manually flushed events");
 separator();
 log("Test Case 8: Custom File Path");
 
-const customPathClient = new RippleClient(
-  {
-    endpoint: "http://localhost:3000/events",
-    apiKey: "test-api-key",
-  },
-  {
+const customPathClient = new RippleClient({
+  endpoint: "http://localhost:3000/events",
+  apiKey: "test-api-key",
+  adapters: {
     storageAdapter: new FileStorageAdapter("./custom_events.json"),
   },
-);
+});
 
 await customPathClient.init();
 await customPathClient.track("custom_path_test", { path: "custom" });

@@ -1,30 +1,19 @@
-import {
-  Client,
-  type ClientConfig,
-  type HttpAdapter,
-  type Platform,
-  type StorageAdapter,
-} from "@internals/core";
+import { Client, type ClientConfig, type Platform } from "@internals/core";
 import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
 import { FileStorageAdapter } from "./adapters/file-storage-adapter.ts";
 
 /**
- * Optional adapters for customizing RippleClient behavior.
+ * Node.js-specific client configuration with optional adapters
  */
-export type RippleClientAdapters = {
-  /**
-   * Custom HTTP adapter (default: FetchHttpAdapter)
-   */
-  httpAdapter?: HttpAdapter;
-  /**
-   * Custom storage adapter (default: FileStorageAdapter)
-   */
-  storageAdapter?: StorageAdapter;
+export type NodeClientConfig = Omit<ClientConfig, "adapters"> & {
+  adapters?: {
+    httpAdapter?: ClientConfig["adapters"]["httpAdapter"];
+    storageAdapter?: ClientConfig["adapters"]["storageAdapter"];
+  };
 };
 
 /**
  * Ripple SDK client for Node.js environments.
- * Supports custom HTTP and storage adapters for flexibility.
  *
  * @template TContext The type definition for global context
  */
@@ -34,15 +23,19 @@ export class RippleClient<
   /**
    * Create a new RippleClient instance.
    *
-   * @param config Client configuration
-   * @param adapters Optional custom adapters
+   * @param config Client configuration including optional adapters
    */
-  constructor(config: ClientConfig, adapters?: RippleClientAdapters) {
-    super(
-      config,
-      adapters?.httpAdapter ?? new FetchHttpAdapter(),
-      adapters?.storageAdapter ?? new FileStorageAdapter(),
-    );
+  constructor(config: NodeClientConfig) {
+    const finalConfig: ClientConfig = {
+      ...config,
+      adapters: {
+        httpAdapter: config.adapters?.httpAdapter ?? new FetchHttpAdapter(),
+        storageAdapter:
+          config.adapters?.storageAdapter ?? new FileStorageAdapter(),
+      },
+    };
+
+    super(finalConfig);
   }
 
   /**
