@@ -62,7 +62,6 @@ environments (Browser and Node.js).
 - **Full TypeScript Support**: Strict typing with generics
 - **JSDoc Documentation**: Comprehensive inline documentation
 - **ESLint Compliant**: Follows strict linting rules
-- **Dual Module Format**: ESM and CommonJS support
 - **Tree-Shakeable**: Optimized bundle size
 - **Zero Dependencies**: Core has no external dependencies
 - **Clear Error Messages**: Descriptive error handling
@@ -120,7 +119,7 @@ ripple-ts/
 
 - **Purpose**: Event tracking SDK for Node.js runtime
 - **Entry**: `packages/node/src/index.ts`
-- **Build**: Dual format (ESM + CJS) with TypeScript declarations
+- **Build**: ESM-only with TypeScript declarations
 - **Environment**: Node.js
 - **Exports**:
   - `RippleClient` - Main client class

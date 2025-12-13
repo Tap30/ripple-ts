@@ -76,7 +76,6 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 - **Full TypeScript Support**: Strict typing with generics
 - **JSDoc Documentation**: Comprehensive inline documentation
 - **ESLint Compliant**: Follows strict linting rules
-- **Dual Module Format**: ESM and CommonJS support
 - **Tree-Shakeable**: Optimized bundle size
 - **Zero Dependencies**: Core has no external dependencies
 - **Clear Error Messages**: Descriptive error handling
