@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 
 # Wireit
 .wireit
+
+# Misc
+.ripple_events.json
