@@ -42,6 +42,10 @@ const mockStorageAdapter: StorageAdapter = {
 const mockConfig: BrowserClientConfig = {
   apiKey: "test-key",
   endpoint: "https://api.test.com/events",
+  adapters: {
+    httpAdapter: mockHttpAdapter,
+    storageAdapter: mockStorageAdapter,
+  },
 };
 
 describe("RippleClient", () => {
@@ -77,21 +81,9 @@ describe("RippleClient", () => {
       configurable: true,
     });
 
-    client = new RippleClient<TestMetadata>({
-      ...mockConfig,
-      adapters: {
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      },
-    });
+    client = new RippleClient<TestMetadata>(mockConfig);
 
-    clientWithDefaults = new RippleClient({
-      ...mockConfig,
-      adapters: {
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      },
-    });
+    clientWithDefaults = new RippleClient(mockConfig);
   });
 
   describe("constructor", () => {
@@ -99,21 +91,33 @@ describe("RippleClient", () => {
       expect(client).toBeInstanceOf(RippleClient);
     });
 
-    it("should create instance with default adapters", () => {
+    it("should create instance with required adapters", () => {
       const defaultClient = new RippleClient(mockConfig);
 
       expect(defaultClient).toBeInstanceOf(RippleClient);
     });
 
-    it("should create instance with partial adapters", () => {
-      const partialClient = new RippleClient({
+    it("should pass custom sessionStoreKey to SessionManager", async () => {
+      const { SessionManager } = vi.mocked(
+        await import("./session-manager.ts"),
+      );
+
+      new RippleClient({
         ...mockConfig,
-        adapters: {
-          httpAdapter: mockHttpAdapter,
-        },
+        sessionStoreKey: "custom_session_key",
       });
 
-      expect(partialClient).toBeInstanceOf(RippleClient);
+      expect(SessionManager).toHaveBeenCalledWith("custom_session_key");
+    });
+
+    it("should use default sessionStoreKey when not provided", async () => {
+      const { SessionManager } = vi.mocked(
+        await import("./session-manager.ts"),
+      );
+
+      new RippleClient(mockConfig);
+
+      expect(SessionManager).toHaveBeenCalledWith(undefined);
     });
   });
 

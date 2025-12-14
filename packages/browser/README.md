@@ -53,11 +53,19 @@ it alongside the SDK.
 ## Quick Start
 
 ```ts
-import { RippleClient } from "@tapsioss/ripple-browser";
+import {
+  RippleClient,
+  FetchHttpAdapter,
+  IndexedDBAdapter,
+} from "@tapsioss/ripple-browser";
 
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
+  adapters: {
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new IndexedDBAdapter(),
+  },
 });
 
 await client.init();
@@ -69,7 +77,11 @@ await client.track("page_view", { page: "/home" });
 ### Basic Tracking
 
 ```ts
-import { RippleClient } from "@tapsioss/ripple-browser";
+import {
+  RippleClient,
+  FetchHttpAdapter,
+  IndexedDBAdapter,
+} from "@tapsioss/ripple-browser";
 
 const client = new RippleClient({
   apiKey: "your-api-key",
@@ -77,6 +89,11 @@ const client = new RippleClient({
   flushInterval: 5000, // Auto-flush every 5 seconds
   maxBatchSize: 10, // Auto-flush after 10 events
   maxRetries: 3, // Retry failed requests 3 times
+  sessionStoreKey: "my_app_session", // Custom session storage key
+  adapters: {
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new IndexedDBAdapter(),
+  },
 });
 
 // Initialize and restore persisted events
@@ -112,6 +129,10 @@ interface Metadata extends Record<string, unknown> {
 const client = new RippleClient<Metadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
+  adapters: {
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new IndexedDBAdapter(),
+  },
 });
 
 // Type-safe metadata with autocomplete
@@ -209,6 +230,43 @@ const sessionClient = new RippleClient({
 });
 ```
 
+### Multiple Client Instances
+
+When using multiple Ripple instances in the same application, configure unique
+storage keys to prevent conflicts:
+
+```ts
+import {
+  RippleClient,
+  IndexedDBAdapter,
+  LocalStorageAdapter,
+} from "@tapsioss/ripple-browser";
+
+// Analytics client
+const analyticsClient = new RippleClient({
+  apiKey: "analytics-key",
+  endpoint: "https://analytics.example.com/events",
+  sessionStoreKey: "analytics_session",
+  adapters: {
+    storageAdapter: new IndexedDBAdapter("analytics_db", "events", "queue"),
+  },
+});
+
+// Marketing client
+const marketingClient = new RippleClient({
+  apiKey: "marketing-key",
+  endpoint: "https://marketing.example.com/events",
+  sessionStoreKey: "marketing_session",
+  adapters: {
+    storageAdapter: new LocalStorageAdapter("marketing_events"),
+  },
+});
+
+// Both clients can operate independently without conflicts
+await analyticsClient.init();
+await marketingClient.init();
+```
+
 ### Custom HTTP Adapter
 
 ```ts
@@ -247,7 +305,7 @@ const client = new RippleClient({
 
 | Adapter                   | Capacity   | Persistence  | Performance | Use Case                   |
 | ------------------------- | ---------- | ------------ | ----------- | -------------------------- |
-| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | Default choice             |
+| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | Small event queues         |
 | **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | Temporary tracking         |
 | **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | Large event queues         |
 | **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Small queues, cross-domain |
@@ -317,6 +375,73 @@ The SDK is designed to handle concurrent operations safely:
 You can safely call `track()` and `flush()` from multiple parts of your
 application without worrying about race conditions.
 
+## Multi-Instance Considerations
+
+When running multiple Ripple client instances in the same application, consider
+these important factors to avoid conflicts and ensure proper operation:
+
+### Storage Isolation
+
+Each client instance should use separate storage to prevent data conflicts:
+
+```ts
+// ❌ Bad: Both instances will conflict
+const client1 = new RippleClient({ apiKey: "key1", endpoint: "url1" });
+const client2 = new RippleClient({ apiKey: "key2", endpoint: "url2" });
+
+// ✅ Good: Isolated storage
+const client1 = new RippleClient({
+  apiKey: "key1",
+  endpoint: "url1",
+  sessionStoreKey: "app1_session",
+  adapters: {
+    storageAdapter: new IndexedDBAdapter("app1_db", "events", "queue"),
+  },
+});
+
+const client2 = new RippleClient({
+  apiKey: "key2",
+  endpoint: "url2",
+  sessionStoreKey: "app2_session",
+  adapters: {
+    storageAdapter: new LocalStorageAdapter("app2_events"),
+  },
+});
+```
+
+### Resource Management
+
+- Each instance has its own flush timer and queue
+- Always call `dispose()` when instances are no longer needed
+- Consider memory usage with many concurrent instances
+
+```ts
+// Proper cleanup
+const cleanup = () => {
+  client1.dispose();
+  client2.dispose();
+};
+
+// In React/SPA
+useEffect(() => cleanup, []);
+```
+
+### Session Management
+
+Configure unique session storage keys to maintain separate user sessions:
+
+```ts
+const userClient = new RippleClient({
+  sessionStoreKey: "user_analytics_session",
+  // ...
+});
+
+const adminClient = new RippleClient({
+  sessionStoreKey: "admin_analytics_session",
+  // ...
+});
+```
+
 ## Configuration
 
 The RippleClient uses `BrowserClientConfig` for configuration:
@@ -329,10 +454,11 @@ type BrowserClientConfig = {
   flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)
-  adapters?: {
-    // Optional: Custom adapters (defaults provided)
-    httpAdapter?: HttpAdapter; // Optional: Custom HTTP adapter
-    storageAdapter?: StorageAdapter; // Optional: Custom storage adapter
+  sessionStoreKey?: string; // Optional: Custom session storage key (default: "ripple_session_id")
+  adapters: {
+    // Required: Must provide both adapters
+    httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
+    storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
   };
 };
 ```

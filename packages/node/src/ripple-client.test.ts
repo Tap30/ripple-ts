@@ -20,6 +20,10 @@ const mockStorageAdapter: StorageAdapter = {
 const mockConfig: NodeClientConfig = {
   apiKey: "test-key",
   endpoint: "https://api.test.com/events",
+  adapters: {
+    httpAdapter: mockHttpAdapter,
+    storageAdapter: mockStorageAdapter,
+  },
 };
 
 describe("RippleClient", () => {
@@ -29,21 +33,9 @@ describe("RippleClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    client = new RippleClient<TestMetadata>({
-      ...mockConfig,
-      adapters: {
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      },
-    });
+    client = new RippleClient<TestMetadata>(mockConfig);
 
-    clientWithDefaults = new RippleClient({
-      ...mockConfig,
-      adapters: {
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      },
-    });
+    clientWithDefaults = new RippleClient(mockConfig);
   });
 
   describe("constructor", () => {
@@ -51,21 +43,10 @@ describe("RippleClient", () => {
       expect(client).toBeInstanceOf(RippleClient);
     });
 
-    it("should create instance with default adapters", () => {
+    it("should create instance with required adapters", () => {
       const defaultClient = new RippleClient(mockConfig);
 
       expect(defaultClient).toBeInstanceOf(RippleClient);
-    });
-
-    it("should create instance with partial adapters", () => {
-      const partialClient = new RippleClient({
-        ...mockConfig,
-        adapters: {
-          httpAdapter: mockHttpAdapter,
-        },
-      });
-
-      expect(partialClient).toBeInstanceOf(RippleClient);
     });
   });
 

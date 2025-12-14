@@ -10,6 +10,7 @@ const client = new RippleClient({
   maxBatchSize: 5,
   maxRetries: 3,
   flushInterval: 5000,
+  sessionStoreKey: "my_app_session", // Custom session storage key
   adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new IndexedDBAdapter(),
@@ -261,6 +262,10 @@ const testRetryBtn = createButton({
         endpoint: "http://localhost:9999/invalid",
         apiKey: "test-key",
         maxRetries: 2,
+        adapters: {
+          httpAdapter: new FetchHttpAdapter(),
+          storageAdapter: new IndexedDBAdapter(),
+        },
       });
 
       await errorClient.init();

@@ -48,6 +48,7 @@ const typedClient = new RippleClient<AppMetadata>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   adapters: {
+    httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter(".ripple_typed_events.json"),
   },
 });
@@ -161,6 +162,7 @@ const customPathClient = new RippleClient({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   adapters: {
+    httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter("./custom_events.json"),
   },
 });
@@ -177,6 +179,10 @@ const errorClient = new RippleClient({
   endpoint: "http://localhost:9999/invalid",
   apiKey: "test-api-key",
   maxRetries: 2,
+  adapters: {
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new FileStorageAdapter(),
+  },
 });
 
 await errorClient.init();

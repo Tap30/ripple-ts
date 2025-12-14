@@ -1,26 +1,15 @@
 import { Client, type ClientConfig, type Platform } from "@internals/core";
 import { UAParser } from "ua-parser-js";
-import { FetchHttpAdapter } from "./adapters/fetch-http-adapter.ts";
-import { IndexedDBAdapter } from "./adapters/indexed-db-adapter.ts";
 import { SessionManager } from "./session-manager.ts";
 
 /**
- * Browser-specific client configuration with optional adapters
+ * Browser-specific client configuration
  */
-export type BrowserClientConfig = Omit<ClientConfig, "adapters"> & {
+export type BrowserClientConfig = ClientConfig & {
   /**
-   * Custom adapters for HTTP and storage
+   * Custom session storage key (default: "ripple_session_id")
    */
-  adapters?: {
-    /**
-     * HTTP adapter for sending events
-     */
-    httpAdapter?: ClientConfig["adapters"]["httpAdapter"];
-    /**
-     * Storage adapter for persisting events
-     */
-    storageAdapter?: ClientConfig["adapters"]["storageAdapter"];
-  };
+  sessionStoreKey?: string;
 };
 
 /**
@@ -37,21 +26,17 @@ export class RippleClient<
   /**
    * Create a new RippleClient instance.
    *
-   * @param config Client configuration including optional adapters
+   * @param config Client configuration including required adapters
    */
   constructor(config: BrowserClientConfig) {
     const finalConfig: ClientConfig = {
       ...config,
-      adapters: {
-        httpAdapter: config.adapters?.httpAdapter ?? new FetchHttpAdapter(),
-        storageAdapter:
-          config.adapters?.storageAdapter ?? new IndexedDBAdapter(),
-      },
+      adapters: config.adapters,
     };
 
     super(finalConfig);
 
-    this._sessionManager = new SessionManager();
+    this._sessionManager = new SessionManager(config.sessionStoreKey);
   }
 
   /**

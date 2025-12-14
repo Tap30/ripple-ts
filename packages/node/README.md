@@ -48,11 +48,19 @@ yarn add @tapsioss/ripple-node
 ## Quick Start
 
 ```ts
-import { RippleClient } from "@tapsioss/ripple-node";
+import {
+  RippleClient,
+  FetchHttpAdapter,
+  FileStorageAdapter,
+} from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
+  adapters: {
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new FileStorageAdapter(),
+  },
 });
 
 await client.init();
@@ -196,13 +204,53 @@ class RedisStorageAdapter implements StorageAdapter {
 }
 
 const client = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
+  ...config,
   adapters: {
     storageAdapter: new RedisStorageAdapter(),
   },
 });
 ```
+
+### Multiple Client Instances
+
+When using multiple Ripple instances in the same Node.js application, configure
+unique storage paths to prevent conflicts:
+
+```typescript
+import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
+
+// Analytics service
+const analyticsClient = new RippleClient({
+  apiKey: "analytics-key",
+  endpoint: "https://analytics.example.com/events",
+  adapters: {
+    storageAdapter: new FileStorageAdapter("./analytics_events.json"),
+  },
+});
+
+// Marketing service
+const marketingClient = new RippleClient({
+  apiKey: "marketing-key",
+  endpoint: "https://marketing.example.com/events",
+  adapters: {
+    storageAdapter: new FileStorageAdapter("./marketing_events.json"),
+  },
+});
+
+// Both clients can operate independently without conflicts
+await analyticsClient.init();
+await marketingClient.init();
+```
+
+}
+
+public async clear(): Promise<void> { await redis.del("ripple:events"); } }
+
+const client = new RippleClient({ apiKey: "your-api-key", endpoint:
+"<https://api.example.com/events>", adapters: { storageAdapter: new
+RedisStorageAdapter(), }, });
+
+````
 
 ### Custom HTTP Adapter
 
@@ -236,7 +284,7 @@ const client = new RippleClient({
     httpAdapter: new GrpcHttpAdapter(),
   },
 });
-```
+````
 
 ### Graceful Shutdown
 
@@ -273,6 +321,75 @@ The SDK is designed to handle concurrent operations safely:
 You can safely call `track()` and `flush()` from multiple parts of your
 application without worrying about race conditions.
 
+## Multi-Instance Considerations
+
+When running multiple Ripple client instances in the same Node.js application,
+consider these important factors to avoid conflicts and ensure proper operation:
+
+### Storage Isolation
+
+Each client instance should use separate file paths to prevent data conflicts:
+
+```ts
+// ❌ Bad: Both instances will conflict (same default file)
+const client1 = new RippleClient({ apiKey: "key1", endpoint: "url1" });
+const client2 = new RippleClient({ apiKey: "key2", endpoint: "url2" });
+
+// ✅ Good: Isolated storage paths
+const client1 = new RippleClient({
+  apiKey: "key1",
+  endpoint: "url1",
+  adapters: {
+    storageAdapter: new FileStorageAdapter("./service1_events.json"),
+  },
+});
+
+const client2 = new RippleClient({
+  apiKey: "key2",
+  endpoint: "url2",
+  adapters: {
+    storageAdapter: new FileStorageAdapter("./service2_events.json"),
+  },
+});
+```
+
+### Resource Management
+
+- Each instance has its own flush timer and queue
+- Always call `dispose()` when instances are no longer needed
+- Consider memory usage with many concurrent instances
+
+```ts
+// Proper cleanup on process exit
+process.on("SIGTERM", () => {
+  client1.dispose();
+  client2.dispose();
+  process.exit(0);
+});
+```
+
+### Shared vs Separate Adapters
+
+You can share stateless HTTP adapters but should separate storage:
+
+```ts
+const sharedHttpAdapter = new FetchHttpAdapter();
+
+const client1 = new RippleClient({
+  adapters: {
+    httpAdapter: sharedHttpAdapter, // ✅ Safe to share
+    storageAdapter: new FileStorageAdapter("./client1.json"), // ✅ Separate storage
+  },
+});
+
+const client2 = new RippleClient({
+  adapters: {
+    httpAdapter: sharedHttpAdapter, // ✅ Safe to share
+    storageAdapter: new FileStorageAdapter("./client2.json"), // ✅ Separate storage
+  },
+});
+```
+
 ## Configuration
 
 The RippleClient uses `NodeClientConfig` for configuration:
@@ -285,10 +402,10 @@ type NodeClientConfig = {
   flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)
-  adapters?: {
-    // Optional: Custom adapters (defaults provided)
-    httpAdapter?: HttpAdapter; // Optional: Custom HTTP adapter
-    storageAdapter?: StorageAdapter; // Optional: Custom storage adapter
+  adapters: {
+    // Required: Must provide both adapters
+    httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
+    storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
   };
 };
 ```
