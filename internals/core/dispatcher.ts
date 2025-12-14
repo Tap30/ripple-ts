@@ -10,10 +10,12 @@ import { calculateBackoff, delay } from "./utils.ts";
  * Automatically flushes events based on batch size or time interval.
  * Implements exponential backoff with jitter for retries.
  *
- * @template TContext The type of context attached to events
+ * @template TMetadata The type of metadata attached to events
  */
-export class Dispatcher<TContext extends Record<string, unknown>> {
-  private _queue = new Queue<Event<TContext>>();
+export class Dispatcher<
+  TMetadata extends Record<string, unknown> = Record<string, unknown>,
+> {
+  private _queue = new Queue<Event<TMetadata>>();
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _flushMutex = new Mutex();
 
@@ -44,7 +46,7 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
    *
    * @param event The event to enqueue
    */
-  public async enqueue(event: Event<TContext>): Promise<void> {
+  public async enqueue(event: Event<TMetadata>): Promise<void> {
     this._queue.enqueue(event);
     await this._storageAdapter.save(this._queue.toArray());
 
@@ -84,7 +86,7 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
    * @param attempt Current retry attempt number
    */
   private async _sendWithRetry(
-    events: Event<TContext>[],
+    events: Event<TMetadata>[],
     attempt: number = 0,
   ): Promise<void> {
     try {
@@ -100,10 +102,42 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
 
       if (response.ok) {
         await this._storageAdapter.clear();
-      } else if (attempt < this._config.maxRetries) {
+      } else if (response.status >= 400 && response.status < 500) {
+        // 4xx: Client error, no retry - immediately re-queue and persist
+
+        // eslint-disable-next-line no-console
+        console.warn("[Ripple-SDK][WARN]:", {
+          message: "4xx client error, not retrying",
+          status: response.status,
+          eventsCount: events.length,
+        });
+        const currentQueue = this._queue.toArray();
+
+        this._queue.fromArray([...events, ...currentQueue]);
+        await this._storageAdapter.save(this._queue.toArray());
+      } else if (response.status >= 500 && attempt < this._config.maxRetries) {
+        // 5xx: Server error, retry with backoff
+
+        // eslint-disable-next-line no-console
+        console.warn("[Ripple-SDK][WARN]:", {
+          message: "5xx server error, retrying",
+          status: response.status,
+          attempt: attempt + 1,
+          maxRetries: this._config.maxRetries,
+        });
         await delay(calculateBackoff(attempt));
         await this._sendWithRetry(events, attempt + 1);
       } else {
+        // 5xx: Max retries reached, re-queue and persist
+
+        // eslint-disable-next-line no-console
+        console.error("[Ripple-SDK][ERR]:", {
+          message: "5xx server error, max retries reached",
+          status: response.status,
+          maxRetries: this._config.maxRetries,
+          eventsCount: events.length,
+        });
+
         const currentQueue = this._queue.toArray();
 
         this._queue.fromArray([...events, ...currentQueue]);
@@ -114,9 +148,25 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
       console.error("[Ripple-SDK][ERR]:", { err });
 
       if (attempt < this._config.maxRetries) {
+        // eslint-disable-next-line no-console
+        console.warn("[Ripple-SDK][WARN]:", {
+          message: "Network error, retrying",
+          attempt: attempt + 1,
+          maxRetries: this._config.maxRetries,
+          error: err instanceof Error ? err.message : String(err),
+        });
+
         await delay(calculateBackoff(attempt));
         await this._sendWithRetry(events, attempt + 1);
       } else {
+        // eslint-disable-next-line no-console
+        console.error("[Ripple-SDK][ERR]:", {
+          message: "Network error, max retries reached",
+          maxRetries: this._config.maxRetries,
+          eventsCount: events.length,
+          error: err instanceof Error ? err.message : String(err),
+        });
+
         const currentQueue = this._queue.toArray();
 
         this._queue.fromArray([...events, ...currentQueue]);
@@ -144,7 +194,7 @@ export class Dispatcher<TContext extends Record<string, unknown>> {
   public async restore(): Promise<void> {
     const stored = await this._storageAdapter.load();
 
-    this._queue.fromArray(stored as Event<TContext>[]);
+    this._queue.fromArray(stored as Event<TMetadata>[]);
 
     if (this._queue.size() > 0) {
       this._scheduleFlush();

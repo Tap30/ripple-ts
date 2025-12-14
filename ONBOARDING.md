@@ -10,10 +10,10 @@ environments (Browser and Node.js).
 
 ### Core Features
 
-- **Type-Safe Context Management**: Generic context types with full TypeScript
-  autocomplete
-- **Event Metadata**: Optional metadata support with schema versioning for
-  events
+- **Type-Safe Metadata Management**: Generic metadata types with full TypeScript
+  support for both shared and event-specific data
+- **Unified Metadata System**: Single metadata field that merges shared metadata
+  (set via client) with event-specific metadata (passed to track method)
 - **Automatic Batching**: Configurable batch size with auto-flush
 - **Scheduled Flushing**: Time-based automatic event dispatch
 - **Retry Logic**: Exponential backoff with jitter (1000ms × 2^attempt + random
@@ -222,7 +222,7 @@ Client (abstract)
 ├── RippleClient (browser)
 └── RippleClient (node)
 
-ContextManager
+MetadataManager
 Dispatcher
 
 Interfaces:
@@ -240,29 +240,29 @@ Interfaces:
 
 - **Location**: `@internals/core/client.ts`
 - **Purpose**: Base SDK client with common functionality
-- **Generic Type**: `Client<TContext>` - Type-safe context management
+- **Generic Type**: `Client<TMetadata>` - Type-safe metadata management
 - **Key Methods**:
   - `init()` - Initialize and restore persisted events (must be called first)
-  - `track(name, payload?, metadata?)` - Track an event (throws if not
-    initialized)
-  - `setContext<K>(key, value)` - Set global context (type-safe)
+  - `track(name, payload?, metadata?)` - Track an event with optional metadata
+    (throws if not initialized)
+  - `setMetadata<K>(key, value)` - Set shared metadata (type-safe)
   - `flush()` - Force flush queued events
   - `dispose()` - Clean up resources and detach event listeners
-- **Dependencies**: ContextManager, Dispatcher
-- **DX**: Full TypeScript autocomplete for context keys/values
+- **Dependencies**: MetadataManager, Dispatcher
+- **DX**: Full TypeScript autocomplete for metadata keys/values
 
-#### ContextManager
+#### MetadataManager
 
-- **Location**: `@internals/core/context-manager.ts`
-- **Purpose**: Manage global context attached to all events
-- **Generic Type**: `ContextManager<TContext>` - Type-safe context
+- **Location**: `@internals/core/metadata-manager.ts`
+- **Purpose**: Manage global metadata attached to all events
+- **Generic Type**: `MetadataManager<TMetadata>` - Type-safe metadata
 - **Key Methods**:
-  - `set<K>(key, value)` - Set context value (type-safe key/value)
-  - `get<K>(key)` - Get context value (type-safe return)
-  - `getAll()` - Get all context as `Partial<TContext>`
-  - `isEmpty()` - Check if context is empty (returns boolean)
-  - `clear()` - Clear all context
-- **Behavior**: Events with no context will have `context: null` instead of
+  - `set<K>(key, value)` - Set metadata value (type-safe key/value)
+  - `get<K>(key)` - Get metadata value (type-safe return)
+  - `getAll()` - Get all metadata as `Partial<TMetadata>`
+  - `isEmpty()` - Check if metadata is empty (returns boolean)
+  - `clear()` - Clear all metadata
+- **Behavior**: Events with no metadata will have `metadata: null` instead of
   empty object
 - **DX**: Full TypeScript autocomplete and type checking
 
@@ -270,7 +270,7 @@ Interfaces:
 
 - **Location**: `@internals/core/dispatcher.ts`
 - **Purpose**: Queue management, batching, and retry logic
-- **Generic Type**: `Dispatcher<TContext>` - Type-safe events
+- **Generic Type**: `Dispatcher<TMetadata>` - Type-safe events
 - **Constructor**: Accepts `DispatcherConfig` object (not ordered params)
 - **Key Methods**:
   - `enqueue(event)` - Add event to queue
@@ -399,12 +399,16 @@ The Dispatcher handles four critical race condition scenarios:
 
 ### Type Definitions
 
-#### EventMetadata
-
 ```typescript
-type EventMetadata = {
-  schemaVersion?: string;
+type CustomMetadata = {
+  schemaVersion: string;
+  eventType: "user_action" | "system_event" | "conversion";
+  source: string;
+  experimentId?: string;
 };
+
+// Use with typed client
+const client = new RippleClient<CustomMetadata>(config);
 ```
 
 #### Platform
@@ -438,19 +442,18 @@ type Platform = WebPlatform | NativePlatform | ServerPlatform;
 #### Event (Generic)
 
 ```typescript
-type Event<TContext = Record<string, unknown>> = {
+type Event<TMetadata = Record<string, unknown>> = {
   name: string;
   payload: Record<string, unknown> | null;
   issuedAt: number;
-  context: TContext | null;
+  metadata: TMetadata | null;
   sessionId: string | null;
-  metadata: EventMetadata | null;
   platform: Platform | null;
 };
 ```
 
-**Note**: The `context` field is `null` when no context values are set, rather
-than an empty object. This reduces payload size for events without context.
+**Note**: The `metadata` field is `null` when no metadata values are set, rather
+than an empty object. This reduces payload size for events without metadata.
 
 #### ClientConfig
 
@@ -521,21 +524,67 @@ before initialization will throw an error to prevent data loss.
 - **Browser**: Detects browser name/version, device type, and OS
 - **Node.js**: Sets platform type as "server"
 
-### Event Metadata
+### Unified Metadata System
 
-Events can include optional metadata for schema versioning and event-specific
-information:
+The SDK uses a unified metadata system where you can set shared metadata on the
+client and event-specific metadata when tracking events. These are automatically
+merged:
 
 ```typescript
-// Track event with metadata
+// Define custom metadata type
+type AppMetadata = {
+  userId: string;
+  sessionId: string;
+  schemaVersion: string;
+  eventType: "user_action" | "system_event" | "conversion";
+  source: string;
+  experimentId?: string;
+};
+
+// Create typed client
+const client = new RippleClient<AppMetadata>(config);
+
+// Set shared metadata (attached to all events)
+client.setMetadata("userId", "user-123");
+client.setMetadata("sessionId", "session-abc");
+
+// Track event with additional metadata
 await client.track(
   "user_signup",
   { email: "user@example.com", plan: "premium" },
-  { schemaVersion: "1.0.0" },
+  {
+    schemaVersion: "2.0.0",
+    eventType: "conversion",
+    source: "landing_page",
+    experimentId: "signup-flow-v2",
+  },
 );
 
-// Metadata is optional
-await client.track("page_view", { page: "/home" });
+// Final event will have merged metadata:
+// {
+//   userId: "user-123",           // from shared metadata
+//   sessionId: "session-abc",     // from shared metadata
+//   schemaVersion: "2.0.0",       // from event metadata
+//   eventType: "conversion",      // from event metadata
+//   source: "landing_page",       // from event metadata
+//   experimentId: "signup-flow-v2" // from event metadata
+// }
+
+// Event metadata takes precedence over shared metadata
+client.setMetadata("source", "global");
+await client.track(
+  "button_click",
+  { button: "submit" },
+  { source: "checkout_page" }, // This overrides the shared "source"
+);
+
+// Default metadata type (backward compatibility)
+const defaultClient = new RippleClient(config);
+await defaultClient.track(
+  "legacy_event",
+  { data: "value" },
+  { schemaVersion: "1.0.0", customField: "any value" },
+);
 ```
 
 **Use Cases**:
@@ -544,23 +593,23 @@ await client.track("page_view", { page: "/home" });
 - **Event Evolution**: Manage breaking changes in event structure
 - **Data Migration**: Identify events that need transformation
 
-### Type-Safe Context
+### Type-Safe Metadata
 
 ```typescript
-interface AppContext extends Record<string, unknown> {
+interface Metadata extends Record<string, unknown> {
   userId: string;
   sessionId: string;
   appVersion: string;
 }
 
-const client = new RippleClient<AppContext>({
+const client = new RippleClient<Metadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
 
 // Full TypeScript autocomplete and type checking
-client.setContext("userId", "123");
-client.setContext("sessionId", "abc");
+client.setMetadata("userId", "123");
+client.setMetadata("sessionId", "abc");
 ```
 
 ### Custom Adapters
@@ -829,7 +878,7 @@ Ripple repository. See:
 - Follow ESLint rules
 - Write descriptive variable names
 - **Naming Conventions**:
-  - Private members: Use `_` prefix (e.g., `_context`, `_queue`, `_timer`)
+  - Private members: Use `_` prefix (e.g., `_queue`, `_timer`)
   - Public methods: Explicit `public` keyword required
   - Protected members: Explicit `protected` keyword required
 - **Type Definitions**:

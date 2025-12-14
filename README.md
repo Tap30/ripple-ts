@@ -21,10 +21,10 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 
 ### Core Features
 
-- **Type-Safe Context Management**: Generic context types with full TypeScript
-  autocomplete
-- **Event Metadata**: Optional metadata support with schema versioning for
-  events
+- **Type-Safe Metadata Management**: Generic metadata types with full TypeScript
+  support for both shared and event-specific data
+- **Unified Metadata System**: Single metadata field that merges shared metadata
+  (set via client) with event-specific metadata (passed to track method)
 - **Automatic Batching**: Configurable batch size with auto-flush
 - **Scheduled Flushing**: Time-based automatic event dispatch
 - **Retry Logic**: Exponential backoff with jitter (1000ms × 2^attempt + random

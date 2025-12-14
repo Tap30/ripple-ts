@@ -2,6 +2,11 @@ import type { HttpAdapter, StorageAdapter } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RippleClient, type NodeClientConfig } from "./ripple-client.ts";
 
+type TestMetadata = {
+  schemaVersion: string;
+  eventType: string;
+};
+
 const mockHttpAdapter: HttpAdapter = {
   send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
 };
@@ -18,12 +23,21 @@ const mockConfig: NodeClientConfig = {
 };
 
 describe("RippleClient", () => {
-  let client: RippleClient;
+  let client: RippleClient<TestMetadata>;
+  let clientWithDefaults: RippleClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    client = new RippleClient({
+    client = new RippleClient<TestMetadata>({
+      ...mockConfig,
+      adapters: {
+        httpAdapter: mockHttpAdapter,
+        storageAdapter: mockStorageAdapter,
+      },
+    });
+
+    clientWithDefaults = new RippleClient({
       ...mockConfig,
       adapters: {
         httpAdapter: mockHttpAdapter,
@@ -99,14 +113,14 @@ describe("RippleClient", () => {
   });
 
   describe("type safety", () => {
-    it("should support typed context", async () => {
-      interface AppContext extends Record<string, unknown> {
+    it("should support typed metadata", async () => {
+      interface AppMetadata extends Record<string, unknown> {
         userId: string;
         requestId: string;
         appVersion: string;
       }
 
-      const typedClient = new RippleClient<AppContext>({
+      const typedClient = new RippleClient<AppMetadata>({
         ...mockConfig,
         adapters: {
           httpAdapter: mockHttpAdapter,
@@ -116,9 +130,9 @@ describe("RippleClient", () => {
 
       await typedClient.init();
 
-      typedClient.setContext("userId", "123");
-      typedClient.setContext("requestId", "abc");
-      typedClient.setContext("appVersion", "1.0.0");
+      typedClient.setMetadata("userId", "123");
+      typedClient.setMetadata("requestId", "abc");
+      typedClient.setMetadata("appVersion", "1.0.0");
 
       expect(typedClient).toBeInstanceOf(RippleClient);
     });
@@ -151,7 +165,7 @@ describe("RippleClient", () => {
       await client.track(
         "user_action",
         { action: "click" },
-        { schemaVersion: "1.0.0" },
+        { schemaVersion: "1.0.0", eventType: "interaction" },
       );
 
       await client.flush();
@@ -161,7 +175,7 @@ describe("RippleClient", () => {
         expect.arrayContaining([
           expect.objectContaining({
             name: "user_action",
-            metadata: { schemaVersion: "1.0.0" },
+            metadata: { schemaVersion: "1.0.0", eventType: "interaction" },
           }),
         ]),
         expect.any(Object),
@@ -170,25 +184,99 @@ describe("RippleClient", () => {
     });
   });
 
-  describe("context management", () => {
-    it("should set and include context in events", async () => {
+  describe("metadata management", () => {
+    it("should set and include metadata in events", async () => {
+      const genericConfig: NodeClientConfig = {
+        ...mockConfig,
+        adapters: {
+          httpAdapter: mockHttpAdapter,
+          storageAdapter: mockStorageAdapter,
+        },
+      };
+
+      const genericClient = new RippleClient(genericConfig);
+
+      await genericClient.init();
+
+      genericClient.setMetadata("userId", "user-123");
+      genericClient.setMetadata("sessionId", "session-production");
+
+      await genericClient.track("test_event", {});
+
+      await genericClient.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              userId: "user-123",
+              sessionId: "session-production",
+            }) as Record<string, unknown>,
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+  });
+
+  describe("generic metadata", () => {
+    it("should support typed metadata", async () => {
       await client.init();
-
-      client.setContext("userId", "user-123");
-      client.setContext("environment", "production");
-
-      await client.track("test_event", {});
-
+      await client.track(
+        "server_action",
+        { action: "process" },
+        { schemaVersion: "3.0", eventType: "system" },
+      );
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         mockConfig.endpoint,
         expect.arrayContaining([
           expect.objectContaining({
-            context: expect.objectContaining({
-              userId: "user-123",
-              environment: "production",
-            }) as Record<string, unknown>,
+            name: "server_action",
+            metadata: { schemaVersion: "3.0", eventType: "system" },
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+
+    it("should support default metadata type", async () => {
+      await clientWithDefaults.init();
+      await clientWithDefaults.track(
+        "api_call",
+        { endpoint: "/users" },
+        { requestId: "req-123", duration: 150 },
+      );
+      await clientWithDefaults.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "api_call",
+            metadata: { requestId: "req-123", duration: 150 },
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+
+    it("should handle null metadata", async () => {
+      await client.init();
+      await client.track("simple_event");
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "simple_event",
+            metadata: null,
           }),
         ]),
         expect.any(Object),

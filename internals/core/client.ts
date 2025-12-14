@@ -1,25 +1,24 @@
-import { ContextManager } from "./context-manager.ts";
 import { Dispatcher } from "./dispatcher.ts";
+import { MetadataManager } from "./metadata-manager.ts";
 import type {
   ClientConfig,
   DispatcherConfig,
   Event,
-  EventMetadata,
   EventPayload,
   Platform,
 } from "./types.ts";
 
 /**
  * Abstract base class for Ripple SDK clients.
- * Provides core event tracking functionality with type-safe context management.
+ * Provides core event tracking functionality with type-safe metadata management.
  *
- * @template TContext The type definition for global context
+ * @template TMetadata The type definition for metadata
  */
 export abstract class Client<
-  TContext extends Record<string, unknown> = Record<string, unknown>,
+  TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
-  protected readonly _contextManager: ContextManager<TContext>;
-  protected readonly _dispatcher: Dispatcher<TContext>;
+  protected readonly _metadataManager: MetadataManager<TMetadata>;
+  protected readonly _dispatcher: Dispatcher<TMetadata>;
 
   protected _sessionId: string | null = null;
   private _initialized = false;
@@ -44,7 +43,7 @@ export abstract class Client<
       throw new Error("`endpoint` must be provided in `config`.");
     }
 
-    this._contextManager = new ContextManager<TContext>();
+    this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {
       apiKey: config.apiKey,
@@ -55,7 +54,7 @@ export abstract class Client<
       maxRetries: config.maxRetries ?? 3,
     };
 
-    this._dispatcher = new Dispatcher<TContext>(
+    this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
       config.adapters.httpAdapter,
       config.adapters.storageAdapter,
@@ -73,7 +72,7 @@ export abstract class Client<
   public async track(
     name: string,
     payload?: EventPayload,
-    metadata?: EventMetadata,
+    metadata?: Partial<TMetadata>,
   ): Promise<void> {
     if (!this._initialized) {
       throw new Error(
@@ -81,14 +80,11 @@ export abstract class Client<
       );
     }
 
-    const event: Event<TContext> = {
+    const event: Event<TMetadata> = {
       name,
-      metadata: metadata ?? null,
+      metadata: this._metadataManager.merge(metadata),
       payload: payload ?? null,
       issuedAt: Date.now(),
-      context: this._contextManager.isEmpty()
-        ? null
-        : (this._contextManager.getAll() as TContext),
       sessionId: this._sessionId,
       platform: this._getPlatform(),
     };
@@ -97,18 +93,18 @@ export abstract class Client<
   }
 
   /**
-   * Set a global context value.
-   * This context will be attached to all subsequent events.
+   * Set a shared metadata value.
+   * This metadata will be attached to all subsequent events.
    *
-   * @template K The context key type
-   * @param key The context key
+   * @template K The metadata key type
+   * @param key The metadata key
    * @param value The value to set
    */
-  public setContext<K extends keyof TContext>(
+  public setMetadata<K extends keyof TMetadata>(
     key: K,
-    value: TContext[K],
+    value: TMetadata[K],
   ): void {
-    this._contextManager.set(key, value);
+    this._metadataManager.set(key, value);
   }
 
   /**

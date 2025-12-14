@@ -30,10 +30,10 @@ Open `http://localhost:5173` in your browser.
 - **Track Event with Payload**: Track event with custom data
 - **Track Event with Metadata**: Track event with schema version
 
-#### 2. Context Management
+#### 2. Metadata Management
 
-- **Set Context**: Add global context that attaches to all events
-- **Track with Context**: Test typed context with TypeScript autocomplete
+- **Set Metadata**: Add global metadata that attaches to all events
+- **Track with Metadata**: Test typed metadata with TypeScript autocomplete
 
 #### 3. Batch and Flush
 
@@ -91,10 +91,10 @@ tsx index.ts
 - Initialize client with FileStorage adapter
 - Verify file creation at `.ripple_events.json`
 
-#### 2. Type-safe Context
+#### 2. Type-safe Metadata
 
-- Set typed context with TypeScript autocomplete
-- Track events with context attached
+- Set typed metadata with TypeScript autocomplete
+- Track events with metadata attached
 
 #### 3. Basic Event Tracking
 
@@ -106,10 +106,10 @@ tsx index.ts
 
 - Track events with schema versioning
 
-#### 5. Context Management
+#### 5. Metadata Management
 
-- Set global context (deployment, region, etc.)
-- Verify context attached to all events
+- Set global metadata (deployment, region, etc.)
+- Verify metadata attached to all events
 
 #### 6. Batch Processing
 
@@ -170,7 +170,7 @@ The mock server (`server.ts`) provides:
 - [ ] Events tracked successfully
 - [ ] Auto-flush at batch size (5 events)
 - [ ] Manual flush works
-- [ ] Context attached to events
+- [ ] Metadata attached to events
 - [ ] Beacon API used on tab switch
 - [ ] Beacon API used on page refresh
 - [ ] Events persisted in IndexedDB
@@ -183,7 +183,7 @@ The mock server (`server.ts`) provides:
 - [ ] Events tracked successfully
 - [ ] Auto-flush at batch size (5 events)
 - [ ] Manual flush works
-- [ ] Context attached to events
+- [ ] Metadata attached to events
 - [ ] Events persisted to file
 - [ ] Events restored from file
 - [ ] Retry logic works on failure
