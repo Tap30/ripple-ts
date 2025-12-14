@@ -136,9 +136,33 @@ const trackWithMetadataBtn = createButton({
       await client.track(
         "form_submit",
         { formId: "contact-form", fields: 5 },
-        { schemaVersion: "1.0.0" },
+        {
+          schemaVersion: "1.0.0",
+          eventType: "user_interaction",
+          source: "web",
+        },
       );
-      logger.log("Tracked: form_submit with metadata");
+      logger.log("Tracked: form_submit with typed metadata");
+    })();
+  },
+});
+
+const trackWithCustomMetadataBtn = createButton({
+  label: "Track with Custom Metadata",
+  onClick: () => {
+    void (async () => {
+      await client.track(
+        "purchase_completed",
+        { orderId: "order-123", amount: 99.99 },
+        {
+          schemaVersion: "2.1.0",
+          eventType: "conversion",
+          source: "checkout_page",
+          experimentId: "exp-456",
+          timestamp: Date.now(),
+        },
+      );
+      logger.log("Tracked: purchase_completed with rich metadata");
     })();
   },
 });
@@ -146,33 +170,34 @@ const trackWithMetadataBtn = createButton({
 basicSection.appendChild(trackSimpleBtn);
 basicSection.appendChild(trackWithPayloadBtn);
 basicSection.appendChild(trackWithMetadataBtn);
+basicSection.appendChild(trackWithCustomMetadataBtn);
 
-const contextSection = createSection("Context Management");
+const metadataSection = createSection("Metadata Management");
 
-document.body.appendChild(contextSection);
+document.body.appendChild(metadataSection);
 
-const setContextBtn = createButton({
-  label: "Set Context",
+const setMetadataBtn = createButton({
+  label: "Set Metadata",
   onClick: () => {
     const random = Math.random().toString(36).substring(7);
 
-    client.setContext(`key_${random}`, `value_${random}`);
-    logger.log(`Set context: key_${random}`);
+    client.setMetadata(`key_${random}`, `value_${random}`);
+    logger.log(`Set metadata: key_${random}`);
   },
 });
 
-const trackWithContextBtn = createButton({
-  label: "Track with Context",
+const trackWithSharedMetadataBtn = createButton({
+  label: "Track with Shared Metadata",
   onClick: () => {
     void (async () => {
-      await client.track("context_test");
-      logger.log("Tracked event with context");
+      await client.track("metadata_test");
+      logger.log("Tracked event with shared metadata");
     })();
   },
 });
 
-contextSection.appendChild(setContextBtn);
-contextSection.appendChild(trackWithContextBtn);
+metadataSection.appendChild(setMetadataBtn);
+metadataSection.appendChild(trackWithSharedMetadataBtn);
 
 const batchSection = createSection("Batch and Flush");
 

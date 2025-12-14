@@ -4,8 +4,10 @@ import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Dispatcher } from "./dispatcher.ts";
 import type { DispatcherConfig, Event } from "./types.ts";
 
-type TestContext = {
+type TestMetadata = {
   userId: string;
+  schemaVersion: string;
+  eventType: string;
 };
 
 const createMockHttpAdapter = (): HttpAdapter => ({
@@ -30,12 +32,20 @@ const createConfig = (
   ...overrides,
 });
 
-const createEvent = (name: string): Event<TestContext> => ({
+const createEvent = (name: string): Event<TestMetadata> => ({
+  name,
+  payload: { test: "data" },
+  metadata: { userId: "123", schemaVersion: "1.0", eventType: "test" },
+  issuedAt: Date.now(),
+  sessionId: "session-123",
+  platform: null,
+});
+
+const createEventWithoutMetadata = (name: string): Event<TestMetadata> => ({
   name,
   payload: { test: "data" },
   metadata: null,
   issuedAt: Date.now(),
-  context: { userId: "123" },
   sessionId: "session-123",
   platform: null,
 });
@@ -213,7 +223,29 @@ describe("Dispatcher", () => {
   });
 
   describe("retry logic", () => {
-    it("should retry on failed request", async () => {
+    it("should clear storage on successful request", async () => {
+      const httpAdapter = createMockHttpAdapter();
+
+      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        status: 200,
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+      expect(storageAdapter.clear).toHaveBeenCalled();
+    });
+
+    it("should retry on 5xx server error", async () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>)
@@ -231,6 +263,30 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
+    });
+
+    it("should not retry on 4xx client error", async () => {
+      const httpAdapter = createMockHttpAdapter();
+
+      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: false,
+        status: 400,
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+      expect(storageAdapter.save).toHaveBeenCalledWith([
+        expect.objectContaining({ name: "event1" }),
+      ]);
     });
 
     it("should retry on exception", async () => {
@@ -253,7 +309,47 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
     });
 
-    it("should respect maxRetries", async () => {
+    it("should retry on non-Error exception", async () => {
+      const httpAdapter = createMockHttpAdapter();
+
+      (httpAdapter.send as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce("String error")
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(2);
+    });
+
+    it("should handle non-Error exception after max retries", async () => {
+      const httpAdapter = createMockHttpAdapter();
+
+      (httpAdapter.send as ReturnType<typeof vi.fn>)
+        .mockRejectedValue("String error");
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig({ maxRetries: 2 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+      expect(storageAdapter.save).toHaveBeenCalled();
+    });
+
+    it("should respect maxRetries for 5xx server errors", async () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -271,7 +367,7 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(3);
     });
 
-    it("should re-queue events after max retries", async () => {
+    it("should re-queue events after max retries on 5xx server error", async () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -326,7 +422,7 @@ describe("Dispatcher", () => {
       await dispatcher.enqueue(createEvent("event2"));
 
       const calls = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
-        .calls as Array<[Array<Event<TestContext>>]>;
+        .calls as Array<[Array<Event<TestMetadata>>]>;
 
       const lastCall = calls[calls.length - 1]?.[0];
 
@@ -532,7 +628,7 @@ describe("Dispatcher", () => {
       await flushPromise;
 
       const calls = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
-        .calls as Array<[Array<Event<TestContext>>]>;
+        .calls as Array<[Array<Event<TestMetadata>>]>;
 
       const lastCall = calls[calls.length - 1]?.[0];
 
@@ -578,6 +674,65 @@ describe("Dispatcher", () => {
           "Content-Type": "application/json",
         }),
         "Authorization",
+      );
+    });
+
+    it("should handle events with typed metadata", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher<TestMetadata>(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      const eventWithMetadata = createEvent("metadata_test");
+
+      await dispatcher.enqueue(eventWithMetadata);
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "metadata_test",
+            metadata: {
+              userId: "123",
+              schemaVersion: "1.0",
+              eventType: "test",
+            },
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+
+    it("should handle events without metadata", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher<TestMetadata>(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      const eventWithoutMetadata =
+        createEventWithoutMetadata("no_metadata_test");
+
+      await dispatcher.enqueue(eventWithoutMetadata);
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "no_metadata_test",
+            metadata: null,
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
       );
     });
   });

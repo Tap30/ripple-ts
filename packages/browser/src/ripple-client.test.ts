@@ -2,6 +2,11 @@ import type { HttpAdapter, StorageAdapter } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RippleClient, type BrowserClientConfig } from "./ripple-client.ts";
 
+type TestMetadata = {
+  schemaVersion: string;
+  eventType: string;
+};
+
 // Mock UAParser
 vi.mock("ua-parser-js", () => ({
   UAParser: vi.fn().mockImplementation(function () {
@@ -40,7 +45,8 @@ const mockConfig: BrowserClientConfig = {
 };
 
 describe("RippleClient", () => {
-  let client: RippleClient;
+  let client: RippleClient<TestMetadata>;
+  let clientWithDefaults: RippleClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,7 +77,15 @@ describe("RippleClient", () => {
       configurable: true,
     });
 
-    client = new RippleClient({
+    client = new RippleClient<TestMetadata>({
+      ...mockConfig,
+      adapters: {
+        httpAdapter: mockHttpAdapter,
+        storageAdapter: mockStorageAdapter,
+      },
+    });
+
+    clientWithDefaults = new RippleClient({
       ...mockConfig,
       adapters: {
         httpAdapter: mockHttpAdapter,
@@ -143,14 +157,14 @@ describe("RippleClient", () => {
   });
 
   describe("type safety", () => {
-    it("should support typed context", async () => {
-      interface AppContext extends Record<string, unknown> {
+    it("should support typed metadata", async () => {
+      interface AppMetadata extends Record<string, unknown> {
         userId: string;
         sessionId: string;
         appVersion: string;
       }
 
-      const typedClient = new RippleClient<AppContext>({
+      const typedClient = new RippleClient<AppMetadata>({
         ...mockConfig,
         adapters: {
           httpAdapter: mockHttpAdapter,
@@ -160,9 +174,9 @@ describe("RippleClient", () => {
 
       await typedClient.init();
 
-      typedClient.setContext("userId", "123");
-      typedClient.setContext("sessionId", "abc");
-      typedClient.setContext("appVersion", "1.0.0");
+      typedClient.setMetadata("userId", "123");
+      typedClient.setMetadata("sessionId", "abc");
+      typedClient.setMetadata("appVersion", "1.0.0");
 
       expect(typedClient).toBeInstanceOf(RippleClient);
     });
@@ -290,6 +304,70 @@ describe("RippleClient", () => {
       );
 
       global.navigator = originalNavigator;
+    });
+  });
+
+  describe("generic metadata", () => {
+    it("should support typed metadata", async () => {
+      await client.init();
+      await client.track(
+        "user_action",
+        { action: "click" },
+        { schemaVersion: "2.0", eventType: "interaction" },
+      );
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "user_action",
+            metadata: { schemaVersion: "2.0", eventType: "interaction" },
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+
+    it("should support default metadata type", async () => {
+      await clientWithDefaults.init();
+      await clientWithDefaults.track(
+        "page_view",
+        { url: "/home" },
+        { customField: "value", version: 1 },
+      );
+      await clientWithDefaults.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "page_view",
+            metadata: { customField: "value", version: 1 },
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
+    });
+
+    it("should handle null metadata", async () => {
+      await client.init();
+      await client.track("simple_event");
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        mockConfig.endpoint,
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "simple_event",
+            metadata: null,
+          }),
+        ]),
+        expect.any(Object),
+        expect.any(String),
+      );
     });
   });
 });

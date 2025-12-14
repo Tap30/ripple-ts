@@ -35,16 +35,16 @@ await client.init();
 log("✓ Client initialized with FileStorage");
 
 separator();
-log("Test Case 2: Type-safe Context");
+log("Test Case 2: Type-safe Metadata");
 
-type AppContext = {
+type AppMetadata = {
   userId: string;
   requestId: string;
   environment: string;
   serverVersion: string;
 };
 
-const typedClient = new RippleClient<AppContext>({
+const typedClient = new RippleClient<AppMetadata>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   adapters: {
@@ -53,11 +53,11 @@ const typedClient = new RippleClient<AppContext>({
 });
 
 await typedClient.init();
-typedClient.setContext("userId", "user-123");
-typedClient.setContext("requestId", "req-abc-456");
-typedClient.setContext("environment", "development");
-typedClient.setContext("serverVersion", "1.0.0");
-log("✓ Set typed context");
+typedClient.setMetadata("userId", "user-123");
+typedClient.setMetadata("requestId", "req-abc-456");
+typedClient.setMetadata("environment", "development");
+typedClient.setMetadata("serverVersion", "1.0.0");
+log("✓ Set typed metadata");
 
 separator();
 log("Test Case 3: Basic Event Tracking");
@@ -95,21 +95,45 @@ await client.track(
   },
   {
     schemaVersion: "2.0.0",
+    eventType: "user_lifecycle",
+    source: "registration_api",
+    experimentId: "onboarding-v2",
   },
 );
-log("✓ Tracked: user_created with metadata");
+log("✓ Tracked: user_created with rich metadata");
 
 separator();
-log("Test Case 5: Context Management");
+log("Test Case 5: Generic Metadata Types");
 
-client.setContext("deploymentId", "deploy-xyz-123");
-client.setContext("region", "us-east-1");
-log("✓ Set global context");
+await client.track(
+  "api_request_completed",
+  {
+    endpoint: "/api/users",
+    method: "POST",
+    statusCode: 201,
+    responseTime: 145,
+  },
+  {
+    schemaVersion: "1.5.0",
+    eventType: "system_performance",
+    source: "api_gateway",
+    requestId: "req-abc-456",
+    traceId: "trace-def-789",
+  },
+);
+log("✓ Tracked: api_request_completed with typed metadata");
 
-await typedClient.track("context_test", {
-  message: "This event includes typed context",
+separator();
+log("Test Case 6: Metadata Management");
+
+client.setMetadata("deploymentId", "deploy-xyz-123");
+client.setMetadata("region", "us-east-1");
+log("✓ Set shared metadata");
+
+await typedClient.track("metadata_test", {
+  message: "This event includes typed metadata",
 });
-log("✓ Tracked event with typed context");
+log("✓ Tracked event with typed metadata");
 
 separator();
 log("Test Case 6: Batch Processing (10 events)");

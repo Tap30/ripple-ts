@@ -26,9 +26,8 @@ describe("FetchHttpAdapter", () => {
         name: "test_event",
         payload: { key: "value" },
         issuedAt: Date.now(),
-        context: null,
-        sessionId: "session-123",
         metadata: null,
+        sessionId: "session-123",
         platform: null,
       },
     ];

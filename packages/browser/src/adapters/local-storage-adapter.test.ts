@@ -29,9 +29,8 @@ describe("LocalStorageAdapter", () => {
         name: "test_event",
         payload: { key: "value" },
         issuedAt: Date.now(),
-        context: {},
+        metadata: {},
         sessionId: "session-123",
-        metadata: null,
         platform: null,
       },
     ];

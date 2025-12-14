@@ -100,55 +100,73 @@ await client.flush();
 client.dispose();
 ```
 
-### Type-Safe Context
+### Type-Safe Metadata
 
 ```ts
-interface AppContext extends Record<string, unknown> {
+interface Metadata extends Record<string, unknown> {
   userId: string;
   sessionId: string;
   appVersion: string;
 }
 
-const client = new RippleClient<AppContext>({
+const client = new RippleClient<Metadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
 
-// Type-safe context with autocomplete
-client.setContext("userId", "user-123");
-client.setContext("sessionId", "session-abc");
-client.setContext("appVersion", "1.0.0");
+// Type-safe metadata with autocomplete
+client.setMetadata("userId", "user-123");
+client.setMetadata("sessionId", "session-abc");
+client.setMetadata("appVersion", "1.0.0");
 
-// Context is automatically attached to all events
+// Metadata is automatically attached to all events
 await client.track("page_view", { page: "/dashboard" });
 
-// Track event with metadata (schema version)
+// Track event with typed metadata
 await client.track(
   "user_signup",
   { email: "user@example.com" },
-  { schemaVersion: "1.0.0" },
+  {
+    schemaVersion: "1.0.0",
+    eventType: "conversion",
+    source: "landing_page",
+  },
 );
 ```
 
 ### Event Metadata
 
-Track events with optional metadata for schema versioning:
+Track events with optional metadata for schema versioning and type safety:
 
 ```ts
 import { RippleClient } from "@tapsioss/ripple-browser";
 
-const client = new RippleClient({
+// Define custom metadata type
+type AppMetadata = {
+  schemaVersion: string;
+  eventType: "user_action" | "system_event" | "conversion";
+  source: string;
+  experimentId?: string;
+};
+
+// Create typed client
+const client = new RippleClient<Record<string, unknown>, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
 
 await client.init();
 
-// Track with schema version
+// Track with typed metadata
 await client.track(
   "checkout_completed",
   { orderId: "order-123", amount: 99.99 },
-  { schemaVersion: "2.0.0" },
+  {
+    schemaVersion: "2.0.0",
+    eventType: "conversion",
+    source: "checkout_page",
+    experimentId: "checkout-v2",
+  },
 );
 
 // Metadata is optional
@@ -336,17 +354,17 @@ Creates a new RippleClient instance.
 Initializes the client and restores persisted events. **Must be called before
 tracking events**, otherwise `track()` will throw an error to prevent data loss.
 
-#### `async track(name: string, payload?: EventPayload, metadata?: EventMetadata): Promise<void>`
+#### `async track(name: string, payload?: EventPayload, metadata?: TMetadata): Promise<void>`
 
-Tracks an event with optional payload data and metadata. Metadata includes
+Tracks an event with optional payload data and typed metadata. Metadata includes
 schemaVersion for event versioning. Platform information (browser, device, OS)
 is automatically detected and attached.
 
 **Throws**: Error if `init()` has not been called.
 
-#### `setContext<K>(key: K, value: TContext[K]): void`
+#### `setMetadata<K>(key: K, value: TMetadata[K]): void`
 
-Sets a global context value that will be attached to all subsequent events.
+Sets a global metadata value that will be attached to all subsequent events.
 
 #### `async flush(): Promise<void>`
 

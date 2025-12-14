@@ -7,16 +7,6 @@ import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 export type EventPayload = Record<string, unknown>;
 
 /**
- * Event metadata containing schema version and other event-specific data.
- */
-export type EventMetadata = {
-  /**
-   * Schema version for the event
-   */
-  schemaVersion?: string;
-};
-
-/**
  * Platform information with name and version.
  */
 export type PlatformInfo = {
@@ -86,11 +76,11 @@ export type ServerPlatform = {
 export type Platform = WebPlatform | NativePlatform | ServerPlatform;
 
 /**
- * Represents a tracked event with metadata and context.
+ * Represents a tracked event with metadata.
  *
- * @template TContext The type of context attached to events
+ * @template TMetadata The type of metadata attached to events
  */
-export type Event<TContext = Record<string, unknown>> = {
+export type Event<TMetadata = Record<string, unknown>> = {
   /**
    * Event name/identifier
    */
@@ -100,17 +90,13 @@ export type Event<TContext = Record<string, unknown>> = {
    */
   payload: EventPayload | null;
   /**
-   * Event-specific metadata
+   * Event metadata (includes both shared and event-specific metadata)
    */
-  metadata: EventMetadata | null;
+  metadata: TMetadata | null;
   /**
    * Unix timestamp in milliseconds
    */
   issuedAt: number;
-  /**
-   * Global context attached to the event (null if no context is set)
-   */
-  context: TContext | null;
   /**
    * Session identifier (browser only)
    */
