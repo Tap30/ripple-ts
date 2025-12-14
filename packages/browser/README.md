@@ -334,31 +334,6 @@ installed alongside the SDK.
 }
 ```
 
-## Beacon API Support
-
-The SDK automatically uses the Beacon API to ensure events are delivered even
-when the page is being unloaded (navigation, tab close, refresh).
-
-### How It Works
-
-- **Normal Operations**: Uses `fetch` with `keepalive: true` for better error
-  handling and response processing
-- **Page Unload**: Automatically switches to `navigator.sendBeacon()` when the
-  page visibility changes to hidden or during page unload events
-- **Auto-Flush**: Listens to `visibilitychange` events and automatically flushes
-  queued events before the page closes
-
-### Benefits
-
-- **Guaranteed Delivery**: Events are sent even if the user navigates away or
-  closes the tab
-- **Non-Blocking**: Doesn't delay page unload like synchronous XHR
-- **Browser-Optimized**: The browser handles network timing automatically
-- **No Configuration**: Works automatically without any setup
-
-This ensures critical events like "session_end" or "checkout_complete" are never
-lost during navigation.
-
 ## Concurrency Guarantees
 
 The SDK is designed to handle concurrent operations safely:
