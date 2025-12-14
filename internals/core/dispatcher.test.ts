@@ -332,8 +332,9 @@ describe("Dispatcher", () => {
     it("should handle non-Error exception after max retries", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>)
-        .mockRejectedValue("String error");
+      (httpAdapter.send as ReturnType<typeof vi.fn>).mockRejectedValue(
+        "String error",
+      );
 
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
