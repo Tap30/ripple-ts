@@ -171,7 +171,7 @@ type AppMetadata = {
 };
 
 // Create typed client
-const client = new RippleClient<Record<string, unknown>, AppMetadata>({
+const client = new RippleClient<AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
