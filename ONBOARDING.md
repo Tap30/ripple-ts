@@ -428,8 +428,24 @@ type CustomMetadata = {
   experimentId?: string;
 };
 
-// Use with typed client
-const client = new RippleClient<CustomMetadata>(config);
+// Define event types mapping
+type AppEvents = {
+  "user.login": { email: string; method: "google" | "email" };
+  "page.view": { url: string; title: string; duration?: number };
+  "purchase.completed": { orderId: string; amount: number; currency: string };
+};
+
+// Use with typed client (both generics)
+const client = new RippleClient<AppEvents, CustomMetadata>(config);
+
+// Type-safe event tracking
+await client.track("user.login", {
+  email: "user@example.com",
+  method: "google",
+});
+
+// Backward compatibility - metadata only
+const legacyClient = new RippleClient<CustomMetadata>(config);
 ```
 
 #### Platform
@@ -569,16 +585,23 @@ type AppMetadata = {
   experimentId?: string;
 };
 
-// Create typed client
-const client = new RippleClient<AppMetadata>(config);
+// Define event types mapping
+type AppEvents = {
+  "user.signup": { email: string; plan: "free" | "premium" };
+  "product.viewed": { productId: string; category: string; price: number };
+  "cart.checkout": { items: Array<{ id: string; quantity: number }> };
+};
+
+// Create typed client with both generics
+const client = new RippleClient<AppEvents, AppMetadata>(config);
 
 // Set shared metadata (attached to all events)
 client.setMetadata("userId", "user-123");
 client.setMetadata("sessionId", "session-abc");
 
-// Track event with additional metadata
+// Track event with type-safe payload and additional metadata
 await client.track(
-  "user_signup",
+  "user.signup",
   { email: "user@example.com", plan: "premium" },
   {
     schemaVersion: "2.0.0",
@@ -587,6 +610,13 @@ await client.track(
     experimentId: "signup-flow-v2",
   },
 );
+
+// Type-safe event tracking - TypeScript will enforce payload structure
+await client.track("product.viewed", {
+  productId: "prod-456",
+  category: "electronics",
+  price: 299.99,
+});
 
 // Final event will have merged metadata:
 // {
@@ -822,14 +852,14 @@ packages/node/src/
 
 #### Test Coverage
 
-**Browser Package** (116 tests):
+**Browser Package**:
 
 - ✅ 100% statements, branches, functions, and lines
 - All adapters: fetch-http, indexed-db, local-storage, session-storage,
   cookie-storage, logger (console, no-op)
 - Core: ripple-client, session-manager
 
-**Node Package** (33 tests):
+**Node Package**:
 
 - ✅ 100% statements, branches, functions, and lines
 - All adapters: fetch-http, file-storage, logger (console, no-op)
@@ -848,7 +878,7 @@ export default defineConfig({
     environment: "jsdom", // or 'node' for node package
     coverage: {
       provider: "v8",
-      reporter: ["text", "html", "lcov"],
+      reporter: ["text"],
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/**/index.ts", "src/**/types.ts"],
       thresholds: {

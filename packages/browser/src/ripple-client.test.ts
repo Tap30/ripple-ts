@@ -11,6 +11,15 @@ type TestMetadata = {
   eventType: string;
 };
 
+type TestEvents = {
+  "user.login": { email: string; method: string };
+  "page.view": { url: string; title: string };
+  "button.click": { buttonId: string; location: string };
+  test_event: { key: string };
+  user_action: Record<string, unknown>;
+  simple_event: Record<string, unknown>;
+};
+
 // Mock UAParser
 vi.mock("ua-parser-js", () => ({
   UAParser: vi.fn().mockImplementation(function () {
@@ -54,7 +63,7 @@ const mockConfig: BrowserClientConfig = {
 };
 
 describe("RippleClient", () => {
-  let client: RippleClient<TestMetadata>;
+  let client: RippleClient<TestEvents, TestMetadata>;
   let clientWithDefaults: RippleClient;
 
   beforeEach(() => {
@@ -86,7 +95,7 @@ describe("RippleClient", () => {
       configurable: true,
     });
 
-    client = new RippleClient<TestMetadata>(mockConfig);
+    client = new RippleClient<TestEvents, TestMetadata>(mockConfig);
 
     clientWithDefaults = new RippleClient(mockConfig);
   });
@@ -173,7 +182,11 @@ describe("RippleClient", () => {
         appVersion: string;
       }
 
-      const typedClient = new RippleClient<AppMetadata>({
+      type AppEvents = {
+        test_event: { key: string };
+      };
+
+      const typedClient = new RippleClient<AppEvents, AppMetadata>({
         ...mockConfig,
         adapters: {
           httpAdapter: mockHttpAdapter,

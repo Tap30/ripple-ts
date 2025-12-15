@@ -11,6 +11,16 @@ type TestMetadata = {
   eventType: string;
 };
 
+type TestEvents = {
+  "user.signup": { email: string; plan: string };
+  "api.request": { endpoint: string; method: string };
+  "error.occurred": { code: number; message: string };
+  test_event: { key: string };
+  user_action: Record<string, unknown>;
+  server_action: Record<string, unknown>;
+  simple_event: Record<string, unknown>;
+};
+
 const mockHttpAdapter: HttpAdapter = {
   send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
 };
@@ -32,13 +42,13 @@ const mockConfig: NodeClientConfig = {
 };
 
 describe("RippleClient", () => {
-  let client: RippleClient<TestMetadata>;
+  let client: RippleClient<TestEvents, TestMetadata>;
   let clientWithDefaults: RippleClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    client = new RippleClient<TestMetadata>(mockConfig);
+    client = new RippleClient<TestEvents, TestMetadata>(mockConfig);
 
     clientWithDefaults = new RippleClient(mockConfig);
   });
@@ -106,7 +116,11 @@ describe("RippleClient", () => {
         appVersion: string;
       }
 
-      const typedClient = new RippleClient<AppMetadata>({
+      type AppEvents = {
+        user_signup: { email: string };
+      };
+
+      const typedClient = new RippleClient<AppEvents, AppMetadata>({
         ...mockConfig,
         adapters: {
           httpAdapter: mockHttpAdapter,
@@ -128,7 +142,10 @@ describe("RippleClient", () => {
     it("should track events with payload", async () => {
       await client.init();
 
-      await client.track("user_signup", { email: "test@example.com" });
+      await client.track("user.signup", {
+        email: "test@example.com",
+        plan: "free",
+      });
 
       await client.flush();
 
@@ -136,8 +153,8 @@ describe("RippleClient", () => {
         mockConfig.endpoint,
         expect.arrayContaining([
           expect.objectContaining({
-            name: "user_signup",
-            payload: { email: "test@example.com" },
+            name: "user.signup",
+            payload: { email: "test@example.com", plan: "free" },
           }),
         ]),
         expect.any(Object),

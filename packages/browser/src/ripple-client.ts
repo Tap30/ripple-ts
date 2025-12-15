@@ -1,4 +1,9 @@
-import { Client, type ClientConfig, type Platform } from "@internals/core";
+import {
+  Client,
+  type ClientConfig,
+  type EventPayload,
+  type Platform,
+} from "@internals/core";
 import { UAParser } from "ua-parser-js";
 import { SessionManager } from "./session-manager.ts";
 
@@ -16,11 +21,13 @@ export type BrowserClientConfig = ClientConfig & {
  * Ripple SDK client for browser environments.
  * Automatically tracks user sessions tied to browser session lifecycle.
  *
+ * @template TEvents The type definition mapping event names to their payloads
  * @template TMetadata The type definition for metadata
  */
 export class RippleClient<
+  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
-> extends Client<TMetadata> {
+> extends Client<TEvents, TMetadata> {
   private readonly _sessionManager: SessionManager;
 
   /**

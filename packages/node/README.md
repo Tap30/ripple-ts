@@ -56,7 +56,14 @@ import {
   LogLevel,
 } from "@tapsioss/ripple-node";
 
-const client = new RippleClient({
+// Define your event types for type safety
+type ServerEvents = {
+  "api.request": { endpoint: string; method: string; duration?: number };
+  "user.created": { userId: string; email: string; plan: string };
+  "error.occurred": { code: number; message: string; stack?: string };
+};
+
+const client = new RippleClient<ServerEvents>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   adapters: {
@@ -67,7 +74,12 @@ const client = new RippleClient({
 });
 
 await client.init();
-await client.track("api_request", { endpoint: "/api/users", method: "GET" });
+// Type-safe event tracking
+await client.track("api.request", {
+  endpoint: "/api/users",
+  method: "GET",
+  duration: 150,
+});
 await client.flush();
 ```
 
@@ -141,6 +153,21 @@ Track events with optional metadata for schema versioning and type safety:
 ```typescript
 import { RippleClient } from "@tapsioss/ripple-node";
 
+// Define event types mapping
+type ServerEvents = {
+  "database.query": {
+    table: string;
+    operation: "select" | "insert" | "update";
+    duration: number;
+  };
+  "cache.miss": { key: string; ttl?: number };
+  "webhook.received": {
+    source: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+  };
+};
+
 // Define custom metadata type
 type ServerMetadata = {
   schemaVersion: string;
@@ -149,25 +176,31 @@ type ServerMetadata = {
   requestId?: string;
 };
 
-// Create typed client
-const client = new RippleClient<ServerMetadata>({
+// Create typed client with both generics
+const client = new RippleClient<ServerEvents, ServerMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
 
 await client.init();
 
-// Track with typed metadata
+// Track with typed events and metadata
 await client.track(
-  "payment_processed",
-  { transactionId: "txn-456", amount: 149.99 },
+  "database.query",
+  { table: "users", operation: "select", duration: 45 },
   {
     schemaVersion: "3.1.0",
     eventType: "api_call",
-    source: "payment_service",
+    source: "user_service",
     requestId: "req-789",
   },
 );
+
+// Type-safe event tracking
+await client.track("cache.miss", {
+  key: "user:123",
+  ttl: 3600,
+});
 
 // Metadata is optional
 await client.track("api_request", { endpoint: "/api/users" });

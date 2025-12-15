@@ -59,7 +59,14 @@ import {
   IndexedDBAdapter,
 } from "@tapsioss/ripple-browser";
 
-const client = new RippleClient({
+// Define your event types for type safety
+type AppEvents = {
+  "page.view": { page: string; referrer?: string };
+  "user.login": { method: "google" | "email" };
+  "purchase.completed": { orderId: string; amount: number };
+};
+
+const client = new RippleClient<AppEvents>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   adapters: {
@@ -69,7 +76,8 @@ const client = new RippleClient({
 });
 
 await client.init();
-await client.track("page_view", { page: "/home" });
+// Type-safe event tracking
+await client.track("page.view", { page: "/home", referrer: "google" });
 ```
 
 ## Usage
@@ -162,6 +170,13 @@ Track events with optional metadata for schema versioning and type safety:
 ```ts
 import { RippleClient } from "@tapsioss/ripple-browser";
 
+// Define event types mapping
+type AppEvents = {
+  "user.signup": { email: string; plan: "free" | "premium" };
+  "product.viewed": { productId: string; category: string };
+  "cart.abandoned": { items: number; totalValue: number };
+};
+
 // Define custom metadata type
 type AppMetadata = {
   schemaVersion: string;
@@ -170,24 +185,31 @@ type AppMetadata = {
   experimentId?: string;
 };
 
-// Create typed client
-const client = new RippleClient<AppMetadata>({
+// Create typed client with both generics
+const client = new RippleClient<AppEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
 
 await client.init();
 
-// Track with typed metadata
+// Track with typed events and metadata
 await client.track(
-  "checkout_completed",
-  { orderId: "order-123", amount: 99.99 },
+  "user.signup",
+  { email: "user@example.com", plan: "premium" },
   {
     schemaVersion: "2.0.0",
     eventType: "conversion",
     source: "checkout_page",
-    experimentId: "checkout-v2",
+    experimentId: "signup-v2",
   },
+);
+
+// Type-safe event tracking
+await client.track("product.viewed", {
+  productId: "prod-123",
+  category: "electronics"
+});
 );
 
 // Metadata is optional

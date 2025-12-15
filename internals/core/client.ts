@@ -14,9 +14,11 @@ import type {
  * Abstract base class for Ripple SDK clients.
  * Provides core event tracking functionality with type-safe metadata management.
  *
+ * @template TEvents The type definition mapping event names to their payloads
  * @template TMetadata The type definition for metadata
  */
 export abstract class Client<
+  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
   protected readonly _metadataManager: MetadataManager<TMetadata>;
@@ -75,9 +77,9 @@ export abstract class Client<
    * @param metadata Event-specific metadata
    * @throws Error if client is not initialized
    */
-  public async track(
-    name: string,
-    payload?: EventPayload,
+  public async track<K extends keyof TEvents>(
+    name: K,
+    payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
     if (!this._initialized) {
@@ -87,7 +89,7 @@ export abstract class Client<
     }
 
     const event: Event<TMetadata> = {
-      name,
+      name: name as string,
       metadata: this._metadataManager.merge(metadata),
       payload: payload ?? null,
       issuedAt: Date.now(),

@@ -11,7 +11,26 @@ type TestMetadata = {
   eventType: string;
 };
 
-class TestClient extends Client<TestMetadata> {
+type TestEvents = {
+  test_event: { key: string };
+  user_signup: { email: string; plan: string };
+  simple_event: Record<string, unknown>;
+  typed_event: { data: string };
+  event1: Record<string, unknown>;
+  event2: Record<string, unknown>;
+  event_0: Record<string, unknown>;
+  event_1: Record<string, unknown>;
+  event_2: Record<string, unknown>;
+  event_3: Record<string, unknown>;
+  event_4: Record<string, unknown>;
+  event_5: Record<string, unknown>;
+  event_6: Record<string, unknown>;
+  event_7: Record<string, unknown>;
+  event_8: Record<string, unknown>;
+  event_9: Record<string, unknown>;
+};
+
+class TestClient extends Client<TestEvents, TestMetadata> {
   protected _getPlatform(): Platform | null {
     return { type: "server" };
   }
@@ -373,7 +392,7 @@ describe("Client", () => {
       await client.init();
       await client.track(
         "user_signup",
-        { email: "test@example.com" },
+        { email: "test@example.com", plan: "free" },
         {
           schemaVersion: "2.0",
           eventType: "conversion",
@@ -452,7 +471,7 @@ describe("Client", () => {
       // This should compile with correct types
       await client.track(
         "typed_event",
-        { userId: "123" },
+        { data: "test" },
         {
           schemaVersion: "1.0",
           eventType: "interaction",
@@ -477,7 +496,7 @@ describe("Client", () => {
       await client.init();
 
       const promises = Array.from({ length: 10 }, (_, i) =>
-        client.track(`event_${i}`),
+        client.track(`event_${i}` as keyof TestEvents),
       );
 
       await Promise.all(promises);

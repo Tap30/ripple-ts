@@ -47,7 +47,11 @@ type AppMetadata = {
   serverVersion: string;
 };
 
-const typedClient = new RippleClient<AppMetadata>({
+type AppEvents = {
+  metadata_test: Record<string, unknown>;
+};
+
+const typedClient = new RippleClient<AppEvents, AppMetadata>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   adapters: {
