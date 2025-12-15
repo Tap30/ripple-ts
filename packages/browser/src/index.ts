@@ -4,13 +4,16 @@ export * from "./adapters/indexed-db-adapter.ts";
 export * from "./adapters/local-storage-adapter.ts";
 export * from "./adapters/session-storage-adapter.ts";
 export * from "./ripple-client.ts";
-export * from "./session-manager.ts";
 
-export type {
-  ClientConfig,
-  Event,
-  EventPayload,
-  HttpAdapter,
-  HttpResponse,
-  StorageAdapter,
+export {
+  ConsoleLoggerAdopter,
+  LogLevel,
+  NoOpLoggerAdapter,
+  type ClientConfig,
+  type Event,
+  type EventPayload,
+  type HttpAdapter,
+  type HttpResponse,
+  type LoggerAdapter,
+  type StorageAdapter,
 } from "@internals/core";

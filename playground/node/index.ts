@@ -2,8 +2,10 @@
 /* eslint-disable no-console */
 
 import {
+  ConsoleLoggerAdopter,
   FetchHttpAdapter,
   FileStorageAdapter,
+  LogLevel,
   RippleClient,
 } from "@tapsioss/ripple-node";
 
@@ -28,6 +30,7 @@ const client = new RippleClient({
   adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter(".ripple_events.json"),
+    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.INFO),
   },
 });
 
@@ -182,6 +185,7 @@ const errorClient = new RippleClient({
   adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter(),
+    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
   },
 });
 

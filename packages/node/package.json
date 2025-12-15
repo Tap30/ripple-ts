@@ -36,8 +36,8 @@
     "clear": "shx rm -rf dist",
     "test": "vitest run --root .",
     "test:watch": "vitest --root .",
-    "prebuild": "pnpm run clear",
-    "build": "tsdown",
+    "bundle": "tsdown",
+    "build": "run-s clear bundle",
     "release": "pnpm publish . --tag latest --access public --no-git-checks"
   }
 }

@@ -1,4 +1,5 @@
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
+import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 
 /**
@@ -120,23 +121,23 @@ export type ClientConfig = {
    */
   endpoint: string;
   /**
-   * Header name for API key (default: "X-API-Key")
+   * Header name for API key (default: `"X-API-Key"`)
    */
   apiKeyHeader?: string;
   /**
-   * Interval in milliseconds between automatic flushes (default: 5000)
+   * Interval in milliseconds between automatic flushes (default: `5000`)
    */
   flushInterval?: number;
   /**
-   * Maximum number of events before auto-flush (default: 10)
+   * Maximum number of events before auto-flush (default: `10`)
    */
   maxBatchSize?: number;
   /**
-   * Maximum retry attempts for failed requests (default: 3)
+   * Maximum retry attempts for failed requests (default: `3`)
    */
   maxRetries?: number;
   /**
-   * Custom adapters for HTTP and storage
+   * Custom adapters for HTTP, storage, and logging
    */
   adapters: {
     /**
@@ -147,6 +148,10 @@ export type ClientConfig = {
      * Storage adapter for persisting events
      */
     storageAdapter: StorageAdapter;
+    /**
+     * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
+     */
+    loggerAdapter?: LoggerAdapter;
   };
 };
 
@@ -178,6 +183,10 @@ export type DispatcherConfig = {
    * Maximum retry attempts for failed requests
    */
   maxRetries: number;
+  /**
+   * Logger for internal logging
+   */
+  loggerAdapter: LoggerAdapter;
 };
 
 /**

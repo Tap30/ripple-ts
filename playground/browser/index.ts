@@ -1,6 +1,8 @@
 import {
+  ConsoleLoggerAdopter,
   FetchHttpAdapter,
   IndexedDBAdapter,
+  LogLevel,
   RippleClient,
 } from "@tapsioss/ripple-browser";
 
@@ -10,10 +12,11 @@ const client = new RippleClient({
   maxBatchSize: 5,
   maxRetries: 3,
   flushInterval: 5000,
-  sessionStoreKey: "my_app_session", // Custom session storage key
+  sessionStoreKey: "my_app_session",
   adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new IndexedDBAdapter(),
+    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.DEBUG),
   },
 });
 
@@ -265,6 +268,7 @@ const testRetryBtn = createButton({
         adapters: {
           httpAdapter: new FetchHttpAdapter(),
           storageAdapter: new IndexedDBAdapter(),
+          loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
         },
       });
 

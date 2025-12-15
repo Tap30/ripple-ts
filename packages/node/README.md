@@ -20,7 +20,7 @@ for Node.js.
 - 🔄 **Retry Logic**: Exponential backoff with jitter
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
 - 💾 **File System Storage**: Persistent event storage with unlimited capacity
-- 🔌 **Pluggable Adapters**: Custom HTTP and storage implementations
+- 🔌 **Pluggable Adapters**: Custom HTTP, storage, and logger implementations
 - 📘 **Type-Safe**: Full TypeScript support with generics
 - 🎯 **Zero Dependencies**: No external dependencies
 - 🌐 **Native Fetch**: Uses Node.js 18+ native fetch API
@@ -52,6 +52,8 @@ import {
   RippleClient,
   FetchHttpAdapter,
   FileStorageAdapter,
+  ConsoleLoggerAdapter,
+  LogLevel,
 } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
@@ -60,6 +62,7 @@ const client = new RippleClient({
   adapters: {
     httpAdapter: new FetchHttpAdapter(),
     storageAdapter: new FileStorageAdapter(),
+    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO), // Optional: Enable logging
   },
 });
 
@@ -406,8 +409,36 @@ type NodeClientConfig = {
     // Required: Must provide both adapters
     httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
     storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
+    loggerAdapter?: LoggerAdapter; // Optional: Logger adapter (default: ConsoleLoggerAdapter with WARN level)
   };
 };
+```
+
+## Logger Adapters
+
+| Adapter                  | Output  | Configurable | Use Case                    |
+| ------------------------ | ------- | ------------ | --------------------------- |
+| **ConsoleLoggerAdapter** | Console | Yes          | Development and debugging   |
+| **NoOpLoggerAdapter**    | None    | No           | Production (silent logging) |
+
+### Log Levels
+
+- `DEBUG`: Detailed debugging information
+- `INFO`: General information messages
+- `WARN`: Warning messages (default level)
+- `ERROR`: Error messages
+- `NONE`: No logging output
+
+```typescript
+import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-node";
+
+const client = new RippleClient({
+  // ... other config
+  adapters: {
+    // ... other adapters
+    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
+  },
+});
 ```
 
 ## API Reference

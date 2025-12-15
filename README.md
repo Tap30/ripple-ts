@@ -32,7 +32,7 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 - **Event Persistence**: Automatic storage of unsent events
 - **Queue Management**: Efficient FIFO queue using linked list (O(1) operations)
 - **Graceful Degradation**: Re-queues events on failure after max retries
-- **Custom Adapters**: Pluggable HTTP and storage implementations
+- **Custom Adapters**: Pluggable HTTP, storage, and logger implementations
 - **Thread-Safe Operations**: Mutex-protected flush operations prevent race
   conditions
 - **Concurrency Safe**: Handles concurrent flush calls, enqueue during flush,
@@ -51,12 +51,14 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 - **Offline Support**: Events persist across page reloads
 - **Session Lifecycle**: Session ID cleared on tab/window close (matches
   sessionStorage behavior)
+- **Console Logging**: Built-in ConsoleLoggerAdapter and NoOpLoggerAdapter
 
 ### Node.js-Specific Features
 
 - **File System Storage**: Unlimited capacity with JSON persistence
 - **Native Fetch**: Node.js 18+ fetch API support
 - **Process Lifecycle**: Graceful shutdown with event flushing
+- **Console Logging**: Built-in ConsoleLoggerAdapter and NoOpLoggerAdapter
 
 ### Configuration Options
 
@@ -68,9 +70,10 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
   flushInterval?: number;            // Optional: Auto-flush interval (default: 5000ms)
   maxBatchSize?: number;             // Optional: Max events per batch (default: 10)
   maxRetries?: number;               // Optional: Max retry attempts (default: 3)
-  adapters?: {                       // Optional: Custom adapters
-    httpAdapter?: HttpAdapter;       // Optional: Custom HTTP adapter
-    storageAdapter?: StorageAdapter; // Optional: Custom storage adapter
+  adapters: {                        // Required: Custom adapters
+    httpAdapter: HttpAdapter;        // Required: Custom HTTP adapter
+    storageAdapter: StorageAdapter;  // Required: Custom storage adapter
+    loggerAdapter?: LoggerAdapter;   // Optional: Custom logger adapter (default: ConsoleLoggerAdapter with WARN level)
   };
 }
 ```

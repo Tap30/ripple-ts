@@ -1,4 +1,8 @@
-import type { HttpAdapter, StorageAdapter } from "@internals/core";
+import {
+  NoOpLoggerAdapter,
+  type HttpAdapter,
+  type StorageAdapter,
+} from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RippleClient, type NodeClientConfig } from "./ripple-client.ts";
 
@@ -23,6 +27,7 @@ const mockConfig: NodeClientConfig = {
   adapters: {
     httpAdapter: mockHttpAdapter,
     storageAdapter: mockStorageAdapter,
+    loggerAdapter: new NoOpLoggerAdapter(),
   },
 };
 
