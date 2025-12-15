@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Dispatcher } from "./dispatcher.ts";
+import { NoOpLoggerAdapter } from "./logger.ts";
 import type { DispatcherConfig, Event } from "./types.ts";
 
 type TestMetadata = {
@@ -29,6 +30,7 @@ const createConfig = (
   flushInterval: 5000,
   maxBatchSize: 10,
   maxRetries: 3,
+  loggerAdapter: new NoOpLoggerAdapter(),
   ...overrides,
 });
 

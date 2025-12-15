@@ -21,7 +21,7 @@ environments (Browser and Node.js).
 - **Event Persistence**: Automatic storage of unsent events
 - **Queue Management**: Efficient FIFO queue using linked list (O(1) operations)
 - **Graceful Degradation**: Re-queues events on failure after max retries
-- **Custom Adapters**: Pluggable HTTP and storage implementations
+- **Custom Adapters**: Pluggable HTTP, storage, and logger implementations
 
 ### Browser-Specific Features
 
@@ -48,12 +48,17 @@ environments (Browser and Node.js).
 
 ```typescript
 {
-  apiKey: string;           // Required: API authentication key
-  endpoint: string;         // Required: API endpoint URL
-  apiKeyHeader?: string;    // Optional: Header name for API key (default: "X-API-Key")
-  flushInterval?: number;   // Optional: Auto-flush interval (default: 5000ms)
-  maxBatchSize?: number;    // Optional: Max events per batch (default: 10)
-  maxRetries?: number;      // Optional: Max retry attempts (default: 3)
+  apiKey: string;                    // Required: API authentication key
+  endpoint: string;                  // Required: API endpoint URL
+  apiKeyHeader?: string;             // Optional: Header name for API key (default: "X-API-Key")
+  flushInterval?: number;            // Optional: Auto-flush interval (default: 5000ms)
+  maxBatchSize?: number;             // Optional: Max events per batch (default: 10)
+  maxRetries?: number;               // Optional: Max retry attempts (default: 3)
+  adapters: {                        // Required: Custom adapters
+    httpAdapter: HttpAdapter;        // Required: Custom HTTP adapter
+    storageAdapter: StorageAdapter;  // Required: Custom storage adapter
+    loggerAdapter?: LoggerAdapter;   // Optional: Custom logger adapter (default: ConsoleLoggerAdapter with WARN level)
+  };
 }
 ```
 
@@ -88,7 +93,7 @@ ripple-ts/
 ├── internals/            # Shared internal libs
 │   └── core/             # Core internals (@internals/core)
 │       └── src/
-│           ├── adapters/ # Adapter interfaces
+│           ├── adapters/ # Adapter interfaces (HTTP, Storage, Logger)
 │           ├── *.ts      # Core implementations
 │           └── index.ts  # Internal exports
 ├── playground/           # Development playground
@@ -387,6 +392,22 @@ The Dispatcher handles four critical race condition scenarios:
   - `FileStorageAdapter` - File system (unlimited, permanent)
   - **Custom**: Implement for Redis, MongoDB, PostgreSQL, etc.
 
+#### LoggerAdapter Interface
+
+- **Location**: `@internals/core/adapters/logger-adapter.ts`
+- **Purpose**: Abstract logging for custom implementations and debugging
+- **Methods**:
+  - `debug(message, ...args)` - Debug level logging
+  - `info(message, ...args)` - Info level logging
+  - `warn(message, ...args)` - Warning level logging
+  - `error(message, ...args)` - Error level logging
+- **Log Levels**: `DEBUG`, `INFO`, `WARN`, `ERROR`, `NONE` (string-based)
+- **Built-in Implementations**:
+  - `ConsoleLoggerAdapter` - Console output with configurable log level
+    (default: WARN)
+  - `NoOpLoggerAdapter` - Silent logger that discards all messages
+  - **Custom**: Implement for external logging services (Winston, Pino, etc.)
+
 #### Storage Adapter Comparison
 
 | Adapter            | Capacity   | Persistence  | Performance | Best For                   |
@@ -493,11 +514,18 @@ type HttpResponse = {
 ### Basic Usage
 
 ```typescript
-import { RippleClient } from "@tapsioss/ripple-browser";
+import {
+  RippleClient,
+  ConsoleLoggerAdapter,
+  LogLevel,
+} from "@tapsioss/ripple-browser";
 
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
+  adapters: {
+    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO), // Optional: Enable logging
+  },
 });
 
 await client.init();
@@ -617,13 +645,19 @@ client.setMetadata("sessionId", "abc");
 #### Using Built-in Adapters
 
 ```typescript
-import { RippleClient, IndexedDBAdapter } from "@tapsioss/ripple-browser";
+import {
+  RippleClient,
+  IndexedDBAdapter,
+  ConsoleLoggerAdapter,
+  LogLevel,
+} from "@tapsioss/ripple-browser";
 
-// Use IndexedDB for large event queues
+// Use IndexedDB for large event queues and debug logging
 const client = new RippleClient({
   ...config,
   adapters: {
     storageAdapter: new IndexedDBAdapter(),
+    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
   },
 });
 ```
@@ -691,6 +725,40 @@ const client = new RippleClient({
 });
 ```
 
+#### Custom Logger Adapter
+
+```typescript
+import { LoggerAdapter, LogLevel } from "@tapsioss/ripple-browser";
+
+class WinstonLoggerAdapter implements LoggerAdapter {
+  constructor(private winston: any) {}
+
+  public debug(message: string, ...args: unknown[]): void {
+    this.winston.debug(`[Ripple] ${message}`, ...args);
+  }
+
+  public info(message: string, ...args: unknown[]): void {
+    this.winston.info(`[Ripple] ${message}`, ...args);
+  }
+
+  public warn(message: string, ...args: unknown[]): void {
+    this.winston.warn(`[Ripple] ${message}`, ...args);
+  }
+
+  public error(message: string, ...args: unknown[]): void {
+    this.winston.error(`[Ripple] ${message}`, ...args);
+  }
+}
+
+// Usage
+const client = new RippleClient({
+  ...config,
+  adapters: {
+    loggerAdapter: new WinstonLoggerAdapter(winston),
+  },
+});
+```
+
 #### Using Multiple Custom Adapters
 
 ```typescript
@@ -699,6 +767,7 @@ const client = new RippleClient({
   adapters: {
     httpAdapter: new AxiosHttpAdapter(),
     storageAdapter: new RedisStorageAdapter(),
+    loggerAdapter: new WinstonLoggerAdapter(winston),
   },
 });
 ```
@@ -757,13 +826,13 @@ packages/node/src/
 
 - ✅ 100% statements, branches, functions, and lines
 - All adapters: fetch-http, indexed-db, local-storage, session-storage,
-  cookie-storage
+  cookie-storage, logger (console, no-op)
 - Core: ripple-client, session-manager
 
 **Node Package** (33 tests):
 
 - ✅ 100% statements, branches, functions, and lines
-- All adapters: fetch-http, file-storage
+- All adapters: fetch-http, file-storage, logger (console, no-op)
 - Core: ripple-client
 
 **Total**: 149 tests across both runtimes

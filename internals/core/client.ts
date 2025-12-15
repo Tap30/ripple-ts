@@ -1,4 +1,6 @@
+import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { Dispatcher } from "./dispatcher.ts";
+import { ConsoleLoggerAdopter } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import type {
   ClientConfig,
@@ -19,6 +21,7 @@ export abstract class Client<
 > {
   protected readonly _metadataManager: MetadataManager<TMetadata>;
   protected readonly _dispatcher: Dispatcher<TMetadata>;
+  protected readonly _logger: LoggerAdapter;
 
   protected _sessionId: string | null = null;
   private _initialized = false;
@@ -43,6 +46,8 @@ export abstract class Client<
       throw new Error("`endpoint` must be provided in `config`.");
     }
 
+    this._logger =
+      config.adapters.loggerAdapter ?? new ConsoleLoggerAdopter(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {
@@ -52,6 +57,7 @@ export abstract class Client<
       flushInterval: config.flushInterval ?? 5000,
       maxBatchSize: config.maxBatchSize ?? 10,
       maxRetries: config.maxRetries ?? 3,
+      loggerAdapter: this._logger,
     };
 
     this._dispatcher = new Dispatcher<TMetadata>(

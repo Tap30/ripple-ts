@@ -1,4 +1,5 @@
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
+import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Mutex } from "./mutex.ts";
 import { Queue } from "./queue.ts";
@@ -22,6 +23,7 @@ export class Dispatcher<
   private readonly _config: DispatcherConfig;
   private readonly _httpAdapter: HttpAdapter;
   private readonly _storageAdapter: StorageAdapter;
+  private readonly _logger: LoggerAdapter;
 
   /**
    * Create a new Dispatcher instance.
@@ -38,6 +40,7 @@ export class Dispatcher<
     this._config = config;
     this._httpAdapter = httpAdapter;
     this._storageAdapter = storageAdapter;
+    this._logger = config.loggerAdapter;
   }
 
   /**
@@ -105,9 +108,7 @@ export class Dispatcher<
       } else if (response.status >= 400 && response.status < 500) {
         // 4xx: Client error, no retry - immediately re-queue and persist
 
-        // eslint-disable-next-line no-console
-        console.warn("[Ripple-SDK][WARN]:", {
-          message: "4xx client error, not retrying",
+        this._logger.warn("4xx client error, not retrying", {
           status: response.status,
           eventsCount: events.length,
         });
@@ -118,9 +119,7 @@ export class Dispatcher<
       } else if (response.status >= 500 && attempt < this._config.maxRetries) {
         // 5xx: Server error, retry with backoff
 
-        // eslint-disable-next-line no-console
-        console.warn("[Ripple-SDK][WARN]:", {
-          message: "5xx server error, retrying",
+        this._logger.warn("5xx server error, retrying", {
           status: response.status,
           attempt: attempt + 1,
           maxRetries: this._config.maxRetries,
@@ -130,9 +129,7 @@ export class Dispatcher<
       } else {
         // 5xx: Max retries reached, re-queue and persist
 
-        // eslint-disable-next-line no-console
-        console.error("[Ripple-SDK][ERR]:", {
-          message: "5xx server error, max retries reached",
+        this._logger.error("5xx server error, max retries reached", {
           status: response.status,
           maxRetries: this._config.maxRetries,
           eventsCount: events.length,
@@ -144,13 +141,10 @@ export class Dispatcher<
         await this._storageAdapter.save(this._queue.toArray());
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[Ripple-SDK][ERR]:", { err });
+      this._logger.error("Network error occurred", { err });
 
       if (attempt < this._config.maxRetries) {
-        // eslint-disable-next-line no-console
-        console.warn("[Ripple-SDK][WARN]:", {
-          message: "Network error, retrying",
+        this._logger.warn("Network error, retrying", {
           attempt: attempt + 1,
           maxRetries: this._config.maxRetries,
           error: err instanceof Error ? err.message : String(err),
@@ -159,9 +153,7 @@ export class Dispatcher<
         await delay(calculateBackoff(attempt));
         await this._sendWithRetry(events, attempt + 1);
       } else {
-        // eslint-disable-next-line no-console
-        console.error("[Ripple-SDK][ERR]:", {
-          message: "Network error, max retries reached",
+        this._logger.error("Network error, max retries reached", {
           maxRetries: this._config.maxRetries,
           eventsCount: events.length,
           error: err instanceof Error ? err.message : String(err),

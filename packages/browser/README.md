@@ -22,7 +22,7 @@ for browsers.
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
 - 💾 **Multiple Storage Options**: localStorage, sessionStorage, IndexedDB,
   Cookies
-- 🔌 **Pluggable Adapters**: Custom HTTP and storage implementations
+- 🔌 **Pluggable Adapters**: Custom HTTP, storage, and logger implementations
 - 📘 **Type-Safe**: Full TypeScript support with generics
 - 🌐 **Offline Support**: Events persist across page reloads
 - ✅ **No Event Loss**: Events are preserved even during concurrent operations
@@ -309,6 +309,33 @@ const client = new RippleClient({
 | **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | Temporary tracking         |
 | **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | Large event queues         |
 | **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Small queues, cross-domain |
+
+## Logger Adapters
+
+| Adapter                  | Output  | Configurable | Use Case                    |
+| ------------------------ | ------- | ------------ | --------------------------- |
+| **ConsoleLoggerAdapter** | Console | Yes          | Development and debugging   |
+| **NoOpLoggerAdapter**    | None    | No           | Production (silent logging) |
+
+### Log Levels
+
+- `DEBUG`: Detailed debugging information
+- `INFO`: General information messages
+- `WARN`: Warning messages (default level)
+- `ERROR`: Error messages
+- `NONE`: No logging output
+
+```typescript
+import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-browser";
+
+const client = new RippleClient({
+  // ... other config
+  adapters: {
+    // ... other adapters
+    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
+  },
+});
+```
 
 ## Platform Detection
 
