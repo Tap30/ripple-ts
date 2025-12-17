@@ -2,11 +2,11 @@ import madge from "madge";
 import { join, resolve } from "node:path";
 import { cwd } from "node:process";
 
-const rootDir = resolve(import.meta.dirname, "..");
+const ROOT_DIR = resolve(import.meta.dirname, "..");
 
 const instance = await madge(cwd(), {
   fileExtensions: ["ts", "tsx"],
-  tsConfig: join(rootDir, "tsconfig.json"),
+  tsConfig: join(ROOT_DIR, "tsconfig.json"),
   detectiveOptions: {
     es6: {
       skipTypeImports: true,
