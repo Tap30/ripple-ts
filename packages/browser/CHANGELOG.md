@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 1.0.0-rc.0
+### Major Changes
+
+
+
+- [`0ba3fa1`](https://github.com/Tap30/ripple-ts/commit/0ba3fa136636234f4f092c2e8ae5866d4277aea0) Thanks [@mimshins](https://github.com/mimshins)! - Initial release candidate
+
 ## 0.3.0
 ### Minor Changes
 

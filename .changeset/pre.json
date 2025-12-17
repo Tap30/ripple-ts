@@ -6,5 +6,7 @@
     "@tapsioss/ripple-node": "0.3.0",
     "@repo/playground": "0.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "floppy-worlds-serve"
+  ]
 }
