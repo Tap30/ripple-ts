@@ -26,6 +26,7 @@
     "changesets:apply": "changeset version",
     "changesets:status": "changeset status --since=main",
     "release": "pnpm build && changeset publish --tag latest",
+    "release:pre": "tsx scripts/pre-release",
     "test:unit:workspace": "pnpm -r --parallel run test",
     "test:unit:workspace:watch": "pnpm -r --parallel run test:watch",
     "test:unit:internals": "vitest run --root internals",
