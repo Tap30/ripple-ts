@@ -1,14 +1,57 @@
+import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
-import { Dispatcher } from "./dispatcher.ts";
+import { type StorageAdapter } from "./adapters/storage-adapter.ts";
+import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
 import { ConsoleLoggerAdopter } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
-import type {
-  ClientConfig,
-  DispatcherConfig,
-  Event,
-  EventPayload,
-  Platform,
-} from "./types.ts";
+import type { Event, EventPayload, Platform } from "./types.ts";
+
+/**
+ * Configuration for the Ripple client.
+ */
+export type ClientConfig = {
+  /**
+   * API key for authentication
+   */
+  apiKey: string;
+  /**
+   * API endpoint URL
+   */
+  endpoint: string;
+  /**
+   * Header name for API key (default: `"X-API-Key"`)
+   */
+  apiKeyHeader?: string;
+  /**
+   * Interval in milliseconds between automatic flushes (default: `5000`)
+   */
+  flushInterval?: number;
+  /**
+   * Maximum number of events before auto-flush (default: `10`)
+   */
+  maxBatchSize?: number;
+  /**
+   * Maximum retry attempts for failed requests (default: `3`)
+   */
+  maxRetries?: number;
+  /**
+   * Custom adapters for HTTP, storage, and logging
+   */
+  adapters: {
+    /**
+     * HTTP adapter for sending events
+     */
+    httpAdapter: HttpAdapter;
+    /**
+     * Storage adapter for persisting events
+     */
+    storageAdapter: StorageAdapter;
+    /**
+     * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
+     */
+    loggerAdapter?: LoggerAdapter;
+  };
+};
 
 /**
  * Abstract base class for Ripple SDK clients.
@@ -25,7 +68,7 @@ export abstract class Client<
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
 
-  protected _sessionId: string | null = null;
+  private _sessionId: string | null = null;
   private _initialized = false;
 
   /**
@@ -68,6 +111,14 @@ export abstract class Client<
       config.adapters.storageAdapter,
     );
   }
+
+  /**
+   * Get platform information for the current runtime.
+   * Must be implemented by runtime-specific clients.
+   *
+   * @returns Platform information or null
+   */
+  protected abstract _getPlatform(): Platform | null;
 
   /**
    * Track an event.
@@ -116,6 +167,37 @@ export abstract class Client<
   }
 
   /**
+   * Get all current metadata.
+   *
+   * @returns All metadata or empty object if none set
+   */
+  public getMetadata(): Partial<TMetadata> {
+    return this._metadataManager.getAll();
+  }
+
+  /**
+   * Get the current session ID.
+   *
+   * @returns Current session ID or null if not set
+   */
+  public getSessionId(): string | null {
+    return this._sessionId;
+  }
+
+  /**
+   * Set the session ID.
+   * Default implementation for base client - runtime packages can override.
+   *
+   * @param sessionId The session ID to set
+   * @returns `null` by default, runtime packages may return the set value
+   */
+  protected _setSessionId(sessionId: string): string | null {
+    this._sessionId = sessionId;
+
+    return null;
+  }
+
+  /**
    * Immediately flush all queued events.
    */
   public async flush(): Promise<void> {
@@ -128,22 +210,18 @@ export abstract class Client<
    */
   public async init(): Promise<void> {
     await this._dispatcher.restore();
+
     this._initialized = true;
   }
 
   /**
-   * Get platform information for the current runtime.
-   * Must be implemented by runtime-specific clients.
-   *
-   * @returns Platform information or null
-   */
-  protected abstract _getPlatform(): Platform | null;
-
-  /**
    * Dispose the client and clean up resources.
-   * Cancels scheduled flushes and detaches event listeners.
+   * Cancels scheduled flushes and clears all references for memory cleanup.
    */
   public dispose(): void {
     this._dispatcher.dispose();
+    this._metadataManager.clear();
+    this._sessionId = null;
+    this._initialized = false;
   }
 }

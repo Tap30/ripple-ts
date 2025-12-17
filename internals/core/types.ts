@@ -1,7 +1,3 @@
-import type { HttpAdapter } from "./adapters/http-adapter.ts";
-import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
-import type { StorageAdapter } from "./adapters/storage-adapter.ts";
-
 /**
  * Event payload containing arbitrary key-value pairs.
  */
@@ -106,87 +102,6 @@ export type Event<TMetadata = Record<string, unknown>> = {
    * Platform information
    */
   platform: Platform | null;
-};
-
-/**
- * Configuration for the Ripple client.
- */
-export type ClientConfig = {
-  /**
-   * API key for authentication
-   */
-  apiKey: string;
-  /**
-   * API endpoint URL
-   */
-  endpoint: string;
-  /**
-   * Header name for API key (default: `"X-API-Key"`)
-   */
-  apiKeyHeader?: string;
-  /**
-   * Interval in milliseconds between automatic flushes (default: `5000`)
-   */
-  flushInterval?: number;
-  /**
-   * Maximum number of events before auto-flush (default: `10`)
-   */
-  maxBatchSize?: number;
-  /**
-   * Maximum retry attempts for failed requests (default: `3`)
-   */
-  maxRetries?: number;
-  /**
-   * Custom adapters for HTTP, storage, and logging
-   */
-  adapters: {
-    /**
-     * HTTP adapter for sending events
-     */
-    httpAdapter: HttpAdapter;
-    /**
-     * Storage adapter for persisting events
-     */
-    storageAdapter: StorageAdapter;
-    /**
-     * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
-     */
-    loggerAdapter?: LoggerAdapter;
-  };
-};
-
-/**
- * Configuration for the Dispatcher.
- */
-export type DispatcherConfig = {
-  /**
-   * API key for authentication
-   */
-  apiKey: string;
-  /**
-   * Header name for API key
-   */
-  apiKeyHeader: string;
-  /**
-   * API endpoint URL
-   */
-  endpoint: string;
-  /**
-   * Interval in milliseconds between automatic flushes
-   */
-  flushInterval: number;
-  /**
-   * Maximum number of events before auto-flush
-   */
-  maxBatchSize: number;
-  /**
-   * Maximum retry attempts for failed requests
-   */
-  maxRetries: number;
-  /**
-   * Logger for internal logging
-   */
-  loggerAdapter: LoggerAdapter;
 };
 
 /**

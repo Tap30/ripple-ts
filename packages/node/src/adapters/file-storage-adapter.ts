@@ -38,6 +38,7 @@ export class FileStorageAdapter implements StorageAdapter {
       return JSON.parse(data) as Event[];
     } catch {
       await Promise.resolve();
+
       return [];
     }
   }

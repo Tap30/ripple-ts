@@ -211,4 +211,18 @@ describe("SessionManager", () => {
       expect(sessionId).toBe("special-session");
     });
   });
+
+  describe("clear", () => {
+    it("should clear session ID and remove from storage", () => {
+      sessionManager.init();
+      expect(sessionManager.getSessionId()).toBeTruthy();
+
+      sessionManager.clear();
+
+      expect(sessionManager.getSessionId()).toBeNull();
+      expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+        "ripple_session_id",
+      );
+    });
+  });
 });

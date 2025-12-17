@@ -3,8 +3,42 @@ import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Mutex } from "./mutex.ts";
 import { Queue } from "./queue.ts";
-import type { DispatcherConfig, Event } from "./types.ts";
+import type { Event } from "./types.ts";
 import { calculateBackoff, delay } from "./utils.ts";
+
+/**
+ * Configuration for the Dispatcher.
+ */
+export type DispatcherConfig = {
+  /**
+   * API key for authentication
+   */
+  apiKey: string;
+  /**
+   * Header name for API key
+   */
+  apiKeyHeader: string;
+  /**
+   * API endpoint URL
+   */
+  endpoint: string;
+  /**
+   * Interval in milliseconds between automatic flushes
+   */
+  flushInterval: number;
+  /**
+   * Maximum number of events before auto-flush
+   */
+  maxBatchSize: number;
+  /**
+   * Maximum retry attempts for failed requests
+   */
+  maxRetries: number;
+  /**
+   * Logger for internal logging
+   */
+  loggerAdapter: LoggerAdapter;
+};
 
 /**
  * Manages event queuing, batching, flushing, and retry logic.
@@ -51,6 +85,7 @@ export class Dispatcher<
    */
   public async enqueue(event: Event<TMetadata>): Promise<void> {
     this._queue.enqueue(event);
+
     await this._storageAdapter.save(this._queue.toArray());
 
     if (this._queue.size() >= this._config.maxBatchSize) {
@@ -194,7 +229,7 @@ export class Dispatcher<
   }
 
   /**
-   * Clean up resources and cancel scheduled flushes.
+   * Clean up resources, cancel scheduled flushes, and clear all references for memory cleanup.
    * Should be called when disposing the client.
    */
   public dispose(): void {
@@ -202,5 +237,8 @@ export class Dispatcher<
       clearTimeout(this._timer);
       this._timer = null;
     }
+
+    this._queue.clear();
+    this._flushMutex.release();
   }
 }

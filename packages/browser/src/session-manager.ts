@@ -55,4 +55,13 @@ export class SessionManager {
   public getSessionId(): string | null {
     return this._sessionId;
   }
+
+  /**
+   * Clear the current session.
+   */
+  public clear(): void {
+    this._sessionId = null;
+
+    sessionStorage.removeItem(this._storageKey);
+  }
 }

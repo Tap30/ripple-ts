@@ -9,6 +9,7 @@ import { RippleClient, type BrowserClientConfig } from "./ripple-client.ts";
 type TestMetadata = {
   schemaVersion: string;
   eventType: string;
+  userId: string;
 };
 
 type TestEvents = {
@@ -18,6 +19,7 @@ type TestEvents = {
   test_event: { key: string };
   user_action: Record<string, unknown>;
   simple_event: Record<string, unknown>;
+  page_view: { page: string };
 };
 
 // Mock UAParser
@@ -34,9 +36,19 @@ vi.mock("ua-parser-js", () => ({
 // Mock SessionManager
 vi.mock("./session-manager.ts", () => ({
   SessionManager: vi.fn().mockImplementation(function () {
+    let sessionId: string | null = null;
+    let initCounter = 0;
+
     return {
-      init: vi.fn().mockReturnValue("test-session-id"),
-      getSessionId: vi.fn().mockReturnValue("test-session-id"),
+      init: vi.fn().mockImplementation(() => {
+        initCounter++;
+        sessionId = `test-session-id-${initCounter}`;
+        return sessionId;
+      }),
+      getSessionId: vi.fn().mockImplementation(() => sessionId),
+      clear: vi.fn().mockImplementation(() => {
+        sessionId = null;
+      }),
     };
   }),
 }));
@@ -74,14 +86,6 @@ describe("RippleClient", () => {
       value: {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    Object.defineProperty(global, "document", {
-      value: {
-        visibilityState: "visible",
       },
       writable: true,
       configurable: true,
@@ -167,10 +171,11 @@ describe("RippleClient", () => {
   });
 
   describe("getSessionId", () => {
-    it("should return session ID from session manager", () => {
+    it("should return session ID from session manager", async () => {
+      await client.init();
       const sessionId = client.getSessionId();
 
-      expect(sessionId).toBe("test-session-id");
+      expect(sessionId).toBe("test-session-id-1");
     });
   });
 
@@ -223,6 +228,44 @@ describe("RippleClient", () => {
       client.dispose();
 
       expect(mockStorageAdapter.load).toHaveBeenCalled();
+    });
+
+    it("should allow re-initialization after dispose", async () => {
+      // First init
+      await client.init();
+      const firstSessionId = client.getSessionId();
+
+      expect(firstSessionId).toBeTruthy();
+
+      // Dispose
+      client.dispose();
+      expect(client.getSessionId()).toBeNull();
+
+      // Re-init should work
+      await client.init();
+      const secondSessionId = client.getSessionId();
+
+      expect(secondSessionId).toBeTruthy();
+      expect(secondSessionId).not.toBe(firstSessionId);
+    });
+
+    it("should work normally after dispose and re-init", async () => {
+      // First lifecycle
+      await client.init();
+      client.setMetadata("userId", "123");
+
+      // Dispose
+      client.dispose();
+
+      // Re-init and use normally
+      await client.init();
+      client.setMetadata("userId", "456");
+
+      expect(async () => {
+        await client.track("page_view", { page: "/home" });
+      }).not.toThrow();
+
+      expect(client.getMetadata()).toEqual({ userId: "456" });
     });
   });
 

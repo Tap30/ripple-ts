@@ -672,6 +672,43 @@ client.setMetadata("sessionId", "abc");
 
 ### Custom Adapters
 
+## Lifecycle Management
+
+The SDK provides proper lifecycle management for long-running applications:
+
+```typescript
+// Initialize the client
+await client.init();
+
+// Use the client
+await client.track("user_action", { action: "click" });
+
+// Get current state
+const metadata = client.getMetadata();
+const sessionId = client.getSessionId(); // Browser only
+
+// Clean up resources when done
+client.dispose();
+
+// Re-initialize if needed
+await client.init();
+```
+
+### Memory Management
+
+The `dispose()` method ensures complete memory cleanup by:
+
+- Clearing the event queue
+- Canceling scheduled flush operations
+- Releasing mutex locks
+- Clearing metadata and session state
+- Resetting initialization flags
+
+After calling `dispose()`, you can safely call `init()` again to restart the
+client.
+
+### Custom Adapters
+
 #### Using Built-in Adapters
 
 ```typescript

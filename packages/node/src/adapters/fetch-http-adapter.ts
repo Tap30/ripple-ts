@@ -19,16 +19,27 @@ export class FetchHttpAdapter implements HttpAdapter {
     events: Event[],
     headers: Record<string, string>,
   ): Promise<HttpResponse> {
+    const body = JSON.stringify({ events });
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({ events }),
+      body,
     });
+
+    let data: unknown;
+
+    try {
+      data = await response.json();
+    } catch {
+      // Ignore JSON parsing errors
+      data = undefined;
+    }
 
     return {
       ok: response.ok,
       status: response.status,
-      data: await response.json().catch(() => undefined),
+      data,
     };
   }
 }

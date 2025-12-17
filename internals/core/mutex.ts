@@ -70,4 +70,13 @@ export class Mutex {
       this._releaseLock();
     }
   }
+
+  /**
+   * Force release the mutex and clear all queued tasks.
+   * Used for cleanup during disposal.
+   */
+  public release(): void {
+    this._isLocked = false;
+    this._taskQueue = [];
+  }
 }

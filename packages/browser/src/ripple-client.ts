@@ -47,25 +47,6 @@ export class RippleClient<
   }
 
   /**
-   * Initialize the client, restore persisted events, and start session tracking.
-   * Should be called before tracking events.
-   */
-  public override async init(): Promise<void> {
-    this._sessionId = this._sessionManager.init();
-
-    await super.init();
-  }
-
-  /**
-   * Get the current session ID.
-   *
-   * @returns The session ID or null if not initialized
-   */
-  public getSessionId(): string | null {
-    return this._sessionManager.getSessionId();
-  }
-
-  /**
    * Get platform information for browser environment.
    *
    * @returns Web platform information
@@ -94,5 +75,32 @@ export class RippleClient<
         version: os.version?.toLowerCase() || "UNKNOWN",
       },
     };
+  }
+
+  /**
+   * Initialize the client, restore persisted events, and start session tracking.
+   * Should be called before tracking events.
+   */
+  public override async init(): Promise<void> {
+    this._setSessionId(this._sessionManager.init());
+
+    await super.init();
+  }
+
+  /**
+   * Get the current session ID.
+   *
+   * @returns The session ID or null if not initialized
+   */
+  public override getSessionId(): string | null {
+    return this._sessionManager.getSessionId();
+  }
+
+  /**
+   * Dispose the client and clean up resources including session management.
+   */
+  public override dispose(): void {
+    this._sessionManager.clear();
+    super.dispose();
   }
 }

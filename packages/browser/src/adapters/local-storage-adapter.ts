@@ -23,6 +23,7 @@ export class LocalStorageAdapter implements StorageAdapter {
    */
   public async save(events: Event[]): Promise<void> {
     await Promise.resolve();
+
     localStorage.setItem(this._key, JSON.stringify(events));
   }
 
@@ -33,6 +34,7 @@ export class LocalStorageAdapter implements StorageAdapter {
    */
   public async load(): Promise<Event[]> {
     await Promise.resolve();
+
     const data = localStorage.getItem(this._key);
 
     return data ? (JSON.parse(data) as Event[]) : [];
@@ -43,6 +45,7 @@ export class LocalStorageAdapter implements StorageAdapter {
    */
   public async clear(): Promise<void> {
     await Promise.resolve();
+
     localStorage.removeItem(this._key);
   }
 }

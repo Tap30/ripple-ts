@@ -62,7 +62,7 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
 
 ### Configuration Options
 
-```typescript
+```ts
 {
   apiKey: string;                    // Required: API authentication key
   endpoint: string;                  // Required: API endpoint URL
@@ -77,6 +77,13 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
   };
 }
 ```
+
+### Lifecycle Management
+
+- **Initialization**: Call `init()` before tracking events
+- **Memory Cleanup**: Call `dispose()` to clean up resources and free memory
+- **Re-initialization**: After `dispose()`, you can call `init()` again to
+  restart the client
 
 ### Developer Experience
 

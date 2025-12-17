@@ -118,6 +118,9 @@ await client.track("form_submit", { form: "contact" });
 // Track without payload (just signal that something happened)
 await client.track("page_loaded");
 
+// Get current metadata
+const currentMetadata = client.getMetadata();
+
 // Manually flush events
 await client.flush();
 
@@ -128,68 +131,32 @@ client.dispose();
 ### Type-Safe Metadata
 
 ```ts
-interface Metadata extends Record<string, unknown> {
-  userId: string;
-  sessionId: string;
-  appVersion: string;
-}
-
-const client = new RippleClient<Metadata>({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new IndexedDBAdapter(),
-  },
-});
-
-// Type-safe metadata with autocomplete
-client.setMetadata("userId", "user-123");
-client.setMetadata("sessionId", "session-abc");
-client.setMetadata("appVersion", "1.0.0");
-
-// Metadata is automatically attached to all events
-await client.track("page_view", { page: "/dashboard" });
-
-// Track event with typed metadata
-await client.track(
-  "user_signup",
-  { email: "user@example.com" },
-  {
-    schemaVersion: "1.0.0",
-    eventType: "conversion",
-    source: "landing_page",
-  },
-);
-```
-
-### Event Metadata
-
-Track events with optional metadata for schema versioning and type safety:
-
-```ts
 import { RippleClient } from "@tapsioss/ripple-browser";
 
-// Define event types mapping
-type AppEvents = {
+type Events = {
   "user.signup": { email: string; plan: "free" | "premium" };
   "product.viewed": { productId: string; category: string };
   "cart.abandoned": { items: number; totalValue: number };
 };
 
-// Define custom metadata type
-type AppMetadata = {
+type Metadata = {
   schemaVersion: string;
   eventType: "user_action" | "system_event" | "conversion";
   source: string;
   experimentId?: string;
+  userId: string;
+  appVersion: string;
 };
 
 // Create typed client with both generics
-const client = new RippleClient<AppEvents, AppMetadata>({
+const client = new RippleClient<Events, Metadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
+
+// Metadata to automatically attach to all events
+client.setMetadata("userId", "user-123");
+client.setMetadata("appVersion", "1.0.0");
 
 await client.init();
 
@@ -205,25 +172,14 @@ await client.track(
   },
 );
 
-// Type-safe event tracking
 await client.track("product.viewed", {
   productId: "prod-123",
-  category: "electronics"
+  category: "electronics",
 });
-);
-
-// Metadata is optional
-await client.track("button_click", { button: "submit" });
 ```
 
 **Note**: Platform information (browser, device, OS) is automatically detected
 and attached to all events.
-
-**Use Cases**:
-
-- Schema versioning for backward compatibility
-- Event structure evolution tracking
-- Data migration identification
 
 ### Custom Storage Adapters
 
@@ -347,7 +303,7 @@ const client = new RippleClient({
 - `ERROR`: Error messages
 - `NONE`: No logging output
 
-```typescript
+```ts
 import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-browser";
 
 const client = new RippleClient({
@@ -374,7 +330,7 @@ installed alongside the SDK.
 
 **Example platform data:**
 
-```typescript
+```ts
 {
   type: "web",
   browser: { name: "chrome", version: "120.0" },
@@ -466,11 +422,125 @@ const adminClient = new RippleClient({
 });
 ```
 
+## Extending Functionality
+
+### Extending the Client Class
+
+```ts
+import {
+  RippleClient,
+  type BrowserClientConfig,
+} from "@tapsioss/ripple-browser";
+
+class TrackedRippleClient extends RippleClient {
+  private traceId: string | null = null;
+  private flowId: string | null = null;
+
+  constructor(config: BrowserClientConfig) {
+    super(config);
+  }
+
+  // Set trace ID for distributed tracing
+  public setTraceId(traceId: string): void {
+    this.traceId = traceId;
+  }
+
+  // Set flow ID for user journey tracking
+  public setFlowId(flowId: string): void {
+    this.flowId = flowId;
+  }
+
+  // Override track to automatically inject trace/flow IDs
+  public override async track(
+    name: string,
+    payload?: any,
+    metadata?: any,
+  ): Promise<void> {
+    const enhancedMetadata = {
+      ...metadata,
+      ...(this.traceId && { traceId: this.traceId }),
+      ...(this.flowId && { flowId: this.flowId }),
+    };
+
+    return super.track(name, payload, enhancedMetadata);
+  }
+
+  // Convenience method for A/B testing
+  public trackExperiment(experimentId: string, variant: string, event: string) {
+    return this.track(event, { experimentId, variant });
+  }
+}
+
+const client = new TrackedRippleClient(config);
+await client.init();
+
+// Set trace context
+client.setTraceId("trace-abc-123");
+client.setFlowId("checkout-flow");
+
+// All events now include traceId and flowId
+await client.track("button_click", { button: "purchase" });
+await client.trackExperiment("checkout-v2", "variant-a", "conversion");
+```
+
+### Schema Transformation via HTTP Adapter
+
+```ts
+import {
+  type HttpAdapter,
+  type HttpResponse,
+  type Event,
+} from "@tapsioss/ripple-browser";
+
+class SchemaTransformAdapter implements HttpAdapter {
+  constructor(private baseAdapter: HttpAdapter) {}
+
+  public async send(
+    endpoint: string,
+    events: Event[],
+    headers: Record<string, string>,
+    apiKeyHeader: string,
+  ): Promise<HttpResponse> {
+    // Transform to match your analytics platform schema
+    const transformedEvents = events.map(event => ({
+      event_name: event.name,
+      properties: event.payload,
+      user_properties: {
+        session_id: event.sessionId,
+        trace_id: event.metadata?.traceId,
+        flow_id: event.metadata?.flowId,
+      },
+      context: {
+        browser: event.platform?.browser?.name,
+        os: event.platform?.os?.name,
+        timestamp: event.timestamp,
+      },
+    }));
+
+    return this.baseAdapter.send(
+      endpoint,
+      transformedEvents as any,
+      headers,
+      apiKeyHeader,
+    );
+  }
+}
+
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  adapters: {
+    httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
+    storageAdapter: new IndexedDBAdapter(),
+  },
+});
+```
+
 ## Configuration
 
 The RippleClient uses `BrowserClientConfig` for configuration:
 
-```typescript
+```ts
 type BrowserClientConfig = {
   apiKey: string; // Required: API authentication key
   endpoint: string; // Required: API endpoint URL

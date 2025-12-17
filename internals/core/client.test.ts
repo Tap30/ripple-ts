@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
-import { Client } from "./client.ts";
-import type { ClientConfig, Event, Platform } from "./types.ts";
+import { Client, type ClientConfig } from "./client.ts";
+import type { Event, EventPayload, Platform } from "./types.ts";
 
 type TestMetadata = {
   userId: string;
@@ -381,6 +381,116 @@ describe("Client", () => {
       const client = createTestClient();
 
       expect(() => client.dispose()).not.toThrow();
+    });
+
+    it("should clear metadata on dispose", async () => {
+      const client = createTestClient();
+
+      await client.init();
+
+      client.setMetadata("userId", "123");
+      client.dispose();
+
+      // Re-init and check metadata is cleared
+      await client.init();
+      expect(client.getMetadata()).toEqual({});
+    });
+
+    it("should clear session ID on dispose", async () => {
+      const client = createTestClient();
+
+      await client.init();
+
+      // Manually set a session ID to test disposal
+      client["_sessionId"] = "test-session-123";
+      expect(client.getSessionId()).toBe("test-session-123");
+
+      client.dispose();
+      expect(client.getSessionId()).toBeNull();
+    });
+
+    it("should allow re-initialization after dispose", async () => {
+      const client = createTestClient();
+
+      // First init
+      await client.init();
+      // Manually set session ID to simulate session management
+      client["_sessionId"] = "session-1";
+      expect(client.getSessionId()).toBe("session-1");
+
+      // Dispose
+      client.dispose();
+      expect(client.getSessionId()).toBeNull();
+
+      // Re-init should work
+      await expect(client.init()).resolves.not.toThrow();
+      expect(client.getSessionId()).toBeNull(); // Base client doesn't auto-generate sessions
+    });
+
+    it("should work normally after dispose and re-init", async () => {
+      const client = createTestClient();
+
+      // First lifecycle
+      await client.init();
+
+      client.setMetadata("userId", "123");
+
+      await client.track("user_signup", {
+        email: "test@example.com",
+        plan: "premium",
+      });
+
+      // Dispose
+      client.dispose();
+
+      // Re-init and use normally
+      await client.init();
+      client.setMetadata("userId", "456");
+
+      expect(async () => {
+        await client.track("user_signup", {
+          email: "test2@example.com",
+          plan: "basic",
+        });
+      }).not.toThrow();
+
+      expect(client.getMetadata()).toEqual({ userId: "456" });
+    });
+
+    it("should handle multiple dispose calls gracefully", () => {
+      const client = createTestClient();
+
+      expect(() => {
+        client.dispose();
+        client.dispose();
+        client.dispose();
+      }).not.toThrow();
+    });
+
+    it("should allow subclasses to override _setSessionId", () => {
+      class TestClient extends Client<Record<string, EventPayload>> {
+        protected _getPlatform(): Platform | null {
+          return null;
+        }
+
+        public testSetSessionId(sessionId: string): string | null {
+          return this._setSessionId(sessionId);
+        }
+      }
+
+      const client = new TestClient({
+        apiKey: "test-key",
+        endpoint: "https://api.example.com",
+        adapters: {
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        },
+      });
+
+      const result = client.testSetSessionId("test-session-123");
+
+      expect(result).toBeNull();
+      expect(client.getSessionId()).toBe("test-session-123");
     });
   });
 

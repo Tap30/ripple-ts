@@ -37,15 +37,20 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
   }
 
   /**
+   * Clear all metadata.
+   */
+  public clear(): void {
+    this._metadata = {};
+  }
+
+  /**
    * Merge shared metadata with event-specific metadata.
    *
    * @param eventMetadata Event-specific metadata
    * @returns Merged metadata object
    */
   public merge(eventMetadata?: Partial<TMetadata>): TMetadata | null {
-    if (this.isEmpty() && !eventMetadata) {
-      return null;
-    }
+    if (this.isEmpty() && !eventMetadata) return null;
 
     return {
       ...this._metadata,

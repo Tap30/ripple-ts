@@ -27,31 +27,31 @@ export class ConsoleLoggerAdopter implements LoggerAdapter {
   }
 
   public debug(message: string, ...args: unknown[]): void {
-    if (this._shouldLog(LogLevel.DEBUG)) {
-      // eslint-disable-next-line no-console
-      console.debug(`[Ripple] ${message}`, ...args);
-    }
+    if (!this._shouldLog(LogLevel.DEBUG)) return;
+
+    // eslint-disable-next-line no-console
+    console.debug(`[Ripple] ${message}`, ...args);
   }
 
   public info(message: string, ...args: unknown[]): void {
-    if (this._shouldLog(LogLevel.INFO)) {
-      // eslint-disable-next-line no-console
-      console.info(`[Ripple] ${message}`, ...args);
-    }
+    if (!this._shouldLog(LogLevel.INFO)) return;
+
+    // eslint-disable-next-line no-console
+    console.info(`[Ripple] ${message}`, ...args);
   }
 
   public warn(message: string, ...args: unknown[]): void {
-    if (this._shouldLog(LogLevel.WARN)) {
-      // eslint-disable-next-line no-console
-      console.warn(`[Ripple] ${message}`, ...args);
-    }
+    if (!this._shouldLog(LogLevel.WARN)) return;
+
+    // eslint-disable-next-line no-console
+    console.warn(`[Ripple] ${message}`, ...args);
   }
 
   public error(message: string, ...args: unknown[]): void {
-    if (this._shouldLog(LogLevel.ERROR)) {
-      // eslint-disable-next-line no-console
-      console.error(`[Ripple] ${message}`, ...args);
-    }
+    if (!this._shouldLog(LogLevel.ERROR)) return;
+
+    // eslint-disable-next-line no-console
+    console.error(`[Ripple] ${message}`, ...args);
   }
 }
 

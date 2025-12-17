@@ -9,6 +9,7 @@ import { RippleClient, type NodeClientConfig } from "./ripple-client.ts";
 type TestMetadata = {
   schemaVersion: string;
   eventType: string;
+  userId: string;
 };
 
 type TestEvents = {
@@ -19,6 +20,7 @@ type TestEvents = {
   user_action: Record<string, unknown>;
   server_action: Record<string, unknown>;
   simple_event: Record<string, unknown>;
+  page_view: { page: string };
 };
 
 const mockHttpAdapter: HttpAdapter = {
@@ -302,6 +304,39 @@ describe("RippleClient", () => {
       client.dispose();
 
       expect(superDisposeSpy).toHaveBeenCalled();
+    });
+
+    it("should allow re-initialization after dispose", async () => {
+      // First init
+      await client.init();
+
+      // Dispose
+      client.dispose();
+      expect(client.getSessionId()).toBeNull();
+
+      // Re-init should work
+      await client.init();
+      // Node.js client doesn't auto-generate session IDs
+      expect(client.getSessionId()).toBeNull();
+    });
+
+    it("should work normally after dispose and re-init", async () => {
+      // First lifecycle
+      await client.init();
+      client.setMetadata("userId", "123");
+
+      // Dispose
+      client.dispose();
+
+      // Re-init and use normally
+      await client.init();
+      client.setMetadata("userId", "456");
+
+      expect(async () => {
+        await client.track("page_view", { page: "/home" });
+      }).not.toThrow();
+
+      expect(client.getMetadata()).toEqual({ userId: "456" });
     });
   });
 });

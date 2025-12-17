@@ -87,7 +87,7 @@ await client.flush();
 
 ### Basic Tracking
 
-```typescript
+```ts
 import { RippleClient } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
@@ -108,53 +108,35 @@ await client.track("database_query", { table: "users", duration: 45 });
 // Track without payload (just signal that something happened)
 await client.track("server_started");
 
+// Get current metadata
+const currentMetadata = client.getMetadata();
+
+// Get session ID (returns null for Node.js client unless manually set)
+const sessionId = client.getSessionId();
+
 // Manually flush events
 await client.flush();
+
+// Clean up resources when shutting down
+client.dispose();
 ```
 
 ### Type-Safe Metadata
 
-```typescript
-interface Metadata extends Record<string, unknown> {
+```ts
+import { RippleClient } from "@tapsioss/ripple-node";
+
+type Metadata = {
   serverId: string;
   environment: "development" | "staging" | "production";
   region: string;
-}
+  schemaVersion: string;
+  eventType: "api_call" | "system_event" | "user_action";
+  source: string;
+  requestId?: string;
+};
 
-const client = new RippleClient<Metadata>({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-});
-
-// Type-safe metadata with autocomplete
-client.setMetadata("serverId", "server-456");
-client.setMetadata("environment", "production");
-client.setMetadata("region", "us-east-1");
-
-// Metadata is automatically attached to all events
-await client.track("api_request", { endpoint: "/api/users" });
-
-// Track event with typed metadata
-await client.track(
-  "order_created",
-  { orderId: "order-456", amount: 99.99 },
-  {
-    schemaVersion: "2.1.0",
-    eventType: "conversion",
-    source: "api",
-  },
-);
-```
-
-### Event Metadata
-
-Track events with optional metadata for schema versioning and type safety:
-
-```typescript
-import { RippleClient } from "@tapsioss/ripple-node";
-
-// Define event types mapping
-type ServerEvents = {
+type Events = {
   "database.query": {
     table: string;
     operation: "select" | "insert" | "update";
@@ -168,19 +150,16 @@ type ServerEvents = {
   };
 };
 
-// Define custom metadata type
-type ServerMetadata = {
-  schemaVersion: string;
-  eventType: "api_call" | "system_event" | "user_action";
-  source: string;
-  requestId?: string;
-};
-
 // Create typed client with both generics
-const client = new RippleClient<ServerEvents, ServerMetadata>({
+const client = new RippleClient<Events, Metadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
 });
+
+// Metadata to automatically attach to all events
+client.setMetadata("serverId", "server-456");
+client.setMetadata("environment", "production");
+client.setMetadata("region", "us-east-1");
 
 await client.init();
 
@@ -196,28 +175,16 @@ await client.track(
   },
 );
 
-// Type-safe event tracking
+// Metadata is automatically attached to all events
 await client.track("cache.miss", {
   key: "user:123",
   ttl: 3600,
 });
-
-// Metadata is optional
-await client.track("api_request", { endpoint: "/api/users" });
 ```
-
-**Note**: Platform information (server type) is automatically attached to all
-events.
-
-**Use Cases**:
-
-- Schema versioning for backward compatibility
-- Event structure evolution tracking
-- Data migration identification
 
 ### Custom Storage Adapter
 
-```typescript
+```ts
 import {
   RippleClient,
   type StorageAdapter,
@@ -252,7 +219,7 @@ const client = new RippleClient({
 When using multiple Ripple instances in the same Node.js application, configure
 unique storage paths to prevent conflicts:
 
-```typescript
+```ts
 import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
 
 // Analytics service
@@ -280,17 +247,9 @@ await marketingClient.init();
 
 }
 
-public async clear(): Promise<void> { await redis.del("ripple:events"); } }
-
-const client = new RippleClient({ apiKey: "your-api-key", endpoint:
-"<https://api.example.com/events>", adapters: { storageAdapter: new
-RedisStorageAdapter(), }, });
-
-````
-
 ### Custom HTTP Adapter
 
-```typescript
+```ts
 import {
   RippleClient,
   type HttpAdapter,
@@ -320,11 +279,11 @@ const client = new RippleClient({
     httpAdapter: new GrpcHttpAdapter(),
   },
 });
-````
+```
 
 ### Graceful Shutdown
 
-```typescript
+```ts
 import { RippleClient } from "@tapsioss/ripple-node";
 
 const client = new RippleClient(config);
@@ -426,11 +385,138 @@ const client2 = new RippleClient({
 });
 ```
 
+## Extending Functionality
+
+### Extending the Client Class
+
+```ts
+import { RippleClient, type NodeClientConfig } from "@tapsioss/ripple-node";
+
+class TrackedRippleClient extends RippleClient {
+  private requestId: string | null = null;
+  private correlationId: string | null = null;
+
+  constructor(config: NodeClientConfig) {
+    super(config);
+  }
+
+  // Set request ID for request tracing
+  public setRequestId(requestId: string): void {
+    this.requestId = requestId;
+  }
+
+  // Set correlation ID for cross-service tracking
+  public setCorrelationId(correlationId: string): void {
+    this.correlationId = correlationId;
+  }
+
+  // Override track to automatically inject IDs
+  public override async track(
+    name: string,
+    payload?: any,
+    metadata?: any,
+  ): Promise<void> {
+    const enhancedMetadata = {
+      ...metadata,
+      ...(this.requestId && { requestId: this.requestId }),
+      ...(this.correlationId && { correlationId: this.correlationId }),
+      serviceVersion: process.env.SERVICE_VERSION,
+    };
+
+    return super.track(name, payload, enhancedMetadata);
+  }
+
+  // Convenience method for API monitoring
+  public trackApiCall(
+    endpoint: string,
+    method: string,
+    duration: number,
+    status: number,
+  ) {
+    return this.track("api_call", {
+      endpoint,
+      method,
+      duration,
+      status,
+      success: status < 400,
+    });
+  }
+}
+
+const client = new TrackedRippleClient(config);
+await client.init();
+
+// Set request context (e.g., from Express middleware)
+client.setRequestId("req-xyz-789");
+client.setCorrelationId("corr-abc-123");
+
+// All events now include request/correlation IDs
+await client.track("database_query", { table: "users", duration: 45 });
+await client.trackApiCall("/api/users", "GET", 150, 200);
+```
+
+### Schema Transformation via HTTP Adapter
+
+```ts
+import {
+  type HttpAdapter,
+  type HttpResponse,
+  type Event,
+} from "@tapsioss/ripple-node";
+
+class SchemaTransformAdapter implements HttpAdapter {
+  constructor(private baseAdapter: HttpAdapter) {}
+
+  public async send(
+    endpoint: string,
+    events: Event[],
+    headers: Record<string, string>,
+    apiKeyHeader: string,
+  ): Promise<HttpResponse> {
+    // Transform to match your observability platform schema
+    const transformedEvents = events.map(event => ({
+      "@timestamp": new Date(event.timestamp).toISOString(),
+      level: "info",
+      message: `Event: ${event.name}`,
+      event: {
+        name: event.name,
+        data: event.payload,
+      },
+      trace: {
+        id: event.metadata?.correlationId,
+        request_id: event.metadata?.requestId,
+      },
+      service: {
+        name: "your-service",
+        version: event.metadata?.serviceVersion,
+      },
+      labels: event.metadata,
+    }));
+
+    return this.baseAdapter.send(
+      endpoint,
+      transformedEvents as any,
+      headers,
+      apiKeyHeader,
+    );
+  }
+}
+
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  adapters: {
+    httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
+    storageAdapter: new FileStorageAdapter(),
+  },
+});
+```
+
 ## Configuration
 
 The RippleClient uses `NodeClientConfig` for configuration:
 
-```typescript
+```ts
 type NodeClientConfig = {
   apiKey: string; // Required: API authentication key
   endpoint: string; // Required: API endpoint URL
@@ -462,7 +548,7 @@ type NodeClientConfig = {
 - `ERROR`: Error messages
 - `NONE`: No logging output
 
-```typescript
+```ts
 import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
@@ -517,7 +603,7 @@ this when you're done using the client (e.g., during graceful shutdown).
 By default, events are persisted to `.ripple_events.json` in the current working
 directory. You can customize the file path:
 
-```typescript
+```ts
 import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
