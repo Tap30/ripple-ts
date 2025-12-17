@@ -1,5 +1,12 @@
 # @tapsioss/ripple-node
 
+## 0.3.0
+### Minor Changes
+
+
+
+- [`d127dd8`](https://github.com/Tap30/ripple-ts/commit/d127dd817f4e9c933d78a3ef421e2e220b77743c) Thanks [@mimshins](https://github.com/mimshins)! - Refactor: improve disposability, memory management, documentation, and readability of the code.
+
 ## 0.2.0
 ### Minor Changes
 
