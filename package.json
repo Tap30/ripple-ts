@@ -39,7 +39,7 @@
     "dev:start": "pnpm --filter @repo/playground run dev:server",
     "dev:node": "pnpm --filter @repo/playground run dev:node",
     "dev:browser": "pnpm --filter @repo/playground run dev:browser",
-    "format:prettier": "prettier . --write --cache",
+    "format:prettier": "prettier . --write --cache --cache-location=.prettiercache",
     "format:eslint": "eslint --color --cache --config eslint.config.js --cache-location .eslintcache --fix",
     "format": "run-p format:prettier format:eslint",
     "check:cycles": "tsx scripts/check-cycles",
