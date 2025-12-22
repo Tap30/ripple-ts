@@ -1,5 +1,12 @@
 # @tapsioss/ripple-node
 
+## 0.4.0
+### Minor Changes
+
+
+
+- [#11](https://github.com/Tap30/ripple-ts/pull/11) [`f2c1782`](https://github.com/Tap30/ripple-ts/commit/f2c178200d8fd8dcf0b9fd70a98b3a325b02e4aa) Thanks [@mimshins](https://github.com/mimshins)! - Refactor!: flatten `ClientConfig` by removing nested `adapters` field.
+
 ## 0.3.0
 ### Minor Changes
 
