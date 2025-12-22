@@ -66,11 +66,9 @@ type ServerEvents = {
 const client = new RippleClient<ServerEvents>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter(),
-    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO), // Optional: Enable logging
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new FileStorageAdapter(),
+  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO), // Optional: Enable logging
 });
 
 await client.init();
@@ -208,9 +206,7 @@ class RedisStorageAdapter implements StorageAdapter {
 
 const client = new RippleClient({
   ...config,
-  adapters: {
-    storageAdapter: new RedisStorageAdapter(),
-  },
+  storageAdapter: new RedisStorageAdapter(),
 });
 ```
 
@@ -226,18 +222,14 @@ import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
 const analyticsClient = new RippleClient({
   apiKey: "analytics-key",
   endpoint: "https://analytics.example.com/events",
-  adapters: {
-    storageAdapter: new FileStorageAdapter("./analytics_events.json"),
-  },
+  storageAdapter: new FileStorageAdapter("./analytics_events.json"),
 });
 
 // Marketing service
 const marketingClient = new RippleClient({
   apiKey: "marketing-key",
   endpoint: "https://marketing.example.com/events",
-  adapters: {
-    storageAdapter: new FileStorageAdapter("./marketing_events.json"),
-  },
+  storageAdapter: new FileStorageAdapter("./marketing_events.json"),
 });
 
 // Both clients can operate independently without conflicts
@@ -275,9 +267,7 @@ class GrpcHttpAdapter implements HttpAdapter {
 
 const client = new RippleClient({
   ...config,
-  adapters: {
-    httpAdapter: new GrpcHttpAdapter(),
-  },
+  httpAdapter: new GrpcHttpAdapter(),
 });
 ```
 
@@ -334,17 +324,13 @@ const client2 = new RippleClient({ apiKey: "key2", endpoint: "url2" });
 const client1 = new RippleClient({
   apiKey: "key1",
   endpoint: "url1",
-  adapters: {
-    storageAdapter: new FileStorageAdapter("./service1_events.json"),
-  },
+  storageAdapter: new FileStorageAdapter("./service1_events.json"),
 });
 
 const client2 = new RippleClient({
   apiKey: "key2",
   endpoint: "url2",
-  adapters: {
-    storageAdapter: new FileStorageAdapter("./service2_events.json"),
-  },
+  storageAdapter: new FileStorageAdapter("./service2_events.json"),
 });
 ```
 
@@ -371,17 +357,13 @@ You can share stateless HTTP adapters but should separate storage:
 const sharedHttpAdapter = new FetchHttpAdapter();
 
 const client1 = new RippleClient({
-  adapters: {
-    httpAdapter: sharedHttpAdapter, // ✅ Safe to share
-    storageAdapter: new FileStorageAdapter("./client1.json"), // ✅ Separate storage
-  },
+  httpAdapter: sharedHttpAdapter, // ✅ Safe to share
+  storageAdapter: new FileStorageAdapter("./client1.json"), // ✅ Separate storage
 });
 
 const client2 = new RippleClient({
-  adapters: {
-    httpAdapter: sharedHttpAdapter, // ✅ Safe to share
-    storageAdapter: new FileStorageAdapter("./client2.json"), // ✅ Separate storage
-  },
+  httpAdapter: sharedHttpAdapter, // ✅ Safe to share
+  storageAdapter: new FileStorageAdapter("./client2.json"), // ✅ Separate storage
 });
 ```
 
@@ -505,10 +487,8 @@ class SchemaTransformAdapter implements HttpAdapter {
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
-    storageAdapter: new FileStorageAdapter(),
-  },
+  httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
+  storageAdapter: new FileStorageAdapter(),
 });
 ```
 
@@ -524,12 +504,9 @@ type NodeClientConfig = {
   flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)
-  adapters: {
-    // Required: Must provide both adapters
-    httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
-    storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
-    loggerAdapter?: LoggerAdapter; // Optional: Logger adapter (default: ConsoleLoggerAdapter with WARN level)
-  };
+  httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
+  storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
+  loggerAdapter?: LoggerAdapter; // Optional: Logger adapter (default: ConsoleLoggerAdapter with WARN level)
 };
 ```
 
@@ -553,10 +530,7 @@ import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
   // ... other config
-  adapters: {
-    // ... other adapters
-    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
-  },
+  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
 });
 ```
 
@@ -608,9 +582,7 @@ import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
 
 const client = new RippleClient({
   ...config,
-  adapters: {
-    storageAdapter: new FileStorageAdapter("/var/log/ripple/events.json"),
-  },
+  storageAdapter: new FileStorageAdapter("/var/log/ripple/events.json"),
 });
 ```
 

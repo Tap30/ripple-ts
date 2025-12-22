@@ -35,22 +35,17 @@ export type ClientConfig = {
    */
   maxRetries?: number;
   /**
-   * Custom adapters for HTTP, storage, and logging
+   * HTTP adapter for sending events
    */
-  adapters: {
-    /**
-     * HTTP adapter for sending events
-     */
-    httpAdapter: HttpAdapter;
-    /**
-     * Storage adapter for persisting events
-     */
-    storageAdapter: StorageAdapter;
-    /**
-     * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
-     */
-    loggerAdapter?: LoggerAdapter;
-  };
+  httpAdapter: HttpAdapter;
+  /**
+   * Storage adapter for persisting events
+   */
+  storageAdapter: StorageAdapter;
+  /**
+   * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
+   */
+  loggerAdapter?: LoggerAdapter;
 };
 
 /**
@@ -77,9 +72,9 @@ export abstract class Client<
    * @param config Client configuration including adapters
    */
   constructor(config: ClientConfig) {
-    if (!config.adapters?.httpAdapter || !config.adapters?.storageAdapter) {
+    if (!config.httpAdapter || !config.storageAdapter) {
       throw new Error(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config.adapters`.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
       );
     }
 
@@ -92,7 +87,7 @@ export abstract class Client<
     }
 
     this._logger =
-      config.adapters.loggerAdapter ?? new ConsoleLoggerAdopter(LogLevel.WARN);
+      config.loggerAdapter ?? new ConsoleLoggerAdopter(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {
@@ -107,8 +102,8 @@ export abstract class Client<
 
     this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
-      config.adapters.httpAdapter,
-      config.adapters.storageAdapter,
+      config.httpAdapter,
+      config.storageAdapter,
     );
   }
 

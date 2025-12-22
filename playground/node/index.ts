@@ -27,11 +27,9 @@ const client = new RippleClient({
   maxBatchSize: 5,
   maxRetries: 3,
   flushInterval: 5000,
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter(".ripple_events.json"),
-    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.INFO),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new FileStorageAdapter(".ripple_events.json"),
+  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.INFO),
 });
 
 await client.init();
@@ -54,10 +52,8 @@ type AppEvents = {
 const typedClient = new RippleClient<AppEvents, AppMetadata>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter(".ripple_typed_events.json"),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new FileStorageAdapter(".ripple_typed_events.json"),
 });
 
 await typedClient.init();
@@ -168,10 +164,8 @@ log("Test Case 8: Custom File Path");
 const customPathClient = new RippleClient({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter("./custom_events.json"),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new FileStorageAdapter("./custom_events.json"),
 });
 
 await customPathClient.init();
@@ -186,11 +180,9 @@ const errorClient = new RippleClient({
   endpoint: "http://localhost:9999/invalid",
   apiKey: "test-api-key",
   maxRetries: 2,
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter(),
-    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new FileStorageAdapter(),
+  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
 });
 
 await errorClient.init();

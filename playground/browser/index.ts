@@ -13,11 +13,9 @@ const client = new RippleClient({
   maxRetries: 3,
   flushInterval: 5000,
   sessionStoreKey: "my_app_session",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new IndexedDBAdapter(),
-    loggerAdapter: new ConsoleLoggerAdopter(LogLevel.DEBUG),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new IndexedDBAdapter(),
+  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.DEBUG),
 });
 
 await client.init();
@@ -265,11 +263,9 @@ const testRetryBtn = createButton({
         endpoint: "http://localhost:9999/invalid",
         apiKey: "test-key",
         maxRetries: 2,
-        adapters: {
-          httpAdapter: new FetchHttpAdapter(),
-          storageAdapter: new IndexedDBAdapter(),
-          loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
-        },
+        httpAdapter: new FetchHttpAdapter(),
+        storageAdapter: new IndexedDBAdapter(),
+        loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
       });
 
       await errorClient.init();
