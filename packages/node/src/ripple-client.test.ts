@@ -36,11 +36,9 @@ const mockStorageAdapter: StorageAdapter = {
 const mockConfig: NodeClientConfig = {
   apiKey: "test-key",
   endpoint: "https://api.test.com/events",
-  adapters: {
-    httpAdapter: mockHttpAdapter,
-    storageAdapter: mockStorageAdapter,
-    loggerAdapter: new NoOpLoggerAdapter(),
-  },
+  httpAdapter: mockHttpAdapter,
+  storageAdapter: mockStorageAdapter,
+  loggerAdapter: new NoOpLoggerAdapter(),
 };
 
 describe("RippleClient", () => {
@@ -124,10 +122,8 @@ describe("RippleClient", () => {
 
       const typedClient = new RippleClient<AppEvents, AppMetadata>({
         ...mockConfig,
-        adapters: {
-          httpAdapter: mockHttpAdapter,
-          storageAdapter: mockStorageAdapter,
-        },
+        httpAdapter: mockHttpAdapter,
+        storageAdapter: mockStorageAdapter,
       });
 
       await typedClient.init();
@@ -193,10 +189,8 @@ describe("RippleClient", () => {
     it("should set and include metadata in events", async () => {
       const genericConfig: NodeClientConfig = {
         ...mockConfig,
-        adapters: {
-          httpAdapter: mockHttpAdapter,
-          storageAdapter: mockStorageAdapter,
-        },
+        httpAdapter: mockHttpAdapter,
+        storageAdapter: mockStorageAdapter,
       };
 
       const genericClient = new RippleClient(genericConfig);

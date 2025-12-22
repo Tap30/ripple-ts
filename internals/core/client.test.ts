@@ -60,10 +60,8 @@ const createConfig = (
   apiKey: "test-key",
   endpoint: "https://api.test.com/events",
   ...overrides,
-  adapters: {
-    httpAdapter: httpAdapter ?? createMockHttpAdapter(),
-    storageAdapter: storageAdapter ?? createMockStorageAdapter(),
-  },
+  httpAdapter: httpAdapter ?? createMockHttpAdapter(),
+  storageAdapter: storageAdapter ?? createMockStorageAdapter(),
 });
 
 const createTestClient = (
@@ -99,13 +97,11 @@ describe("Client", () => {
         new TestClient({
           apiKey: "test-key",
           endpoint: "https://api.test.com/events",
-          adapters: {
-            httpAdapter: undefined as unknown as HttpAdapter,
-            storageAdapter: createMockStorageAdapter(),
-          },
+          httpAdapter: undefined as unknown as HttpAdapter,
+          storageAdapter: createMockStorageAdapter(),
         });
       }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config.adapters`.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
       );
     });
 
@@ -114,13 +110,11 @@ describe("Client", () => {
         new TestClient({
           apiKey: "test-key",
           endpoint: "https://api.test.com/events",
-          adapters: {
-            httpAdapter: createMockHttpAdapter(),
-            storageAdapter: undefined as unknown as StorageAdapter,
-          },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: undefined as unknown as StorageAdapter,
         });
       }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config.adapters`.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
       );
     });
 
@@ -129,10 +123,8 @@ describe("Client", () => {
         new TestClient({
           apiKey: "",
           endpoint: "https://api.test.com/events",
-          adapters: {
-            httpAdapter: createMockHttpAdapter(),
-            storageAdapter: createMockStorageAdapter(),
-          },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
         });
       }).toThrow("`apiKey` must be provided in `config`.");
     });
@@ -142,10 +134,8 @@ describe("Client", () => {
         new TestClient({
           apiKey: "test-key",
           endpoint: "",
-          adapters: {
-            httpAdapter: createMockHttpAdapter(),
-            storageAdapter: createMockStorageAdapter(),
-          },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
         });
       }).toThrow("`endpoint` must be provided in `config`.");
     });
@@ -481,10 +471,8 @@ describe("Client", () => {
       const client = new TestClient({
         apiKey: "test-key",
         endpoint: "https://api.example.com",
-        adapters: {
-          httpAdapter: createMockHttpAdapter(),
-          storageAdapter: createMockStorageAdapter(),
-        },
+        httpAdapter: createMockHttpAdapter(),
+        storageAdapter: createMockStorageAdapter(),
       });
 
       const result = client.testSetSessionId("test-session-123");

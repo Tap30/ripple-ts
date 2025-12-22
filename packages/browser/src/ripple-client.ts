@@ -38,7 +38,6 @@ export class RippleClient<
   constructor(config: BrowserClientConfig) {
     const finalConfig: ClientConfig = {
       ...config,
-      adapters: config.adapters,
     };
 
     super(finalConfig);

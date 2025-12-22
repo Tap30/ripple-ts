@@ -134,10 +134,8 @@ import { RippleClient } from "@tapsioss/ripple-browser";
 const client = new RippleClient<AppEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new LocalStorageAdapter(),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new LocalStorageAdapter(),
 });
 
 await client.init();

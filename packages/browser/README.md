@@ -69,10 +69,8 @@ type AppEvents = {
 const client = new RippleClient<AppEvents>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new IndexedDBAdapter(),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new IndexedDBAdapter(),
 });
 
 await client.init();
@@ -98,10 +96,8 @@ const client = new RippleClient({
   maxBatchSize: 10, // Auto-flush after 10 events
   maxRetries: 3, // Retry failed requests 3 times
   sessionStoreKey: "my_app_session", // Custom session storage key
-  adapters: {
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new IndexedDBAdapter(),
-  },
+  httpAdapter: new FetchHttpAdapter(),
+  storageAdapter: new IndexedDBAdapter(),
 });
 
 // Initialize and restore persisted events
@@ -194,17 +190,13 @@ import {
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    storageAdapter: new IndexedDBAdapter(),
-  },
+  storageAdapter: new IndexedDBAdapter(),
 });
 
 // Or use sessionStorage for temporary tracking
 const sessionClient = new RippleClient({
   ...config,
-  adapters: {
-    storageAdapter: new SessionStorageAdapter(),
-  },
+  storageAdapter: new SessionStorageAdapter(),
 });
 ```
 
@@ -225,9 +217,7 @@ const analyticsClient = new RippleClient({
   apiKey: "analytics-key",
   endpoint: "https://analytics.example.com/events",
   sessionStoreKey: "analytics_session",
-  adapters: {
-    storageAdapter: new IndexedDBAdapter("analytics_db", "events", "queue"),
-  },
+  storageAdapter: new IndexedDBAdapter("analytics_db", "events", "queue"),
 });
 
 // Marketing client
@@ -235,9 +225,7 @@ const marketingClient = new RippleClient({
   apiKey: "marketing-key",
   endpoint: "https://marketing.example.com/events",
   sessionStoreKey: "marketing_session",
-  adapters: {
-    storageAdapter: new LocalStorageAdapter("marketing_events"),
-  },
+  storageAdapter: new LocalStorageAdapter("marketing_events"),
 });
 
 // Both clients can operate independently without conflicts
@@ -273,9 +261,7 @@ class AxiosHttpAdapter implements HttpAdapter {
 
 const client = new RippleClient({
   ...config,
-  adapters: {
-    httpAdapter: new AxiosHttpAdapter(),
-  },
+  httpAdapter: new AxiosHttpAdapter(),
 });
 ```
 
@@ -308,10 +294,7 @@ import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-browser";
 
 const client = new RippleClient({
   // ... other config
-  adapters: {
-    // ... other adapters
-    loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
-  },
+  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
 });
 ```
 
@@ -374,18 +357,14 @@ const client1 = new RippleClient({
   apiKey: "key1",
   endpoint: "url1",
   sessionStoreKey: "app1_session",
-  adapters: {
-    storageAdapter: new IndexedDBAdapter("app1_db", "events", "queue"),
-  },
+  storageAdapter: new IndexedDBAdapter("app1_db", "events", "queue"),
 });
 
 const client2 = new RippleClient({
   apiKey: "key2",
   endpoint: "url2",
   sessionStoreKey: "app2_session",
-  adapters: {
-    storageAdapter: new LocalStorageAdapter("app2_events"),
-  },
+  storageAdapter: new LocalStorageAdapter("app2_events"),
 });
 ```
 
@@ -529,10 +508,8 @@ class SchemaTransformAdapter implements HttpAdapter {
 const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  adapters: {
-    httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
-    storageAdapter: new IndexedDBAdapter(),
-  },
+  httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
+  storageAdapter: new IndexedDBAdapter(),
 });
 ```
 
@@ -549,11 +526,9 @@ type BrowserClientConfig = {
   maxBatchSize?: number; // Optional: Max events per batch (default: 10)
   maxRetries?: number; // Optional: Max retry attempts (default: 3)
   sessionStoreKey?: string; // Optional: Custom session storage key (default: "ripple_session_id")
-  adapters: {
-    // Required: Must provide both adapters
-    httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
-    storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
-  };
+  httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
+  storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
+  loggerAdapter?: LoggerAdapter; // Optional: Logger adapter (default: ConsoleLoggerAdapter with WARN level)
 };
 ```
 

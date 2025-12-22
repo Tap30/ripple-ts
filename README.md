@@ -70,11 +70,9 @@ A high-performance, scalable, and fault tolerant event tracking TypeScript SDK.
   flushInterval?: number;            // Optional: Auto-flush interval (default: 5000ms)
   maxBatchSize?: number;             // Optional: Max events per batch (default: 10)
   maxRetries?: number;               // Optional: Max retry attempts (default: 3)
-  adapters: {                        // Required: Custom adapters
-    httpAdapter: HttpAdapter;        // Required: Custom HTTP adapter
-    storageAdapter: StorageAdapter;  // Required: Custom storage adapter
-    loggerAdapter?: LoggerAdapter;   // Optional: Custom logger adapter (default: ConsoleLoggerAdapter with WARN level)
-  };
+  httpAdapter: HttpAdapter;          // Required: Custom HTTP adapter
+  storageAdapter: StorageAdapter;    // Required: Custom storage adapter
+  loggerAdapter?: LoggerAdapter;     // Optional: Custom logger adapter (default: ConsoleLoggerAdapter with WARN level)
 }
 ```
 
