@@ -3,6 +3,7 @@ import {
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type ServerPlatform,
 } from "@internals/core";
 
 /**
@@ -41,6 +42,6 @@ export class RippleClient<
   protected _getPlatform(): Platform | null {
     return {
       type: "server",
-    };
+    } satisfies ServerPlatform;
   }
 }

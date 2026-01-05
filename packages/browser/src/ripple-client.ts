@@ -3,6 +3,7 @@ import {
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type WebPlatform,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
 import { SessionManager } from "./session-manager.ts";
@@ -73,7 +74,7 @@ export class RippleClient<
         name: os.name?.toLowerCase() || "UNKNOWN",
         version: os.version?.toLowerCase() || "UNKNOWN",
       },
-    };
+    } satisfies WebPlatform;
   }
 
   /**

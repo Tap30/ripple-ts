@@ -12,5 +12,8 @@ export {
   type HttpAdapter,
   type HttpResponse,
   type LoggerAdapter,
+  type Platform,
+  type PlatformInfo,
+  type ServerPlatform,
   type StorageAdapter,
 } from "@internals/core";
