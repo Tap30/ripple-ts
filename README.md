@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="64" height="64" alt="Ripple Logo" src="./ripple-logo.png" />
+
 # Ripple | TypeScript
 
 </div>
