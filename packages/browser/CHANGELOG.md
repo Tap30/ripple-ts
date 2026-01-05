@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 0.4.1
+### Patch Changes
+
+
+
+- [`0de0418`](https://github.com/Tap30/ripple-ts/commit/0de0418b3417873204c103e5843f24708a4223ec) Thanks [@mimshins](https://github.com/mimshins)! - Feat: expose platform-specific types.
+
 ## 0.4.0
 ### Minor Changes
 
