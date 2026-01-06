@@ -29,7 +29,7 @@ ripple-ts/
 
 ### Type Safety
 
-```typescript
+```ts
 // Define event types mapping
 type AppEvents = {
   "user.login": { email: string; method: "google" | "email" };
@@ -73,11 +73,10 @@ await client.track("user.login", {
 
 ## Development Commands
 
-```bash
+```sh
 pnpm build          # Build all packages
 pnpm test           # Run tests with coverage
-pnpm check:lint     # ESLint check
-pnpm check:types    # TypeScript check
+pnpm check:lint     # ESLint, TypeScript, and Prettier check
 pnpm format         # Prettier formatting
 pnpm clean          # Clean build artifacts
 ```
@@ -85,8 +84,8 @@ pnpm clean          # Clean build artifacts
 ## Testing
 
 - **Coverage**: 100% statements, branches, functions, lines
-- **Structure**: Tests co-located with source files (\*.test.ts)
-- **Environments**: jsdom for browser, node for Node.js
+- **Structure**: Tests co-located with source files `(\*.test.ts)`
+- **Environments**: `jsdom` for browser, node for Node.js
 - **Total**: 266 tests across all packages
 
 ## Code Guidelines
@@ -99,7 +98,7 @@ pnpm clean          # Clean build artifacts
 
 ### JSDoc Format
 
-```typescript
+```ts
 /**
  * Send events to the specified endpoint.
  *
@@ -109,26 +108,9 @@ pnpm clean          # Clean build artifacts
  */
 ```
 
-## Package Exports
-
-### @tapsioss/ripple-browser
-
-- `RippleClient` - Main client class
-- `FetchHttpAdapter` - HTTP adapter with keepalive
-- Storage adapters: `LocalStorageAdapter`, `SessionStorageAdapter`,
-  `IndexedDBAdapter`, `CookieStorageAdapter`
-- Logger adapters: `ConsoleLoggerAdapter`, `NoOpLoggerAdapter`
-
-### @tapsioss/ripple-node
-
-- `RippleClient` - Main client class
-- `FetchHttpAdapter` - Node.js fetch adapter
-- `FileStorageAdapter` - File system storage
-- Logger adapters: `ConsoleLoggerAdapter`, `NoOpLoggerAdapter`
-
 ## Usage Example
 
-```typescript
+```ts
 import { RippleClient } from "@tapsioss/ripple-browser";
 
 const client = new RippleClient<AppEvents, AppMetadata>({
@@ -151,5 +133,5 @@ client.dispose(); // Clean up when done
 
 1. Fork and create feature branch
 2. Ensure 100% test coverage
-3. Run `pnpm check:lint` before committing
+3. Run `pnpm check:lint` and `pnpm test` before committing
 4. Follow commit convention: `feat:`, `fix:`, `docs:`, etc.

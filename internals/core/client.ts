@@ -184,12 +184,9 @@ export abstract class Client<
    * Default implementation for base client - runtime packages can override.
    *
    * @param sessionId The session ID to set
-   * @returns `null` by default, runtime packages may return the set value
    */
-  protected _setSessionId(sessionId: string): string | null {
+  protected _setSessionId(sessionId: string): void {
     this._sessionId = sessionId;
-
-    return null;
   }
 
   /**

@@ -463,8 +463,8 @@ describe("Client", () => {
           return null;
         }
 
-        public testSetSessionId(sessionId: string): string | null {
-          return this._setSessionId(sessionId);
+        public testSetSessionId(sessionId: string): void {
+          this._setSessionId(sessionId);
         }
       }
 
@@ -475,9 +475,8 @@ describe("Client", () => {
         storageAdapter: createMockStorageAdapter(),
       });
 
-      const result = client.testSetSessionId("test-session-123");
+      client.testSetSessionId("test-session-123");
 
-      expect(result).toBeNull();
       expect(client.getSessionId()).toBe("test-session-123");
     });
   });
