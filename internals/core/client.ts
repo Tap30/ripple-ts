@@ -74,7 +74,7 @@ export abstract class Client<
   constructor(config: ClientConfig) {
     if (!config.httpAdapter || !config.storageAdapter) {
       throw new Error(
-        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
       );
     }
 
