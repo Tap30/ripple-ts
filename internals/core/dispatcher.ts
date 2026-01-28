@@ -141,16 +141,14 @@ export class Dispatcher<
       if (response.ok) {
         await this._storageAdapter.clear();
       } else if (response.status >= 400 && response.status < 500) {
-        // 4xx: Client error, no retry - immediately re-queue and persist
+        // 4xx: Client error, no retry - drop events (they won't succeed without client-side fix)
 
-        this._logger.warn("4xx client error, not retrying", {
+        this._logger.warn("4xx client error, dropping events", {
           status: response.status,
           eventsCount: events.length,
         });
-        const currentQueue = this._queue.toArray();
 
-        this._queue.fromArray([...events, ...currentQueue]);
-        await this._storageAdapter.save(this._queue.toArray());
+        await this._storageAdapter.clear();
       } else if (response.status >= 500 && attempt < this._config.maxRetries) {
         // 5xx: Server error, retry with backoff
 
@@ -159,6 +157,7 @@ export class Dispatcher<
           attempt: attempt + 1,
           maxRetries: this._config.maxRetries,
         });
+
         await delay(calculateBackoff(attempt));
         await this._sendWithRetry(events, attempt + 1);
       } else {

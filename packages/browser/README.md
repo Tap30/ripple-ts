@@ -340,6 +340,17 @@ The SDK is designed to handle concurrent operations safely:
 You can safely call `track()` and `flush()` from multiple parts of your
 application without worrying about race conditions.
 
+## Error Handling
+
+The SDK handles HTTP errors differently based on their type:
+
+- **2xx Success**: Events are cleared from storage
+- **4xx Client Errors**: Events are dropped (not retried or persisted) since
+  client errors won't resolve without code changes
+- **5xx Server Errors**: Retried with exponential backoff up to `maxRetries`,
+  then re-queued and persisted for later retry
+- **Network Errors**: Same behavior as 5xx errors
+
 ## Multi-Instance Considerations
 
 When running multiple Ripple client instances in the same application, consider
