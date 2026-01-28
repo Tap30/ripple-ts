@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 0.5.0
+### Minor Changes
+
+
+
+- [`1aad5ad`](https://github.com/Tap30/ripple-ts/commit/1aad5ad3ab599e034eeafe35d4589e9f4b599c9c) Thanks [@mimshins](https://github.com/mimshins)! - Feat: add dynamic rebatching to dispatcher's flush.
+
 ## 0.4.2
 ### Patch Changes
 
