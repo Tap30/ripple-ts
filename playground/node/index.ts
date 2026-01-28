@@ -159,7 +159,7 @@ for (let i = 0; i < 10; i++) {
 log("✓ Tracked 10 events (should auto-flush at batch size 5)");
 
 separator();
-log("Test Case 5: Dynamic Rebatching (25 events)");
+log("Test Case 6: Dynamic Rebatching (25 events)");
 
 log("Simulating offline accumulation scenario...");
 
@@ -174,14 +174,14 @@ log("✓ Tracked 25 events - flush will rebatch into 5 batches of 5 events each"
 log("Check server logs to see multiple batch requests");
 
 separator();
-log("Test Case 6: Manual Flush");
+log("Test Case 7: Manual Flush");
 
 await client.track("pre_flush_event", { test: true });
 await client.flush();
 log("✓ Manually flushed events");
 
 separator();
-log("Test Case 7: Custom File Path");
+log("Test Case 8: Custom File Path");
 
 const customPathClient = new RippleClient({
   endpoint: "http://localhost:3000/events",
@@ -196,7 +196,7 @@ await customPathClient.flush();
 log("✓ Tested custom file path storage");
 
 separator();
-log("Test Case 8: Error Handling (Invalid Endpoint)");
+log("Test Case 9: Error Handling (Invalid Endpoint)");
 
 try {
   const errorClient = new RippleClient({
@@ -219,7 +219,7 @@ try {
 }
 
 separator();
-log("Test Case 9: High Volume (100 events)");
+log("Test Case 10: High Volume (100 events)");
 
 const startTime = performance.now();
 
@@ -235,7 +235,7 @@ const duration = performance.now() - startTime;
 log(`✓ Tracked 100 events in ${duration}ms`);
 
 separator();
-log("Test Case 10: Different Event Types");
+log("Test Case 11: Different Event Types");
 
 await client.track("error_occurred", {
   error: "Database connection failed",
@@ -260,7 +260,7 @@ await client.track("business_event", {
 log("✓ Tracked: business_event");
 
 separator();
-log("Test Case 11: Lifecycle Management");
+log("Test Case 12: Lifecycle Management");
 
 await client.flush();
 log("✓ Final flush completed");
