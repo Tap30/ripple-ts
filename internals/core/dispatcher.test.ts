@@ -267,7 +267,7 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
     });
 
-    it("should not retry on 4xx client error", async () => {
+    it("should not retry on 4xx client error and should drop events", async () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -283,12 +283,16 @@ describe("Dispatcher", () => {
       );
 
       await dispatcher.enqueue(createEvent("event1"));
+      const saveCallsAfterEnqueue = (
+        storageAdapter.save as ReturnType<typeof vi.fn>
+      ).mock.calls.length;
+
       await dispatcher.flush();
 
       expect(httpAdapter.send).toHaveBeenCalledTimes(1);
-      expect(storageAdapter.save).toHaveBeenCalledWith([
-        expect.objectContaining({ name: "event1" }),
-      ]);
+      expect(storageAdapter.clear).toHaveBeenCalled();
+      // Verify no additional save calls after flush (only the one from enqueue)
+      expect(storageAdapter.save).toHaveBeenCalledTimes(saveCallsAfterEnqueue);
     });
 
     it("should retry on exception", async () => {

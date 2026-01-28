@@ -101,7 +101,7 @@ describe("Client", () => {
           storageAdapter: createMockStorageAdapter(),
         });
       }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
       );
     });
 
@@ -114,7 +114,7 @@ describe("Client", () => {
           storageAdapter: undefined as unknown as StorageAdapter,
         });
       }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in config.",
+        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
       );
     });
 
