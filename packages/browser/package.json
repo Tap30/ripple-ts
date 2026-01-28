@@ -1,6 +1,6 @@
 {
   "name": "@tapsioss/ripple-browser",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Official Ripple TypeScript SDK for browsers.",
   "type": "module",
   "main": "./dist/index.js",

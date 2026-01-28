@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 0.4.2
+### Patch Changes
+
+
+
+- [#15](https://github.com/Tap30/ripple-ts/pull/15) [`7c6baaa`](https://github.com/Tap30/ripple-ts/commit/7c6baaa40ed8539fd19ebbb4b36f80ee40106042) Thanks [@mimshins](https://github.com/mimshins)! - Fix: resolve the potential memory bloat and overhead in case of 4xx client errors.
+
 ## 0.4.1
 ### Patch Changes
 
