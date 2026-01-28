@@ -222,6 +222,104 @@ describe("Dispatcher", () => {
 
       expect(httpAdapter.send).toHaveBeenCalledTimes(1);
     });
+
+    it("should rebatch events when queue exceeds maxBatchSize", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 3 });
+      const dispatcher = new Dispatcher(config, httpAdapter, storageAdapter);
+
+      // Manually restore 7 events to simulate offline accumulation
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createEvent("event1"),
+        createEvent("event2"),
+        createEvent("event3"),
+        createEvent("event4"),
+        createEvent("event5"),
+        createEvent("event6"),
+        createEvent("event7"),
+      ]);
+
+      await dispatcher.restore();
+      await dispatcher.flush();
+
+      // Should send 3 batches: [1,2,3], [4,5,6], [7]
+      expect(httpAdapter.send).toHaveBeenCalledTimes(3);
+
+      const calls = (httpAdapter.send as ReturnType<typeof vi.fn>).mock.calls;
+
+      expect(calls[0]?.[1]).toHaveLength(3);
+      expect(calls[1]?.[1]).toHaveLength(3);
+      expect(calls[2]?.[1]).toHaveLength(1);
+    });
+
+    it("should send single batch when queue size equals maxBatchSize", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 3 });
+      const dispatcher = new Dispatcher(config, httpAdapter, storageAdapter);
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createEvent("event1"),
+        createEvent("event2"),
+        createEvent("event3"),
+      ]);
+
+      await dispatcher.restore();
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+      expect(
+        (httpAdapter.send as ReturnType<typeof vi.fn>).mock.calls[0]?.[1],
+      ).toHaveLength(3);
+    });
+
+    it("should send single batch when queue size is less than maxBatchSize", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 10 });
+      const dispatcher = new Dispatcher(config, httpAdapter, storageAdapter);
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createEvent("event1"),
+        createEvent("event2"),
+      ]);
+
+      await dispatcher.restore();
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+      expect(
+        (httpAdapter.send as ReturnType<typeof vi.fn>).mock.calls[0]?.[1],
+      ).toHaveLength(2);
+    });
+
+    it("should maintain event order across rebatched sends", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 2 });
+      const dispatcher = new Dispatcher(config, httpAdapter, storageAdapter);
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createEvent("event1"),
+        createEvent("event2"),
+        createEvent("event3"),
+        createEvent("event4"),
+        createEvent("event5"),
+      ]);
+
+      await dispatcher.restore();
+      await dispatcher.flush();
+
+      const calls = (httpAdapter.send as ReturnType<typeof vi.fn>).mock
+        .calls as Array<[string, Array<Event<TestMetadata>>, object, string]>;
+
+      expect(calls[0]?.[1]?.[0]?.name).toBe("event1");
+      expect(calls[0]?.[1]?.[1]?.name).toBe("event2");
+      expect(calls[1]?.[1]?.[0]?.name).toBe("event3");
+      expect(calls[1]?.[1]?.[1]?.name).toBe("event4");
+      expect(calls[2]?.[1]?.[0]?.name).toBe("event5");
+    });
   });
 
   describe("retry logic", () => {

@@ -99,6 +99,7 @@ export class Dispatcher<
    * Immediately flush all queued events.
    * Cancels any scheduled flush.
    * Uses mutex to prevent concurrent flush operations.
+   * Events are sent in batches according to `maxBatchSize` (dynamic rebatching).
    */
   public async flush(): Promise<void> {
     await this._flushMutex.runAtomic(async () => {
@@ -109,11 +110,15 @@ export class Dispatcher<
 
       if (this._queue.isEmpty()) return;
 
-      const batch = this._queue.toArray();
+      const allEvents = this._queue.toArray();
 
       this._queue.clear();
 
-      await this._sendWithRetry(batch);
+      for (let i = 0; i < allEvents.length; i += this._config.maxBatchSize) {
+        const batch = allEvents.slice(i, i + this._config.maxBatchSize);
+
+        await this._sendWithRetry(batch);
+      }
     });
   }
 

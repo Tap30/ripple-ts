@@ -19,6 +19,8 @@ for Node.js.
 
 - 🚀 **High Performance**: Efficient queue management with O(1) operations
 - 📦 **Automatic Batching**: Configurable batch size and flush intervals
+- 🔄 **Dynamic Rebatching**: Optimizes throughput when queue grows during
+  offline/retry scenarios
 - 🔄 **Retry Logic**: Exponential backoff with jitter
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
 - 💾 **File System Storage**: Persistent event storage with unlimited capacity

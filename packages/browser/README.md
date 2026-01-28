@@ -19,6 +19,8 @@ for browsers.
 
 - 🚀 **High Performance**: Efficient queue management with O(1) operations
 - 📦 **Automatic Batching**: Configurable batch size and flush intervals
+- 🔄 **Dynamic Rebatching**: Optimizes throughput when queue grows during
+  offline/retry scenarios
 - 🔄 **Retry Logic**: Exponential backoff with jitter
 - 🔐 **Session Tracking**: Automatic session ID generation and management
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
