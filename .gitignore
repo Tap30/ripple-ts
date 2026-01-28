@@ -149,3 +149,5 @@ vite.config.ts.timestamp-*
 
 # Misc
 .ripple_events.json
+*.storage.json
+*.log

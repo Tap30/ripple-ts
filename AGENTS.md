@@ -59,6 +59,8 @@ await client.track("user.login", {
   safety
 - **Unified Metadata System** - Merges shared and event-specific metadata
 - **Automatic Batching** - Configurable batch size with auto-flush
+- **Dynamic Rebatching** - Automatically rebatches accumulated events during
+  flush for optimal throughput
 - **Retry Logic** - Exponential backoff with jitter
 - **Event Persistence** - Automatic storage of unsent events
 - **Race Condition Prevention** - Mutex-protected operations
