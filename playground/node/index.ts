@@ -1,15 +1,76 @@
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable no-console */
 
+import { appendFileSync, writeFileSync } from "node:fs";
+
 import {
-  ConsoleLoggerAdopter,
   FetchHttpAdapter,
   FileStorageAdapter,
   LogLevel,
   RippleClient,
+  type LoggerAdapter,
 } from "@tapsioss/ripple-node";
 
-// Utility for logging
+class HybridLogger implements LoggerAdapter {
+  private readonly _filePath: string;
+  private readonly _level: LogLevel;
+  private readonly _levelOrder = [
+    LogLevel.DEBUG,
+    LogLevel.INFO,
+    LogLevel.WARN,
+    LogLevel.ERROR,
+    LogLevel.NONE,
+  ] as const;
+
+  constructor(filePath: string, level: LogLevel = LogLevel.INFO) {
+    this._filePath = filePath;
+    this._level = level;
+
+    writeFileSync(this._filePath, "");
+  }
+
+  private _shouldLog(messageLevel: LogLevel): boolean {
+    if (this._level === LogLevel.NONE) return false;
+
+    return (
+      this._levelOrder.indexOf(messageLevel) >=
+      this._levelOrder.indexOf(this._level)
+    );
+  }
+
+  private _log(
+    level: LogLevel,
+    consoleMethod: "debug" | "info" | "warn" | "error",
+    message: string,
+    args: unknown[],
+  ): void {
+    if (!this._shouldLog(level)) return;
+
+    const timestamp = new Date().toISOString();
+    const argsStr = args.length > 0 ? ` ${JSON.stringify(args)}` : "";
+    const line = `[${timestamp}] [${level.toUpperCase()}] ${message}${argsStr}\n`;
+
+    appendFileSync(this._filePath, line);
+    console[consoleMethod](`[Ripple] ${message}`, ...args);
+  }
+
+  public debug(message: string, ...args: unknown[]): void {
+    this._log(LogLevel.DEBUG, "debug", message, args);
+  }
+
+  public info(message: string, ...args: unknown[]): void {
+    this._log(LogLevel.INFO, "info", message, args);
+  }
+
+  public warn(message: string, ...args: unknown[]): void {
+    this._log(LogLevel.WARN, "warn", message, args);
+  }
+
+  public error(message: string, ...args: unknown[]): void {
+    this._log(LogLevel.ERROR, "error", message, args);
+  }
+}
+
 const log = (message: string): void => {
   console.log(`[${new Date().toISOString()}] ${message}`);
 };
@@ -28,43 +89,15 @@ const client = new RippleClient({
   maxRetries: 3,
   flushInterval: 5000,
   httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter(".ripple_events.json"),
-  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.INFO),
+  storageAdapter: new FileStorageAdapter("ripple.storage.json"),
+  loggerAdapter: new HybridLogger("ripple.log", LogLevel.DEBUG),
 });
 
 await client.init();
 log("✓ Client initialized with FileStorage");
 
 separator();
-log("Test Case 2: Type-safe Metadata");
-
-type AppMetadata = {
-  userId: string;
-  requestId: string;
-  environment: string;
-  serverVersion: string;
-};
-
-type AppEvents = {
-  metadata_test: Record<string, unknown>;
-};
-
-const typedClient = new RippleClient<AppEvents, AppMetadata>({
-  endpoint: "http://localhost:3000/events",
-  apiKey: "test-api-key",
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter(".ripple_typed_events.json"),
-});
-
-await typedClient.init();
-typedClient.setMetadata("userId", "user-123");
-typedClient.setMetadata("requestId", "req-abc-456");
-typedClient.setMetadata("environment", "development");
-typedClient.setMetadata("serverVersion", "1.0.0");
-log("✓ Set typed metadata");
-
-separator();
-log("Test Case 3: Basic Event Tracking");
+log("Test Case 2: Basic Event Tracking");
 
 await client.track("server_start", {
   port: 3000,
@@ -88,7 +121,7 @@ await client.track("database_query", {
 log("✓ Tracked: database_query");
 
 separator();
-log("Test Case 4: Event with Metadata");
+log("Test Case 3: Event with Metadata");
 
 await client.track(
   "user_created",
@@ -107,40 +140,14 @@ await client.track(
 log("✓ Tracked: user_created with rich metadata");
 
 separator();
-log("Test Case 5: Generic Metadata Types");
-
-await client.track(
-  "api_request_completed",
-  {
-    endpoint: "/api/users",
-    method: "POST",
-    statusCode: 201,
-    responseTime: 145,
-  },
-  {
-    schemaVersion: "1.5.0",
-    eventType: "system_performance",
-    source: "api_gateway",
-    requestId: "req-abc-456",
-    traceId: "trace-def-789",
-  },
-);
-log("✓ Tracked: api_request_completed with typed metadata");
-
-separator();
-log("Test Case 6: Metadata Management");
+log("Test Case 4: Metadata Management");
 
 client.setMetadata("deploymentId", "deploy-xyz-123");
 client.setMetadata("region", "us-east-1");
 log("✓ Set shared metadata");
 
-await typedClient.track("metadata_test", {
-  message: "This event includes typed metadata",
-});
-log("✓ Tracked event with typed metadata");
-
 separator();
-log("Test Case 6: Batch Processing (10 events)");
+log("Test Case 5: Batch Processing (10 events)");
 
 for (let i = 0; i < 10; i++) {
   await client.track("batch_event", {
@@ -152,20 +159,35 @@ for (let i = 0; i < 10; i++) {
 log("✓ Tracked 10 events (should auto-flush at batch size 5)");
 
 separator();
-log("Test Case 7: Manual Flush");
+log("Test Case 5: Dynamic Rebatching (25 events)");
+
+log("Simulating offline accumulation scenario...");
+
+for (let i = 0; i < 25; i++) {
+  await client.track("rebatch_event", {
+    index: i,
+    batch: Math.floor(i / 5),
+  });
+}
+
+log("✓ Tracked 25 events - flush will rebatch into 5 batches of 5 events each");
+log("Check server logs to see multiple batch requests");
+
+separator();
+log("Test Case 6: Manual Flush");
 
 await client.track("pre_flush_event", { test: true });
 await client.flush();
 log("✓ Manually flushed events");
 
 separator();
-log("Test Case 8: Custom File Path");
+log("Test Case 7: Custom File Path");
 
 const customPathClient = new RippleClient({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter("./custom_events.json"),
+  storageAdapter: new FileStorageAdapter("custom.storage.json"),
 });
 
 await customPathClient.init();
@@ -174,27 +196,30 @@ await customPathClient.flush();
 log("✓ Tested custom file path storage");
 
 separator();
-log("Test Case 9: Error Handling (Invalid Endpoint)");
+log("Test Case 8: Error Handling (Invalid Endpoint)");
 
-const errorClient = new RippleClient({
-  endpoint: "http://localhost:9999/invalid",
-  apiKey: "test-api-key",
-  maxRetries: 2,
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter(),
-  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
-});
+try {
+  const errorClient = new RippleClient({
+    endpoint: "http://localhost:9999/invalid",
+    apiKey: "test-api-key",
+    maxRetries: 2,
+    httpAdapter: new FetchHttpAdapter(),
+    storageAdapter: new FileStorageAdapter("error.storage.json"),
+    loggerAdapter: new HybridLogger("ripple-error.log", LogLevel.WARN),
+  });
 
-await errorClient.init();
-// await errorClient.track("error_test", { shouldFail: true });
-// log("✓ Tracked event to invalid endpoint (check console for retry logs)");
-
-// await new Promise(resolve => {
-//   setTimeout(resolve, 5000);
-// });
+  await errorClient.init();
+  await errorClient.track("error_test", { shouldFail: true });
+  await errorClient.flush();
+  log(
+    "✓ Tracked event to invalid endpoint (check ripple-error.log for retry logs)",
+  );
+} catch {
+  log("✓ Error handling test completed (expected failure)");
+}
 
 separator();
-log("Test Case 10: High Volume (100 events)");
+log("Test Case 9: High Volume (100 events)");
 
 const startTime = performance.now();
 
@@ -210,7 +235,7 @@ const duration = performance.now() - startTime;
 log(`✓ Tracked 100 events in ${duration}ms`);
 
 separator();
-log("Test Case 11: Different Event Types");
+log("Test Case 10: Different Event Types");
 
 await client.track("error_occurred", {
   error: "Database connection failed",
@@ -235,7 +260,7 @@ await client.track("business_event", {
 log("✓ Tracked: business_event");
 
 separator();
-log("Test Case 12: Lifecycle Management");
+log("Test Case 11: Lifecycle Management");
 
 await client.flush();
 log("✓ Final flush completed");
@@ -246,8 +271,6 @@ log("✓ Client disposed");
 separator();
 log("Node.js Playground Complete!");
 log("Check the following files:");
-log("  - .ripple_events.json");
-log("  - .ripple_typed_events.json");
-log("  - ./custom_events.json");
-log("Check console for retry logs and network requests");
+log("  - ripple.log (SDK logs - empty if no errors)");
+log("  - ripple-error.log (SDK logs from error test)");
 separator();

@@ -218,6 +218,27 @@ const trackMultipleBtn = createButton({
   },
 });
 
+const trackRebatchBtn = createButton({
+  label: "Test Dynamic Rebatching (25 Events)",
+  onClick: () => {
+    void (async () => {
+      logger.log("Simulating offline accumulation with 25 events...");
+
+      for (let i = 0; i < 25; i++) {
+        await client.track("rebatch_event", {
+          index: i,
+          timestamp: Date.now(),
+        });
+      }
+
+      logger.log(
+        "Tracked 25 events - flush will rebatch into 5 batches of 5 events each",
+      );
+      logger.log("Check Network tab to see multiple batch requests");
+    })();
+  },
+});
+
 const manualFlushBtn = createButton({
   label: "Manual Flush",
   onClick: () => {
@@ -230,6 +251,7 @@ const manualFlushBtn = createButton({
 });
 
 batchSection.appendChild(trackMultipleBtn);
+batchSection.appendChild(trackRebatchBtn);
 batchSection.appendChild(manualFlushBtn);
 
 const unloadSection = createSection("Page Unload");
