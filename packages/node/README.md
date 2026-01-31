@@ -587,19 +587,25 @@ Immediately flushes all queued events to the server.
 Disposes the client and cleans up resources. Cancels scheduled flushes. Call
 this when you're done using the client (e.g., during graceful shutdown).
 
-## Storage
+## Storage Adapters
 
-By default, events are persisted to `.ripple_events.json` in the current working
-directory. You can customize the file path:
+| Adapter                | Capacity  | Persistence | Use Case                          |
+| ---------------------- | --------- | ----------- | --------------------------------- |
+| **FileStorageAdapter** | Unlimited | Permanent   | Default, persistent event storage |
+| **NoOpStorageAdapter** | N/A       | None        | When persistence is not needed    |
 
 ```ts
-import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
+import { FileStorageAdapter, NoOpStorageAdapter } from "@tapsioss/ripple-node";
 
-const client = new RippleClient({
-  ...config,
-  storageAdapter: new FileStorageAdapter("/var/log/ripple/events.json"),
-});
+// Persistent storage (default)
+const fileStorage = new FileStorageAdapter("./events.json");
+
+// No persistence - events are discarded if not sent
+const noopStorage = new NoOpStorageAdapter();
 ```
+
+By default, events are persisted to `.ripple_events.json` in the current working
+directory.
 
 ## Design and API Contract
 

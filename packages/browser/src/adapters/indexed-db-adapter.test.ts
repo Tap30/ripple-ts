@@ -1,5 +1,5 @@
 import type { Event as RippleEvent } from "@internals/core";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IndexedDBAdapter } from "./indexed-db-adapter.ts";
 
 describe("IndexedDBAdapter", () => {
@@ -20,7 +20,7 @@ describe("IndexedDBAdapter", () => {
         metadata: {},
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
 
     mockObjectStore = {
@@ -52,6 +52,10 @@ describe("IndexedDBAdapter", () => {
     adapter = new IndexedDBAdapter();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("constructor", () => {
     it("should create instance with default parameters", () => {
       expect(adapter).toBeInstanceOf(IndexedDBAdapter);
@@ -66,10 +70,17 @@ describe("IndexedDBAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
     });
+
+    it("should create instance with TTL", () => {
+      const customAdapter = new IndexedDBAdapter("db", "store", "key", 60000);
+
+      expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
+    });
   });
 
   describe("save", () => {
-    it("should save events to IndexedDB", async () => {
+    it("should save events to IndexedDB with timestamp", async () => {
+      vi.setSystemTime(1000);
       const openRequest = {} as IDBOpenDBRequest;
       const putRequest = {} as IDBRequest<IDBValidKey>;
 
@@ -89,7 +100,10 @@ describe("IndexedDBAdapter", () => {
 
       expect(indexedDB.open).toHaveBeenCalledWith("ripple_db", 1);
       expect(mockDB.transaction).toHaveBeenCalledWith("events", "readwrite");
-      expect(mockObjectStore.put).toHaveBeenCalledWith(mockEvents, "queue");
+      expect(mockObjectStore.put).toHaveBeenCalledWith(
+        { events: mockEvents, savedAt: 1000 },
+        "queue",
+      );
     });
 
     it("should handle database open error", async () => {
@@ -242,7 +256,9 @@ describe("IndexedDBAdapter", () => {
 
       await Promise.resolve();
 
-      Object.defineProperty(getRequest, "result", { value: mockEvents });
+      Object.defineProperty(getRequest, "result", {
+        value: { events: mockEvents, savedAt: Date.now() },
+      });
       getRequest.onsuccess?.(new Event("success"));
 
       const result = await loadPromise;
@@ -272,6 +288,81 @@ describe("IndexedDBAdapter", () => {
       const result = await loadPromise;
 
       expect(result).toEqual([]);
+    });
+
+    it("should return empty array and clear when TTL expired", async () => {
+      const ttlAdapter = new IndexedDBAdapter(
+        "ripple_db",
+        "events",
+        "queue",
+        1000,
+      );
+
+      const openRequest = {} as IDBOpenDBRequest;
+      const getRequest = {} as IDBRequest;
+      const deleteRequest = {} as IDBRequest<undefined>;
+
+      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
+      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
+      vi.mocked(mockObjectStore.delete).mockReturnValue(deleteRequest);
+      vi.setSystemTime(2000);
+
+      const loadPromise = ttlAdapter.load();
+
+      Object.defineProperty(openRequest, "result", { value: mockDB });
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      Object.defineProperty(getRequest, "result", {
+        value: { events: mockEvents, savedAt: 0 },
+      });
+      getRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      // Handle the clear() call
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      deleteRequest.onsuccess?.(new Event("success"));
+
+      const result = await loadPromise;
+
+      expect(result).toEqual([]);
+    });
+
+    it("should return events when TTL not expired", async () => {
+      const ttlAdapter = new IndexedDBAdapter(
+        "ripple_db",
+        "events",
+        "queue",
+        5000,
+      );
+
+      const openRequest = {} as IDBOpenDBRequest;
+      const getRequest = {} as IDBRequest;
+
+      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
+      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
+      vi.setSystemTime(2000);
+
+      const loadPromise = ttlAdapter.load();
+
+      Object.defineProperty(openRequest, "result", { value: mockDB });
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      Object.defineProperty(getRequest, "result", {
+        value: { events: mockEvents, savedAt: 1000 },
+      });
+      getRequest.onsuccess?.(new Event("success"));
+
+      const result = await loadPromise;
+
+      expect(result).toEqual(mockEvents);
     });
 
     it("should handle database open error", async () => {
@@ -415,6 +506,7 @@ describe("IndexedDBAdapter", () => {
 
   describe("custom parameters", () => {
     it("should use custom database name, store name, and key", async () => {
+      vi.setSystemTime(1000);
       const customAdapter = new IndexedDBAdapter(
         "custom_db",
         "custom_store",
@@ -444,7 +536,7 @@ describe("IndexedDBAdapter", () => {
         "readwrite",
       );
       expect(mockObjectStore.put).toHaveBeenCalledWith(
-        mockEvents,
+        { events: mockEvents, savedAt: 1000 },
         "custom_key",
       );
     });

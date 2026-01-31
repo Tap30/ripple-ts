@@ -1,11 +1,11 @@
-import type { Event } from "@internals/core";
+import type { Event as RippleEvent } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LocalStorageAdapter } from "./local-storage-adapter.ts";
 
 describe("LocalStorageAdapter", () => {
   let adapter: LocalStorageAdapter;
   let mockLocalStorage: Storage;
-  let mockEvents: Event[];
+  let mockEvents: RippleEvent[];
 
   beforeEach(() => {
     mockLocalStorage = {
@@ -32,7 +32,7 @@ describe("LocalStorageAdapter", () => {
         metadata: {},
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
   });
 
@@ -46,44 +46,45 @@ describe("LocalStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
+
+    it("should create instance with TTL", () => {
+      const customAdapter = new LocalStorageAdapter("key", 60000);
+
+      expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
+    });
   });
 
   describe("save", () => {
-    it("should save events to localStorage", async () => {
+    it("should save events to localStorage with timestamp", async () => {
+      vi.setSystemTime(1000);
       await adapter.save(mockEvents);
 
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
         "ripple_events",
-        JSON.stringify(mockEvents),
+        JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
+      vi.useRealTimers();
     });
 
     it("should use custom key when provided", async () => {
+      vi.setSystemTime(1000);
       const customAdapter = new LocalStorageAdapter("custom_events");
 
       await customAdapter.save(mockEvents);
 
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
         "custom_events",
-        JSON.stringify(mockEvents),
+        JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
-    });
-
-    it("should save empty array", async () => {
-      await adapter.save([]);
-
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify([]),
-      );
+      vi.useRealTimers();
     });
   });
 
   describe("load", () => {
     it("should load events from localStorage", async () => {
-      const eventsJson = JSON.stringify(mockEvents);
+      const data = JSON.stringify({ events: mockEvents, savedAt: Date.now() });
 
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(eventsJson);
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
 
       const result = await adapter.load();
 
@@ -99,28 +100,37 @@ describe("LocalStorageAdapter", () => {
       expect(result).toEqual([]);
     });
 
-    it("should use custom key when provided", async () => {
-      const customAdapter = new LocalStorageAdapter("custom_events");
+    it("should return empty array and clear when TTL expired", async () => {
+      const ttlAdapter = new LocalStorageAdapter("ripple_events", 1000);
+      const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
 
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue("[]");
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
+      vi.setSystemTime(2000);
 
-      await customAdapter.load();
+      const result = await ttlAdapter.load();
 
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith("custom_events");
+      expect(result).toEqual([]);
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("ripple_events");
+      vi.useRealTimers();
+    });
+
+    it("should return events when TTL not expired", async () => {
+      const ttlAdapter = new LocalStorageAdapter("ripple_events", 5000);
+      const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
+
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
+      vi.setSystemTime(2000);
+
+      const result = await ttlAdapter.load();
+
+      expect(result).toEqual(mockEvents);
+      vi.useRealTimers();
     });
 
     it("should handle invalid JSON gracefully", async () => {
       vi.mocked(mockLocalStorage.getItem).mockReturnValue("invalid json");
 
       await expect(adapter.load()).rejects.toThrow();
-    });
-
-    it("should load empty array correctly", async () => {
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue("[]");
-
-      const result = await adapter.load();
-
-      expect(result).toEqual([]);
     });
   });
 

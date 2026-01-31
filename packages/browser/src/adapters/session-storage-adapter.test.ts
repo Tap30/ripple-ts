@@ -1,11 +1,11 @@
-import type { Event } from "@internals/core";
+import type { Event as RippleEvent } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionStorageAdapter } from "./session-storage-adapter.ts";
 
 describe("SessionStorageAdapter", () => {
   let adapter: SessionStorageAdapter;
   let mockSessionStorage: Storage;
-  let mockEvents: Event[];
+  let mockEvents: RippleEvent[];
 
   beforeEach(() => {
     mockSessionStorage = {
@@ -32,7 +32,7 @@ describe("SessionStorageAdapter", () => {
         metadata: {},
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
   });
 
@@ -46,44 +46,45 @@ describe("SessionStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
+
+    it("should create instance with TTL", () => {
+      const customAdapter = new SessionStorageAdapter("key", 60000);
+
+      expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
+    });
   });
 
   describe("save", () => {
-    it("should save events to sessionStorage", async () => {
+    it("should save events to sessionStorage with timestamp", async () => {
+      vi.setSystemTime(1000);
       await adapter.save(mockEvents);
 
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
         "ripple_events",
-        JSON.stringify(mockEvents),
+        JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
+      vi.useRealTimers();
     });
 
     it("should use custom key when provided", async () => {
+      vi.setSystemTime(1000);
       const customAdapter = new SessionStorageAdapter("custom_events");
 
       await customAdapter.save(mockEvents);
 
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
         "custom_events",
-        JSON.stringify(mockEvents),
+        JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
-    });
-
-    it("should save empty array", async () => {
-      await adapter.save([]);
-
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify([]),
-      );
+      vi.useRealTimers();
     });
   });
 
   describe("load", () => {
     it("should load events from sessionStorage", async () => {
-      const eventsJson = JSON.stringify(mockEvents);
+      const data = JSON.stringify({ events: mockEvents, savedAt: Date.now() });
 
-      vi.mocked(mockSessionStorage.getItem).mockReturnValue(eventsJson);
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(data);
 
       const result = await adapter.load();
 
@@ -99,28 +100,39 @@ describe("SessionStorageAdapter", () => {
       expect(result).toEqual([]);
     });
 
-    it("should use custom key when provided", async () => {
-      const customAdapter = new SessionStorageAdapter("custom_events");
+    it("should return empty array and clear when TTL expired", async () => {
+      const ttlAdapter = new SessionStorageAdapter("ripple_events", 1000);
+      const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
 
-      vi.mocked(mockSessionStorage.getItem).mockReturnValue("[]");
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(data);
+      vi.setSystemTime(2000);
 
-      await customAdapter.load();
+      const result = await ttlAdapter.load();
 
-      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("custom_events");
+      expect(result).toEqual([]);
+      expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+        "ripple_events",
+      );
+      vi.useRealTimers();
+    });
+
+    it("should return events when TTL not expired", async () => {
+      const ttlAdapter = new SessionStorageAdapter("ripple_events", 5000);
+      const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
+
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(data);
+      vi.setSystemTime(2000);
+
+      const result = await ttlAdapter.load();
+
+      expect(result).toEqual(mockEvents);
+      vi.useRealTimers();
     });
 
     it("should handle invalid JSON gracefully", async () => {
       vi.mocked(mockSessionStorage.getItem).mockReturnValue("invalid json");
 
       await expect(adapter.load()).rejects.toThrow();
-    });
-
-    it("should load empty array correctly", async () => {
-      vi.mocked(mockSessionStorage.getItem).mockReturnValue("[]");
-
-      const result = await adapter.load();
-
-      expect(result).toEqual([]);
     });
   });
 

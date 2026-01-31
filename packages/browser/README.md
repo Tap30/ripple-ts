@@ -271,12 +271,33 @@ const client = new RippleClient({
 
 ## Storage Adapters
 
-| Adapter                   | Capacity   | Persistence  | Performance | Use Case                   |
-| ------------------------- | ---------- | ------------ | ----------- | -------------------------- |
-| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | Small event queues         |
-| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | Temporary tracking         |
-| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | Large event queues         |
-| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Small queues, cross-domain |
+| Adapter                   | Capacity   | Persistence  | Performance | TTL Support | Use Case                   |
+| ------------------------- | ---------- | ------------ | ----------- | ----------- | -------------------------- |
+| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes      | Small event queues         |
+| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes      | Temporary tracking         |
+| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | Large event queues         |
+| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | Small queues, cross-domain |
+
+### TTL (Time-to-Live) Support
+
+LocalStorageAdapter, SessionStorageAdapter, and IndexedDBAdapter support
+optional TTL to automatically expire stored events:
+
+```ts
+import {
+  LocalStorageAdapter,
+  SessionStorageAdapter,
+  IndexedDBAdapter,
+} from "@tapsioss/ripple-browser";
+
+// Events expire after 1 hour (3600000ms)
+const localStorage = new LocalStorageAdapter("ripple_events", 3600000);
+const sessionStorage = new SessionStorageAdapter("ripple_events", 3600000);
+const indexedDB = new IndexedDBAdapter("ripple_db", "events", "queue", 3600000);
+```
+
+CookieStorageAdapter uses the native `maxAge` parameter (in seconds) for
+expiration, so no additional TTL is needed.
 
 ## Logger Adapters
 
