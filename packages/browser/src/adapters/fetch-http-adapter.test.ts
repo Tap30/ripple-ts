@@ -29,7 +29,7 @@ describe("FetchHttpAdapter", () => {
         metadata: null,
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
   });
 

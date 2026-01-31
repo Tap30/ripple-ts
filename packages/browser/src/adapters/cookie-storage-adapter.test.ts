@@ -1,14 +1,13 @@
-import type { Event } from "@internals/core";
+import type { Event as RippleEvent } from "@internals/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CookieStorageAdapter } from "./cookie-storage-adapter.ts";
 
 describe("CookieStorageAdapter", () => {
   let adapter: CookieStorageAdapter;
-  let mockEvents: Event[];
+  let mockEvents: RippleEvent[];
   let originalCookieDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
-    // Store original descriptor
     originalCookieDescriptor = Object.getOwnPropertyDescriptor(
       document,
       "cookie",
@@ -24,12 +23,11 @@ describe("CookieStorageAdapter", () => {
         metadata: {},
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
   });
 
   afterEach(() => {
-    // Restore original cookie descriptor
     if (originalCookieDescriptor) {
       Object.defineProperty(document, "cookie", originalCookieDescriptor);
     }

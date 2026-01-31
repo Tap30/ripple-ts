@@ -22,7 +22,7 @@ describe("FileStorageAdapter", () => {
         metadata: {},
         sessionId: "session-123",
         platform: null,
-      },
+      } satisfies RippleEvent,
     ];
   });
 
