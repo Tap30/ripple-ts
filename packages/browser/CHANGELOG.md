@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 0.6.0
+### Minor Changes
+
+
+
+- [#18](https://github.com/Tap30/ripple-ts/pull/18) [`750c4d7`](https://github.com/Tap30/ripple-ts/commit/750c4d78759c89062f08727f05356b84f8707590) Thanks [@mimshins](https://github.com/mimshins)! - Feat: add `ttl` property to storage adapters.
+
 ## 0.5.0
 ### Minor Changes
 
