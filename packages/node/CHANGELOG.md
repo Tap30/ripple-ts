@@ -1,5 +1,12 @@
 # @tapsioss/ripple-node
 
+## 0.7.0
+### Minor Changes
+
+
+
+- [#23](https://github.com/Tap30/ripple-ts/pull/23) [`7bd9101`](https://github.com/Tap30/ripple-ts/commit/7bd910195631b9ed2102a3b7b59634712b4b323f) Thanks [@mimshins](https://github.com/mimshins)! - Refactor!: update HttpResponse interface to remove `ok` field from it.
+
 ## 0.6.0
 ### Minor Changes
 

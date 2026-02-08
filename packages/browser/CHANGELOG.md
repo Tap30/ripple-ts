@@ -1,5 +1,20 @@
 # @tapsioss/ripple-browser
 
+## 0.7.0
+### Minor Changes
+
+
+
+- [#20](https://github.com/Tap30/ripple-ts/pull/20) [`333cd0c`](https://github.com/Tap30/ripple-ts/commit/333cd0c6023f5b9edb46bb3b275633855b7f2abe) Thanks [@mimshins](https://github.com/mimshins)! - Feat: add `persistedQueueLimit` property to adapters.
+
+
+
+- [#23](https://github.com/Tap30/ripple-ts/pull/23) [`7bd9101`](https://github.com/Tap30/ripple-ts/commit/7bd910195631b9ed2102a3b7b59634712b4b323f) Thanks [@mimshins](https://github.com/mimshins)! - Refactor!: update HttpResponse interface to remove `ok` field from it.
+
+
+
+- [#22](https://github.com/Tap30/ripple-ts/pull/22) [`ca157cb`](https://github.com/Tap30/ripple-ts/commit/ca157cbccb0943924b99397155dc5b7e3cb15d9f) Thanks [@mimshins](https://github.com/mimshins)! - Refactor!: update browser runtime prebuilt adapters to accept config object instead of separate params.
+
 ## 0.6.0
 ### Minor Changes
 
