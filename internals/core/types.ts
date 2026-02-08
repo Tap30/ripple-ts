@@ -109,10 +109,6 @@ export type Event<TMetadata = Record<string, unknown>> = {
  */
 export type HttpResponse = {
   /**
-   * Whether the request was successful (2xx status)
-   */
-  ok: boolean;
-  /**
    * HTTP status code
    */
   status: number;

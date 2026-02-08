@@ -24,7 +24,7 @@ type TestEvents = {
 };
 
 const mockHttpAdapter: HttpAdapter = {
-  send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+  send: vi.fn().mockResolvedValue({ status: 200 }),
 };
 
 const mockStorageAdapter: StorageAdapter = {

@@ -38,7 +38,6 @@ export class FetchHttpAdapter implements HttpAdapter {
     }
 
     return {
-      ok: response.ok,
       status: response.status,
       data,
     };

@@ -42,7 +42,6 @@ describe("FetchHttpAdapter", () => {
   describe("send", () => {
     it("should send events using fetch", async () => {
       const mockResponse = {
-        ok: true,
         status: 200,
         json: vi.fn().mockResolvedValue({}),
       };
@@ -56,13 +55,12 @@ describe("FetchHttpAdapter", () => {
         headers,
         body: JSON.stringify({ events: mockEvents }),
       });
-      expect(result.ok).toBe(true);
+
       expect(result.status).toBe(200);
     });
 
     it("should handle successful response", async () => {
       const mockResponse = {
-        ok: true,
         status: 200,
         json: vi.fn().mockResolvedValue({ success: true }),
       };
@@ -71,14 +69,12 @@ describe("FetchHttpAdapter", () => {
 
       const result = await adapter.send(endpoint, mockEvents, headers);
 
-      expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
       expect(result.data).toEqual({ success: true });
     });
 
     it("should handle failed response", async () => {
       const mockResponse = {
-        ok: false,
         status: 500,
         json: vi.fn().mockResolvedValue({}),
       };
@@ -87,13 +83,11 @@ describe("FetchHttpAdapter", () => {
 
       const result = await adapter.send(endpoint, mockEvents, headers);
 
-      expect(result.ok).toBe(false);
       expect(result.status).toBe(500);
     });
 
     it("should handle JSON parsing error", async () => {
       const mockResponse = {
-        ok: true,
         status: 200,
         json: vi.fn().mockRejectedValue(new Error("Invalid JSON")),
       };
@@ -102,23 +96,20 @@ describe("FetchHttpAdapter", () => {
 
       const result = await adapter.send(endpoint, mockEvents, headers);
 
-      expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
       expect(result.data).toBeUndefined();
     });
 
     it("should handle empty events array", async () => {
       const mockResponse = {
-        ok: true,
         status: 200,
         json: vi.fn().mockResolvedValue({}),
       };
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await adapter.send(endpoint, [], headers);
+      await adapter.send(endpoint, [], headers);
 
-      expect(result.ok).toBe(true);
       expect(fetch).toHaveBeenCalledWith(
         endpoint,
         expect.objectContaining({
@@ -134,7 +125,6 @@ describe("FetchHttpAdapter", () => {
       };
 
       const mockResponse = {
-        ok: true,
         status: 200,
         json: vi.fn().mockResolvedValue({}),
       };

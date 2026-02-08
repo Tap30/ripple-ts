@@ -43,7 +43,7 @@ class TestClientWithDefaults extends Client {
 }
 
 const createMockHttpAdapter = (): HttpAdapter => ({
-  send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+  send: vi.fn().mockResolvedValue({ status: 200 }),
 });
 
 const createMockStorageAdapter = (): StorageAdapter => ({
