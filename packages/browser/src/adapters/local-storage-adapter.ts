@@ -5,6 +5,12 @@ type StorageData = {
   savedAt: number;
 };
 
+export type LocalStorageAdapterConfig = {
+  key?: string;
+  ttl?: number;
+  persistedQueueLimit?: number;
+};
+
 /**
  * Storage adapter implementation using localStorage.
  * Provides persistent storage across browser sessions with optional TTL.
@@ -17,19 +23,12 @@ export class LocalStorageAdapter implements StorageAdapter {
   /**
    * Create a new LocalStorageAdapter instance.
    *
-   * @param key The localStorage key to use (default: "ripple_events")
-   * @param ttl Time-to-live in milliseconds (default: null, no expiration)
-   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
-   * Uses FIFO eviction when limit is reached.
+   * @param config Configuration object
    */
-  constructor(
-    key: string = "ripple_events",
-    ttl: number | null = null,
-    persistedQueueLimit: number | null = null,
-  ) {
-    this._key = key;
-    this._ttl = ttl;
-    this._persistedQueueLimit = persistedQueueLimit;
+  constructor(config: LocalStorageAdapterConfig = {}) {
+    this._key = config.key ?? "ripple_events";
+    this._ttl = config.ttl ?? null;
+    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**

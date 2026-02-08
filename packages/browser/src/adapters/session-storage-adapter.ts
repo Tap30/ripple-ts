@@ -5,6 +5,12 @@ type StorageData = {
   savedAt: number;
 };
 
+export type SessionStorageAdapterConfig = {
+  key?: string;
+  ttl?: number;
+  persistedQueueLimit?: number;
+};
+
 /**
  * Storage adapter implementation using sessionStorage.
  * Data persists only for the duration of the page session with optional TTL.
@@ -17,19 +23,12 @@ export class SessionStorageAdapter implements StorageAdapter {
   /**
    * Create a new SessionStorageAdapter instance.
    *
-   * @param key The sessionStorage key to use (default: "ripple_events")
-   * @param ttl Time-to-live in milliseconds (default: null, no expiration)
-   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
-   * Uses FIFO eviction when limit is reached.
+   * @param config Configuration object
    */
-  constructor(
-    key: string = "ripple_events",
-    ttl: number | null = null,
-    persistedQueueLimit: number | null = null,
-  ) {
-    this._key = key;
-    this._ttl = ttl;
-    this._persistedQueueLimit = persistedQueueLimit;
+  constructor(config: SessionStorageAdapterConfig = {}) {
+    this._key = config.key ?? "ripple_events";
+    this._ttl = config.ttl ?? null;
+    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**

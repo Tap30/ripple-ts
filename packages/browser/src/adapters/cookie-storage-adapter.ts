@@ -1,5 +1,11 @@
 import type { Event, StorageAdapter } from "@internals/core";
 
+export type CookieStorageAdapterConfig = {
+  key?: string;
+  maxAge?: number;
+  persistedQueueLimit?: number;
+};
+
 /**
  * Storage adapter implementation using cookies.
  * Note: Limited storage capacity (~4KB). Use for small event queues only.
@@ -12,19 +18,12 @@ export class CookieStorageAdapter implements StorageAdapter {
   /**
    * Create a new CookieStorageAdapter instance.
    *
-   * @param key The cookie name (default: "ripple_events")
-   * @param maxAge Cookie max age in seconds (default: 7 days)
-   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
-   * Uses FIFO eviction when limit is reached.
+   * @param config Configuration object
    */
-  constructor(
-    key: string = "ripple_events",
-    maxAge: number = 604800,
-    persistedQueueLimit: number | null = null,
-  ) {
-    this._key = key;
-    this._maxAge = maxAge;
-    this._persistedQueueLimit = persistedQueueLimit;
+  constructor(config: CookieStorageAdapterConfig = {}) {
+    this._key = config.key ?? "ripple_events";
+    this._maxAge = config.maxAge ?? 604800;
+    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**

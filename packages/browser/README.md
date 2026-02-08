@@ -221,7 +221,7 @@ const analyticsClient = new RippleClient({
   apiKey: "analytics-key",
   endpoint: "https://analytics.example.com/events",
   sessionStoreKey: "analytics_session",
-  storageAdapter: new IndexedDBAdapter("analytics_db", "events", "queue"),
+  storageAdapter: new IndexedDBAdapter({ dbName: "analytics_db" }),
 });
 
 // Marketing client
@@ -229,7 +229,7 @@ const marketingClient = new RippleClient({
   apiKey: "marketing-key",
   endpoint: "https://marketing.example.com/events",
   sessionStoreKey: "marketing_session",
-  storageAdapter: new LocalStorageAdapter("marketing_events"),
+  storageAdapter: new LocalStorageAdapter({ key: "marketing_events" }),
 });
 
 // Both clients can operate independently without conflicts
@@ -291,9 +291,9 @@ import {
 } from "@tapsioss/ripple-browser";
 
 // Events expire after 1 hour (3600000ms)
-const localStorage = new LocalStorageAdapter("ripple_events", 3600000);
-const sessionStorage = new SessionStorageAdapter("ripple_events", 3600000);
-const indexedDB = new IndexedDBAdapter("ripple_db", "events", "queue", 3600000);
+const localStorage = new LocalStorageAdapter({ ttl: 3600000 });
+const sessionStorage = new SessionStorageAdapter({ ttl: 3600000 });
+const indexedDB = new IndexedDBAdapter({ ttl: 3600000 });
 ```
 
 CookieStorageAdapter uses the native `maxAge` parameter (in seconds) for
@@ -314,25 +314,25 @@ import {
 } from "@tapsioss/ripple-browser";
 
 // Limit persisted events to 1000 (oldest events are dropped when exceeded)
-const localStorage = new LocalStorageAdapter("ripple_events", null, 1000);
-const sessionStorage = new SessionStorageAdapter("ripple_events", null, 1000);
-const indexedDB = new IndexedDBAdapter(
-  "ripple_db",
-  "events",
-  "queue",
-  null,
-  1000,
-);
-const cookieStorage = new CookieStorageAdapter("ripple_events", 604800, 10); // Very small limit for cookies
+const localStorage = new LocalStorageAdapter({ persistedQueueLimit: 1000 });
+const sessionStorage = new SessionStorageAdapter({ persistedQueueLimit: 1000 });
+const indexedDB = new IndexedDBAdapter({ persistedQueueLimit: 1000 });
+const cookieStorage = new CookieStorageAdapter({ persistedQueueLimit: 10 }); // Very small limit for cookies
 
 // Combine TTL and queue limit
-const limitedStorage = new IndexedDBAdapter(
-  "ripple_db",
-  "events",
-  "queue",
-  3600000,
-  5000,
-);
+const limitedStorage = new IndexedDBAdapter({
+  ttl: 3600000,
+  persistedQueueLimit: 5000,
+});
+
+// Custom database configuration with limits
+const customDB = new IndexedDBAdapter({
+  dbName: "my_analytics",
+  storeName: "events",
+  key: "queue",
+  ttl: 7200000,
+  persistedQueueLimit: 10000,
+});
 ```
 
 This feature is particularly useful for:

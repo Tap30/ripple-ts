@@ -42,19 +42,21 @@ describe("SessionStorageAdapter", () => {
     });
 
     it("should create instance with custom key", () => {
-      const customAdapter = new SessionStorageAdapter("custom_key");
+      const customAdapter = new SessionStorageAdapter({ key: "custom_key" });
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
 
     it("should create instance with TTL", () => {
-      const customAdapter = new SessionStorageAdapter("key", 60000);
+      const customAdapter = new SessionStorageAdapter({ ttl: 60000 });
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
 
     it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new SessionStorageAdapter("key", null, 100);
+      const customAdapter = new SessionStorageAdapter({
+        persistedQueueLimit: 100,
+      });
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
@@ -76,7 +78,7 @@ describe("SessionStorageAdapter", () => {
 
     it("should use custom key when provided", async () => {
       vi.setSystemTime(1000);
-      const customAdapter = new SessionStorageAdapter("custom_events");
+      const customAdapter = new SessionStorageAdapter({ key: "custom_events" });
 
       vi.mocked(mockSessionStorage.getItem).mockReturnValue(null);
 
@@ -120,11 +122,9 @@ describe("SessionStorageAdapter", () => {
 
     it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
       vi.setSystemTime(3000);
-      const limitedAdapter = new SessionStorageAdapter(
-        "ripple_events",
-        null,
-        2,
-      );
+      const limitedAdapter = new SessionStorageAdapter({
+        persistedQueueLimit: 2,
+      });
 
       const existingEvents: RippleEvent[] = [
         {
@@ -192,7 +192,7 @@ describe("SessionStorageAdapter", () => {
     });
 
     it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new SessionStorageAdapter("ripple_events", 1000);
+      const ttlAdapter = new SessionStorageAdapter({ ttl: 1000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
 
       vi.mocked(mockSessionStorage.getItem).mockReturnValue(data);
@@ -208,7 +208,7 @@ describe("SessionStorageAdapter", () => {
     });
 
     it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new SessionStorageAdapter("ripple_events", 5000);
+      const ttlAdapter = new SessionStorageAdapter({ ttl: 5000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
 
       vi.mocked(mockSessionStorage.getItem).mockReturnValue(data);
@@ -237,7 +237,7 @@ describe("SessionStorageAdapter", () => {
     });
 
     it("should use custom key when provided", async () => {
-      const customAdapter = new SessionStorageAdapter("custom_events");
+      const customAdapter = new SessionStorageAdapter({ key: "custom_events" });
 
       await customAdapter.clear();
 

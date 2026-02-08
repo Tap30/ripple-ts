@@ -5,6 +5,14 @@ type StorageData = {
   savedAt: number;
 };
 
+export type IndexedDBAdapterConfig = {
+  dbName?: string;
+  storeName?: string;
+  key?: string;
+  ttl?: number;
+  persistedQueueLimit?: number;
+};
+
 /**
  * Storage adapter implementation using IndexedDB.
  * Provides large-capacity persistent storage with better performance for large datasets.
@@ -19,25 +27,14 @@ export class IndexedDBAdapter implements StorageAdapter {
   /**
    * Create a new IndexedDBAdapter instance.
    *
-   * @param dbName The IndexedDB database name (default: "ripple_db")
-   * @param storeName The object store name (default: "events")
-   * @param key The key to store events under (default: "queue")
-   * @param ttl Time-to-live in milliseconds (default: null, no expiration)
-   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
-   * Uses FIFO eviction when limit is reached.
+   * @param config Configuration object
    */
-  constructor(
-    dbName: string = "ripple_db",
-    storeName: string = "events",
-    key: string = "queue",
-    ttl: number | null = null,
-    persistedQueueLimit: number | null = null,
-  ) {
-    this._dbName = dbName;
-    this._storeName = storeName;
-    this._key = key;
-    this._ttl = ttl;
-    this._persistedQueueLimit = persistedQueueLimit;
+  constructor(config: IndexedDBAdapterConfig = {}) {
+    this._dbName = config.dbName ?? "ripple_db";
+    this._storeName = config.storeName ?? "events";
+    this._key = config.key ?? "queue";
+    this._ttl = config.ttl ?? null;
+    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**
