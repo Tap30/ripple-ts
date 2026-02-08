@@ -1,9 +1,9 @@
 import type { Event as RippleEvent, StorageAdapter } from "@internals/core";
 
-interface StorageData {
+type StorageData = {
   events: RippleEvent[];
   savedAt: number;
-}
+};
 
 /**
  * Storage adapter implementation using sessionStorage.
@@ -12,16 +12,24 @@ interface StorageData {
 export class SessionStorageAdapter implements StorageAdapter {
   private readonly _key: string;
   private readonly _ttl: number | null;
+  private readonly _persistedQueueLimit: number | null;
 
   /**
    * Create a new SessionStorageAdapter instance.
    *
    * @param key The sessionStorage key to use (default: "ripple_events")
    * @param ttl Time-to-live in milliseconds (default: null, no expiration)
+   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
+   * Uses FIFO eviction when limit is reached.
    */
-  constructor(key: string = "ripple_events", ttl: number | null = null) {
+  constructor(
+    key: string = "ripple_events",
+    ttl: number | null = null,
+    persistedQueueLimit: number | null = null,
+  ) {
     this._key = key;
     this._ttl = ttl;
+    this._persistedQueueLimit = persistedQueueLimit;
   }
 
   /**
@@ -30,9 +38,21 @@ export class SessionStorageAdapter implements StorageAdapter {
    * @param events Array of events to save
    */
   public async save(events: RippleEvent[]): Promise<void> {
-    await Promise.resolve();
+    const persistedEvents = await this.load();
 
-    const data: StorageData = { events, savedAt: Date.now() };
+    let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
+
+    if (
+      this._persistedQueueLimit !== null &&
+      eventsToSave.length > this._persistedQueueLimit
+    ) {
+      eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+    }
+
+    const data: StorageData = {
+      events: eventsToSave,
+      savedAt: Date.now(),
+    };
 
     sessionStorage.setItem(this._key, JSON.stringify(data));
   }

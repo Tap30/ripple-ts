@@ -14,6 +14,7 @@ export class IndexedDBAdapter implements StorageAdapter {
   private readonly _storeName: string;
   private readonly _key: string;
   private readonly _ttl: number | null;
+  private readonly _persistedQueueLimit: number | null;
 
   /**
    * Create a new IndexedDBAdapter instance.
@@ -22,17 +23,21 @@ export class IndexedDBAdapter implements StorageAdapter {
    * @param storeName The object store name (default: "events")
    * @param key The key to store events under (default: "queue")
    * @param ttl Time-to-live in milliseconds (default: null, no expiration)
+   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
+   * Uses FIFO eviction when limit is reached.
    */
   constructor(
     dbName: string = "ripple_db",
     storeName: string = "events",
     key: string = "queue",
     ttl: number | null = null,
+    persistedQueueLimit: number | null = null,
   ) {
     this._dbName = dbName;
     this._storeName = storeName;
     this._key = key;
     this._ttl = ttl;
+    this._persistedQueueLimit = persistedQueueLimit;
   }
 
   /**
@@ -58,6 +63,46 @@ export class IndexedDBAdapter implements StorageAdapter {
     });
   }
 
+  private _write(db: IDBDatabase, data: StorageData): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(this._storeName, "readwrite");
+      const store = transaction.objectStore(this._storeName);
+      const request = store.put(data, this._key);
+
+      request.onerror = () =>
+        reject(new Error(request.error?.message ?? "Failed to write data"));
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  private _read(db: IDBDatabase): Promise<StorageData | null> {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this._storeName, "readonly");
+      const store = transaction.objectStore(this._storeName);
+      const request = store.get(this._key);
+
+      request.onerror = () =>
+        reject(new Error(request.error?.message ?? "Failed to read data"));
+      request.onsuccess = () => {
+        const data = request.result as StorageData | undefined;
+
+        if (!data) {
+          resolve(null);
+
+          return;
+        }
+
+        if (this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
+          void this.clear().then(() => resolve(null));
+
+          return;
+        }
+
+        resolve(data);
+      };
+    });
+  }
+
   /**
    * Save events to IndexedDB.
    *
@@ -65,21 +110,23 @@ export class IndexedDBAdapter implements StorageAdapter {
    */
   public async save(events: RippleEvent[]): Promise<void> {
     const db = await this._openDB();
+    const data = await this._read(db);
 
-    const data: StorageData = {
-      events,
+    const persistedEvents: RippleEvent[] = data?.events ?? [];
+
+    let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
+
+    if (
+      this._persistedQueueLimit !== null &&
+      eventsToSave.length > this._persistedQueueLimit
+    ) {
+      eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+    }
+
+    await this._write(db, {
+      events: eventsToSave,
       savedAt: Date.now(),
-    };
-
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(this._storeName, "readwrite");
-      const store = transaction.objectStore(this._storeName);
-      const request = store.put(data, this._key);
-
-      request.onerror = () =>
-        reject(new Error(request.error?.message ?? "Failed to save events"));
-      request.onsuccess = () => resolve();
-    });
+    } satisfies StorageData);
   }
 
   /**
@@ -89,32 +136,11 @@ export class IndexedDBAdapter implements StorageAdapter {
    */
   public async load(): Promise<RippleEvent[]> {
     const db = await this._openDB();
+    const data = await this._read(db);
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(this._storeName, "readonly");
-      const store = transaction.objectStore(this._storeName);
-      const request = store.get(this._key);
+    if (!data) return [];
 
-      request.onerror = () =>
-        reject(new Error(request.error?.message ?? "Failed to load events"));
-      request.onsuccess = () => {
-        const data = request.result as StorageData | undefined;
-
-        if (!data) {
-          resolve([]);
-
-          return;
-        }
-
-        if (this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
-          void this.clear().then(() => resolve([]));
-
-          return;
-        }
-
-        resolve(data.events);
-      };
-    });
+    return data.events;
   }
 
   /**
@@ -129,7 +155,7 @@ export class IndexedDBAdapter implements StorageAdapter {
       const request = store.delete(this._key);
 
       request.onerror = () =>
-        reject(new Error(request.error?.message ?? "Failed to clear events"));
+        reject(new Error(request.error?.message ?? "Failed to clear data"));
       request.onsuccess = () => resolve();
     });
   }

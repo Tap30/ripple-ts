@@ -52,11 +52,19 @@ describe("SessionStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
+
+    it("should create instance with persistedQueueLimit", () => {
+      const customAdapter = new SessionStorageAdapter("key", null, 100);
+
+      expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
+    });
   });
 
   describe("save", () => {
     it("should save events to sessionStorage with timestamp", async () => {
       vi.setSystemTime(1000);
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(null);
+
       await adapter.save(mockEvents);
 
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
@@ -70,11 +78,94 @@ describe("SessionStorageAdapter", () => {
       vi.setSystemTime(1000);
       const customAdapter = new SessionStorageAdapter("custom_events");
 
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(null);
+
       await customAdapter.save(mockEvents);
 
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
         "custom_events",
         JSON.stringify({ events: mockEvents, savedAt: 1000 }),
+      );
+      vi.useRealTimers();
+    });
+
+    it("should merge with existing persisted events", async () => {
+      vi.setSystemTime(2000);
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "existing_event",
+          payload: { old: "data" },
+          issuedAt: 500,
+          metadata: {},
+          sessionId: "session-old",
+          platform: null,
+        },
+      ];
+
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(
+        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
+      );
+
+      await adapter.save(mockEvents);
+
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
+        "ripple_events",
+        JSON.stringify({
+          events: [...existingEvents, ...mockEvents],
+          savedAt: 2000,
+        }),
+      );
+      vi.useRealTimers();
+    });
+
+    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
+      vi.setSystemTime(3000);
+      const limitedAdapter = new SessionStorageAdapter(
+        "ripple_events",
+        null,
+        2,
+      );
+
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "event_1",
+          payload: {},
+          issuedAt: 1000,
+          metadata: {},
+          sessionId: "session-1",
+          platform: null,
+        },
+        {
+          name: "event_2",
+          payload: {},
+          issuedAt: 2000,
+          metadata: {},
+          sessionId: "session-2",
+          platform: null,
+        },
+      ];
+
+      vi.mocked(mockSessionStorage.getItem).mockReturnValue(
+        JSON.stringify({ events: existingEvents, savedAt: 2000 }),
+      );
+
+      const newEvent: RippleEvent = {
+        name: "event_3",
+        payload: {},
+        issuedAt: 3000,
+        metadata: {},
+        sessionId: "session-3",
+        platform: null,
+      };
+
+      await limitedAdapter.save([newEvent]);
+
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
+        "ripple_events",
+        JSON.stringify({
+          events: [existingEvents[1], newEvent],
+          savedAt: 3000,
+        }),
       );
       vi.useRealTimers();
     });

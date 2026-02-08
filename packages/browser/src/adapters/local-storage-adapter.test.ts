@@ -52,11 +52,19 @@ describe("LocalStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
+
+    it("should create instance with persistedQueueLimit", () => {
+      const customAdapter = new LocalStorageAdapter("key", null, 100);
+
+      expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
+    });
   });
 
   describe("save", () => {
     it("should save events to localStorage with timestamp", async () => {
       vi.setSystemTime(1000);
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(null);
+
       await adapter.save(mockEvents);
 
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -70,11 +78,121 @@ describe("LocalStorageAdapter", () => {
       vi.setSystemTime(1000);
       const customAdapter = new LocalStorageAdapter("custom_events");
 
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(null);
+
       await customAdapter.save(mockEvents);
 
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
         "custom_events",
         JSON.stringify({ events: mockEvents, savedAt: 1000 }),
+      );
+      vi.useRealTimers();
+    });
+
+    it("should merge with existing persisted events", async () => {
+      vi.setSystemTime(2000);
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "existing_event",
+          payload: { old: "data" },
+          issuedAt: 500,
+          metadata: {},
+          sessionId: "session-old",
+          platform: null,
+        },
+      ];
+
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
+        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
+      );
+
+      await adapter.save(mockEvents);
+
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "ripple_events",
+        JSON.stringify({
+          events: [...existingEvents, ...mockEvents],
+          savedAt: 2000,
+        }),
+      );
+      vi.useRealTimers();
+    });
+
+    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
+      vi.setSystemTime(3000);
+      const limitedAdapter = new LocalStorageAdapter("ripple_events", null, 2);
+
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "event_1",
+          payload: {},
+          issuedAt: 1000,
+          metadata: {},
+          sessionId: "session-1",
+          platform: null,
+        },
+        {
+          name: "event_2",
+          payload: {},
+          issuedAt: 2000,
+          metadata: {},
+          sessionId: "session-2",
+          platform: null,
+        },
+      ];
+
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
+        JSON.stringify({ events: existingEvents, savedAt: 2000 }),
+      );
+
+      const newEvent: RippleEvent = {
+        name: "event_3",
+        payload: {},
+        issuedAt: 3000,
+        metadata: {},
+        sessionId: "session-3",
+        platform: null,
+      };
+
+      await limitedAdapter.save([newEvent]);
+
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "ripple_events",
+        JSON.stringify({
+          events: [existingEvents[1], newEvent],
+          savedAt: 3000,
+        }),
+      );
+      vi.useRealTimers();
+    });
+
+    it("should not evict when under persistedQueueLimit", async () => {
+      vi.setSystemTime(2000);
+      const limitedAdapter = new LocalStorageAdapter("ripple_events", null, 5);
+
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "event_1",
+          payload: {},
+          issuedAt: 1000,
+          metadata: {},
+          sessionId: "session-1",
+          platform: null,
+        },
+      ];
+
+      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
+        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
+      );
+
+      await limitedAdapter.save(mockEvents);
+
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "ripple_events",
+        JSON.stringify({
+          events: [...existingEvents, ...mockEvents],
+          savedAt: 2000,
+        }),
       );
       vi.useRealTimers();
     });

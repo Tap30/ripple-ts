@@ -271,12 +271,12 @@ const client = new RippleClient({
 
 ## Storage Adapters
 
-| Adapter                   | Capacity   | Persistence  | Performance | TTL Support | Use Case                   |
-| ------------------------- | ---------- | ------------ | ----------- | ----------- | -------------------------- |
-| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes      | Small event queues         |
-| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes      | Temporary tracking         |
-| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | Large event queues         |
-| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | Small queues, cross-domain |
+| Adapter                   | Capacity   | Persistence  | Performance | TTL Support | Queue Limit Support | Use Case                   |
+| ------------------------- | ---------- | ------------ | ----------- | ----------- | ------------------- | -------------------------- |
+| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes      | ✅ Yes              | Small event queues         |
+| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes      | ✅ Yes              | Temporary tracking         |
+| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues         |
+| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | ✅ Yes              | Small queues, cross-domain |
 
 ### TTL (Time-to-Live) Support
 
@@ -298,6 +298,48 @@ const indexedDB = new IndexedDBAdapter("ripple_db", "events", "queue", 3600000);
 
 CookieStorageAdapter uses the native `maxAge` parameter (in seconds) for
 expiration, so no additional TTL is needed.
+
+### Persisted Queue Limit
+
+All storage adapters support an optional `persistedQueueLimit` parameter to
+prevent storage overflow. When the limit is reached, oldest events are evicted
+using a FIFO (First-In-First-Out) policy:
+
+```ts
+import {
+  LocalStorageAdapter,
+  SessionStorageAdapter,
+  IndexedDBAdapter,
+  CookieStorageAdapter,
+} from "@tapsioss/ripple-browser";
+
+// Limit persisted events to 1000 (oldest events are dropped when exceeded)
+const localStorage = new LocalStorageAdapter("ripple_events", null, 1000);
+const sessionStorage = new SessionStorageAdapter("ripple_events", null, 1000);
+const indexedDB = new IndexedDBAdapter(
+  "ripple_db",
+  "events",
+  "queue",
+  null,
+  1000,
+);
+const cookieStorage = new CookieStorageAdapter("ripple_events", 604800, 10); // Very small limit for cookies
+
+// Combine TTL and queue limit
+const limitedStorage = new IndexedDBAdapter(
+  "ripple_db",
+  "events",
+  "queue",
+  3600000,
+  5000,
+);
+```
+
+This feature is particularly useful for:
+
+- Preventing storage quota errors in browsers
+- Managing memory usage in long-running applications
+- Ensuring cookie storage stays within size limits (~4KB)
 
 ## Logger Adapters
 

@@ -43,6 +43,16 @@ describe("CookieStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
     });
+
+    it("should create instance with persistedQueueLimit", () => {
+      const customAdapter = new CookieStorageAdapter(
+        "custom_events",
+        3600,
+        100,
+      );
+
+      expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
+    });
   });
 
   describe("save", () => {
@@ -95,6 +105,91 @@ describe("CookieStorageAdapter", () => {
       await adapter.save([]);
 
       const expectedValue = encodeURIComponent(JSON.stringify([]));
+
+      expect(cookieSetter).toHaveBeenCalledWith(
+        `ripple_events=${expectedValue}; max-age=604800; path=/; SameSite=Strict`,
+      );
+    });
+
+    it("should merge with existing persisted events", async () => {
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "existing_event",
+          payload: { old: "data" },
+          issuedAt: 500,
+          metadata: {},
+          sessionId: "session-old",
+          platform: null,
+        },
+      ];
+
+      const cookieSetter = vi.fn();
+      const existingValue = encodeURIComponent(JSON.stringify(existingEvents));
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => `ripple_events=${existingValue}`,
+        configurable: true,
+      });
+
+      await adapter.save(mockEvents);
+
+      const mergedEvents = [...existingEvents, ...mockEvents];
+      const expectedValue = encodeURIComponent(JSON.stringify(mergedEvents));
+
+      expect(cookieSetter).toHaveBeenCalledWith(
+        `ripple_events=${expectedValue}; max-age=604800; path=/; SameSite=Strict`,
+      );
+    });
+
+    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
+      const limitedAdapter = new CookieStorageAdapter(
+        "ripple_events",
+        604800,
+        2,
+      );
+
+      const existingEvents: RippleEvent[] = [
+        {
+          name: "event_1",
+          payload: {},
+          issuedAt: 1000,
+          metadata: {},
+          sessionId: "session-1",
+          platform: null,
+        },
+        {
+          name: "event_2",
+          payload: {},
+          issuedAt: 2000,
+          metadata: {},
+          sessionId: "session-2",
+          platform: null,
+        },
+      ];
+
+      const newEvent: RippleEvent = {
+        name: "event_3",
+        payload: {},
+        issuedAt: 3000,
+        metadata: {},
+        sessionId: "session-3",
+        platform: null,
+      };
+
+      const cookieSetter = vi.fn();
+      const existingValue = encodeURIComponent(JSON.stringify(existingEvents));
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => `ripple_events=${existingValue}`,
+        configurable: true,
+      });
+
+      await limitedAdapter.save([newEvent]);
+
+      const evictedEvents = [existingEvents[1], newEvent];
+      const expectedValue = encodeURIComponent(JSON.stringify(evictedEvents));
 
       expect(cookieSetter).toHaveBeenCalledWith(
         `ripple_events=${expectedValue}; max-age=604800; path=/; SameSite=Strict`,
