@@ -39,17 +39,18 @@ describe("CookieStorageAdapter", () => {
     });
 
     it("should create instance with custom parameters", () => {
-      const customAdapter = new CookieStorageAdapter("custom_events", 3600);
+      const customAdapter = new CookieStorageAdapter({
+        key: "custom_events",
+        maxAge: 3600,
+      });
 
       expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
     });
 
     it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new CookieStorageAdapter(
-        "custom_events",
-        3600,
-        100,
-      );
+      const customAdapter = new CookieStorageAdapter({
+        persistedQueueLimit: 100,
+      });
 
       expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
     });
@@ -75,7 +76,11 @@ describe("CookieStorageAdapter", () => {
     });
 
     it("should use custom key and maxAge", async () => {
-      const customAdapter = new CookieStorageAdapter("custom_events", 3600);
+      const customAdapter = new CookieStorageAdapter({
+        key: "custom_events",
+        maxAge: 3600,
+      });
+
       const cookieSetter = vi.fn();
 
       Object.defineProperty(document, "cookie", {
@@ -143,11 +148,9 @@ describe("CookieStorageAdapter", () => {
     });
 
     it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
-      const limitedAdapter = new CookieStorageAdapter(
-        "ripple_events",
-        604800,
-        2,
-      );
+      const limitedAdapter = new CookieStorageAdapter({
+        persistedQueueLimit: 2,
+      });
 
       const existingEvents: RippleEvent[] = [
         {
@@ -253,7 +256,7 @@ describe("CookieStorageAdapter", () => {
     });
 
     it("should use custom key", async () => {
-      const customAdapter = new CookieStorageAdapter("custom_events");
+      const customAdapter = new CookieStorageAdapter({ key: "custom_events" });
       const eventsJson = JSON.stringify(mockEvents);
       const encodedValue = encodeURIComponent(eventsJson);
 
@@ -327,7 +330,7 @@ describe("CookieStorageAdapter", () => {
     });
 
     it("should use custom key when clearing", async () => {
-      const customAdapter = new CookieStorageAdapter("custom_events");
+      const customAdapter = new CookieStorageAdapter({ key: "custom_events" });
       const cookieSetter = vi.fn();
 
       Object.defineProperty(document, "cookie", {

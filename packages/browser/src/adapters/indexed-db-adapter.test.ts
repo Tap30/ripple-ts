@@ -62,29 +62,25 @@ describe("IndexedDBAdapter", () => {
     });
 
     it("should create instance with custom parameters", () => {
-      const customAdapter = new IndexedDBAdapter(
-        "custom_db",
-        "custom_store",
-        "custom_key",
-      );
+      const customAdapter = new IndexedDBAdapter({
+        dbName: "custom_db",
+        storeName: "custom_store",
+        key: "custom_key",
+      });
 
       expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
     });
 
     it("should create instance with TTL", () => {
-      const customAdapter = new IndexedDBAdapter("db", "store", "key", 60000);
+      const customAdapter = new IndexedDBAdapter({ ttl: 60000 });
 
       expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
     });
 
     it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new IndexedDBAdapter(
-        "db",
-        "store",
-        "key",
-        null,
-        100,
-      );
+      const customAdapter = new IndexedDBAdapter({
+        persistedQueueLimit: 100,
+      });
 
       expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
     });
@@ -309,13 +305,9 @@ describe("IndexedDBAdapter", () => {
 
     it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
       vi.setSystemTime(3000);
-      const limitedAdapter = new IndexedDBAdapter(
-        "ripple_db",
-        "events",
-        "queue",
-        null,
-        2,
-      );
+      const limitedAdapter = new IndexedDBAdapter({
+        persistedQueueLimit: 2,
+      });
 
       const openRequest = {} as IDBOpenDBRequest;
       const getRequest = {} as IDBRequest<unknown>;
@@ -512,12 +504,7 @@ describe("IndexedDBAdapter", () => {
     });
 
     it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new IndexedDBAdapter(
-        "ripple_db",
-        "events",
-        "queue",
-        1000,
-      );
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
 
       const openRequest = {} as IDBOpenDBRequest;
       const getRequest = {} as IDBRequest;
@@ -555,12 +542,7 @@ describe("IndexedDBAdapter", () => {
     });
 
     it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new IndexedDBAdapter(
-        "ripple_db",
-        "events",
-        "queue",
-        5000,
-      );
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 5000 });
 
       const openRequest = {} as IDBOpenDBRequest;
       const getRequest = {} as IDBRequest;
@@ -728,11 +710,11 @@ describe("IndexedDBAdapter", () => {
   describe("custom parameters", () => {
     it("should use custom database name, store name, and key", async () => {
       vi.setSystemTime(1000);
-      const customAdapter = new IndexedDBAdapter(
-        "custom_db",
-        "custom_store",
-        "custom_key",
-      );
+      const customAdapter = new IndexedDBAdapter({
+        dbName: "custom_db",
+        storeName: "custom_store",
+        key: "custom_key",
+      });
 
       const openRequest = {} as IDBOpenDBRequest;
       const getRequest = {} as IDBRequest<unknown>;

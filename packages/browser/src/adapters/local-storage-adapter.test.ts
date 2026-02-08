@@ -42,19 +42,21 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should create instance with custom key", () => {
-      const customAdapter = new LocalStorageAdapter("custom_key");
+      const customAdapter = new LocalStorageAdapter({ key: "custom_key" });
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
 
     it("should create instance with TTL", () => {
-      const customAdapter = new LocalStorageAdapter("key", 60000);
+      const customAdapter = new LocalStorageAdapter({ ttl: 60000 });
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
 
     it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new LocalStorageAdapter("key", null, 100);
+      const customAdapter = new LocalStorageAdapter({
+        persistedQueueLimit: 100,
+      });
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
@@ -76,7 +78,7 @@ describe("LocalStorageAdapter", () => {
 
     it("should use custom key when provided", async () => {
       vi.setSystemTime(1000);
-      const customAdapter = new LocalStorageAdapter("custom_events");
+      const customAdapter = new LocalStorageAdapter({ key: "custom_events" });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(null);
 
@@ -120,7 +122,9 @@ describe("LocalStorageAdapter", () => {
 
     it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
       vi.setSystemTime(3000);
-      const limitedAdapter = new LocalStorageAdapter("ripple_events", null, 2);
+      const limitedAdapter = new LocalStorageAdapter({
+        persistedQueueLimit: 2,
+      });
 
       const existingEvents: RippleEvent[] = [
         {
@@ -168,7 +172,9 @@ describe("LocalStorageAdapter", () => {
 
     it("should not evict when under persistedQueueLimit", async () => {
       vi.setSystemTime(2000);
-      const limitedAdapter = new LocalStorageAdapter("ripple_events", null, 5);
+      const limitedAdapter = new LocalStorageAdapter({
+        persistedQueueLimit: 5,
+      });
 
       const existingEvents: RippleEvent[] = [
         {
@@ -219,7 +225,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new LocalStorageAdapter("ripple_events", 1000);
+      const ttlAdapter = new LocalStorageAdapter({ ttl: 1000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
@@ -233,7 +239,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new LocalStorageAdapter("ripple_events", 5000);
+      const ttlAdapter = new LocalStorageAdapter({ ttl: 5000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
@@ -260,7 +266,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should use custom key when provided", async () => {
-      const customAdapter = new LocalStorageAdapter("custom_events");
+      const customAdapter = new LocalStorageAdapter({ key: "custom_events" });
 
       await customAdapter.clear();
 
