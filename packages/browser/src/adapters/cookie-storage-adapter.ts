@@ -7,16 +7,24 @@ import type { Event, StorageAdapter } from "@internals/core";
 export class CookieStorageAdapter implements StorageAdapter {
   private readonly _key: string;
   private readonly _maxAge: number;
+  private readonly _persistedQueueLimit: number | null;
 
   /**
    * Create a new CookieStorageAdapter instance.
    *
    * @param key The cookie name (default: "ripple_events")
    * @param maxAge Cookie max age in seconds (default: 7 days)
+   * @param persistedQueueLimit Maximum number of events to keep in storage (default: null, no limit).
+   * Uses FIFO eviction when limit is reached.
    */
-  constructor(key: string = "ripple_events", maxAge: number = 604800) {
+  constructor(
+    key: string = "ripple_events",
+    maxAge: number = 604800,
+    persistedQueueLimit: number | null = null,
+  ) {
     this._key = key;
     this._maxAge = maxAge;
+    this._persistedQueueLimit = persistedQueueLimit;
   }
 
   /**
@@ -25,8 +33,18 @@ export class CookieStorageAdapter implements StorageAdapter {
    * @param events Array of events to save
    */
   public async save(events: Event[]): Promise<void> {
-    await Promise.resolve();
-    const value = encodeURIComponent(JSON.stringify(events));
+    const persistedEvents = await this.load();
+
+    let eventsToSave: Event[] = [...persistedEvents, ...events];
+
+    if (
+      this._persistedQueueLimit !== null &&
+      eventsToSave.length > this._persistedQueueLimit
+    ) {
+      eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+    }
+
+    const value = encodeURIComponent(JSON.stringify(eventsToSave));
 
     document.cookie = `${this._key}=${value}; max-age=${this._maxAge}; path=/; SameSite=Strict`;
   }
