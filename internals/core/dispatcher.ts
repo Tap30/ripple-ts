@@ -143,7 +143,7 @@ export class Dispatcher<
         this._config.apiKeyHeader,
       );
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         await this._storageAdapter.clear();
       } else if (response.status >= 400 && response.status < 500) {
         // 4xx: Client error, no retry - drop events (they won't succeed without client-side fix)

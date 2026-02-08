@@ -12,7 +12,7 @@ type TestMetadata = {
 };
 
 const createMockHttpAdapter = (): HttpAdapter => ({
-  send: vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+  send: vi.fn().mockResolvedValue({ status: 200 }),
 });
 
 const createMockStorageAdapter = (): StorageAdapter => ({
@@ -327,7 +327,6 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
         status: 200,
       });
 
@@ -349,8 +348,8 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: true, status: 200 });
+        .mockResolvedValueOnce({ status: 500 })
+        .mockResolvedValueOnce({ status: 200 });
 
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -369,7 +368,6 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: false,
         status: 400,
       });
 
@@ -398,7 +396,7 @@ describe("Dispatcher", () => {
 
       (httpAdapter.send as ReturnType<typeof vi.fn>)
         .mockRejectedValueOnce(new Error("Network error"))
-        .mockResolvedValueOnce({ ok: true, status: 200 });
+        .mockResolvedValueOnce({ status: 200 });
 
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -418,7 +416,7 @@ describe("Dispatcher", () => {
 
       (httpAdapter.send as ReturnType<typeof vi.fn>)
         .mockRejectedValueOnce("String error")
-        .mockResolvedValueOnce({ ok: true, status: 200 });
+        .mockResolvedValueOnce({ status: 200 });
 
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -458,7 +456,6 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: false,
         status: 500,
       });
 
@@ -476,7 +473,6 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: false,
         status: 500,
       });
 
@@ -541,9 +537,9 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
 
       (httpAdapter.send as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: true, status: 200 });
+        .mockResolvedValueOnce({ status: 500 })
+        .mockResolvedValueOnce({ status: 500 })
+        .mockResolvedValueOnce({ status: 200 });
 
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(

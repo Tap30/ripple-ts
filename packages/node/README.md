@@ -262,7 +262,6 @@ class GrpcHttpAdapter implements HttpAdapter {
     // Implement gRPC call
     const response = await grpcClient.sendEvents({ events });
     return {
-      ok: response.success,
       status: response.code,
       data: response.data,
     };

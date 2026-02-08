@@ -256,7 +256,6 @@ class AxiosHttpAdapter implements HttpAdapter {
   ): Promise<HttpResponse> {
     const response = await axios.post(endpoint, { events }, { headers });
     return {
-      ok: response.status >= 200 && response.status < 300,
       status: response.status,
       data: response.data,
     };
