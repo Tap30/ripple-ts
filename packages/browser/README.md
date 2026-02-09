@@ -277,6 +277,73 @@ const client = new RippleClient({
 | **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues         |
 | **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | ✅ Yes              | Small queues, cross-domain |
 
+### Storage Availability Detection
+
+All storage adapters provide a static `isAvailable()` method to check if the
+storage mechanism is accessible before creating an instance. This is useful for:
+
+- Detecting private/incognito browsing mode restrictions
+- Handling disabled storage APIs (user settings, browser policies)
+- Gracefully degrading when storage is unavailable
+
+```ts
+import {
+  LocalStorageAdapter,
+  SessionStorageAdapter,
+  IndexedDBAdapter,
+  CookieStorageAdapter,
+} from "@tapsioss/ripple-browser";
+
+// Check availability before creating adapter
+if (await IndexedDBAdapter.isAvailable()) {
+  const adapter = new IndexedDBAdapter();
+  // Use IndexedDB
+} else if (await LocalStorageAdapter.isAvailable()) {
+  const adapter = new LocalStorageAdapter();
+  // Fall back to localStorage
+} else {
+  // Use in-memory storage or disable tracking
+  console.warn("No storage available");
+}
+
+// Example: Graceful degradation strategy
+async function createStorageAdapter() {
+  if (await IndexedDBAdapter.isAvailable()) {
+    return new IndexedDBAdapter();
+  }
+
+  if (await LocalStorageAdapter.isAvailable()) {
+    return new LocalStorageAdapter();
+  }
+
+  if (await SessionStorageAdapter.isAvailable()) {
+    return new SessionStorageAdapter();
+  }
+
+  // Last resort: cookies (very limited capacity)
+  if (await CookieStorageAdapter.isAvailable()) {
+    return new CookieStorageAdapter();
+  }
+
+  throw new Error("No storage mechanism available");
+}
+
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  maxBufferSize: 1000, // Limit in-memory buffer
+  storageAdapter: await createStorageAdapter(),
+});
+```
+
+**Common scenarios where storage may be unavailable:**
+
+- Safari private browsing (throws on `localStorage.setItem`)
+- Firefox private browsing (limited IndexedDB quota)
+- User disabled cookies or storage in browser settings
+- Browser extensions blocking storage APIs
+- Incognito/private mode in various browsers
+
 ### TTL (Time-to-Live) Support
 
 LocalStorageAdapter, SessionStorageAdapter, and IndexedDBAdapter support
@@ -298,47 +365,89 @@ const indexedDB = new IndexedDBAdapter({ ttl: 3600000 });
 CookieStorageAdapter uses the native `maxAge` parameter (in seconds) for
 expiration, so no additional TTL is needed.
 
-### Persisted Queue Limit
+### Buffer Size Limit
 
-All storage adapters support an optional `persistedQueueLimit` parameter to
-prevent storage overflow. When the limit is reached, oldest events are evicted
-using a FIFO (First-In-First-Out) policy:
+The client supports an optional `maxBufferSize` parameter to limit the in-memory
+event buffer. When the limit is reached, oldest events are evicted using a FIFO
+(First-In-First-Out) policy:
 
 ```ts
-import {
-  LocalStorageAdapter,
-  SessionStorageAdapter,
-  IndexedDBAdapter,
-  CookieStorageAdapter,
-} from "@tapsioss/ripple-browser";
+import { RippleClient, LocalStorageAdapter } from "@tapsioss/ripple-browser";
 
-// Limit persisted events to 1000 (oldest events are dropped when exceeded)
-const localStorage = new LocalStorageAdapter({ persistedQueueLimit: 1000 });
-const sessionStorage = new SessionStorageAdapter({ persistedQueueLimit: 1000 });
-const indexedDB = new IndexedDBAdapter({ persistedQueueLimit: 1000 });
-const cookieStorage = new CookieStorageAdapter({ persistedQueueLimit: 10 }); // Very small limit for cookies
-
-// Combine TTL and queue limit
-const limitedStorage = new IndexedDBAdapter({
-  ttl: 3600000,
-  persistedQueueLimit: 5000,
+// Limit buffer to 1000 events (oldest events are dropped when exceeded)
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  maxBufferSize: 1000,
+  storageAdapter: new LocalStorageAdapter(),
 });
 
-// Custom database configuration with limits
-const customDB = new IndexedDBAdapter({
-  dbName: "my_analytics",
-  storeName: "events",
-  key: "queue",
-  ttl: 7200000,
-  persistedQueueLimit: 10000,
+// Combine TTL and buffer limit
+const clientWithLimits = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  maxBufferSize: 5000,
+  storageAdapter: new IndexedDBAdapter({ ttl: 3600000 }),
 });
 ```
 
 This feature is particularly useful for:
 
-- Preventing storage quota errors in browsers
-- Managing memory usage in long-running applications
-- Ensuring cookie storage stays within size limits (~4KB)
+- Preventing unbounded memory growth in long-running applications
+- Limiting event accumulation during extended offline periods
+- Controlling how many events are re-queued after network failures
+
+#### Understanding `maxBatchSize` vs `maxBufferSize`
+
+These two parameters serve different purposes and work together:
+
+**`maxBatchSize` (default: 10)** - Controls **when** events are sent
+
+- Triggers immediate flush when queue reaches this size
+- Determines how many events are sent in a single HTTP request
+- Affects network efficiency and latency
+
+**`maxBufferSize` (default: unlimited)** - Controls **how many** events are kept
+
+- Limits total events in memory/storage
+- Drops oldest events when exceeded (FIFO)
+- Prevents unbounded memory growth
+
+**Important**: `maxBufferSize` should always be **greater than or equal to**
+`maxBatchSize`. If `maxBufferSize` is smaller, the batch size will never be
+reached and events will be dropped unnecessarily.
+
+```ts
+// ✅ Good: Buffer is 10x batch size
+const client = new RippleClient({
+  maxBatchSize: 10,
+  maxBufferSize: 100,
+  // ...
+});
+
+// ✅ Good: Large buffer for extended offline periods
+const client = new RippleClient({
+  maxBatchSize: 20,
+  maxBufferSize: 1000,
+  // ...
+});
+
+// ❌ Bad: Buffer smaller than batch (batch will never be reached)
+const client = new RippleClient({
+  maxBatchSize: 100,
+  maxBufferSize: 50, // Events dropped before batch is full!
+  // ...
+});
+```
+
+**Behavior in different scenarios**:
+
+- **Normal operation** (`maxBatchSize: 10, maxBufferSize: 100`): Events flush
+  every 10 events, buffer rarely fills
+- **Offline mode**: Buffer accumulates up to 100 events, then starts dropping
+  oldest
+- **Misconfigured** (`maxBatchSize: 100, maxBufferSize: 50`): Batch never
+  reached, events only sent via time-based flush
 
 ## Logger Adapters
 

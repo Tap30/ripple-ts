@@ -35,6 +35,11 @@ export type ClientConfig = {
    */
   maxRetries?: number;
   /**
+   * Maximum number of events to persist to storage (optional).
+   * When limit is exceeded, oldest events are evicted using FIFO policy.
+   */
+  maxBufferSize?: number;
+  /**
    * HTTP adapter for sending events
    */
   httpAdapter: HttpAdapter;
@@ -97,6 +102,7 @@ export abstract class Client<
       flushInterval: config.flushInterval ?? 5000,
       maxBatchSize: config.maxBatchSize ?? 10,
       maxRetries: config.maxRetries ?? 3,
+      maxBufferSize: config.maxBufferSize,
       loggerAdapter: this._logger,
     };
 

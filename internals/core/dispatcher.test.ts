@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
-import type { StorageAdapter } from "./adapters/storage-adapter.ts";
+import {
+  StorageQuotaExceededError,
+  type StorageAdapter,
+} from "./adapters/storage-adapter.ts";
 import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
 import { NoOpLoggerAdapter } from "./logger.ts";
 import type { Event } from "./types.ts";
@@ -389,6 +392,27 @@ describe("Dispatcher", () => {
       expect(storageAdapter.clear).toHaveBeenCalled();
       // Verify no additional save calls after flush (only the one from enqueue)
       expect(storageAdapter.save).toHaveBeenCalledTimes(saveCallsAfterEnqueue);
+    });
+
+    it("should drop events on unexpected status codes (3xx)", async () => {
+      const httpAdapter = createMockHttpAdapter();
+
+      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
+        status: 302,
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+      expect(storageAdapter.clear).toHaveBeenCalled();
     });
 
     it("should retry on exception", async () => {
@@ -835,6 +859,574 @@ describe("Dispatcher", () => {
         expect.any(Object),
         expect.any(String),
       );
+    });
+  });
+
+  describe("storage error handling", () => {
+    it("should log error when save fails during enqueue", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.save).mockRejectedValue(
+        new Error("QuotaExceededError"),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events to storage",
+        expect.objectContaining({
+          error: "QuotaExceededError",
+        }),
+      );
+    });
+
+    it("should log warning when StorageQuotaExceededError during enqueue", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      vi.mocked(storageAdapter.save).mockRejectedValue(
+        new StorageQuotaExceededError(5, 5),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Storage quota exceeded"),
+      );
+    });
+
+    it("should log error when clear fails after successful send", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.clear).mockRejectedValue(
+        new Error("Storage error"),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to clear storage after successful send",
+        expect.objectContaining({
+          error: "Storage error",
+        }),
+      );
+    });
+
+    it("should log error when clear fails after 4xx error", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 400 });
+      vi.mocked(storageAdapter.clear).mockRejectedValue(
+        new Error("Storage error"),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to clear storage after 4xx error",
+        expect.objectContaining({
+          error: "Storage error",
+        }),
+      );
+    });
+
+    it("should log error when save fails after max retries", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
+      vi.mocked(storageAdapter.save).mockResolvedValueOnce(undefined); // First save during enqueue
+      vi.mocked(storageAdapter.save).mockRejectedValueOnce(
+        new Error("Storage full"),
+      ); // Second save after retries
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events after max retries",
+        expect.objectContaining({
+          error: "Storage full",
+        }),
+      );
+    });
+
+    it("should log error when save fails after network error", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockRejectedValue(new Error("Network error"));
+      vi.mocked(storageAdapter.save).mockResolvedValueOnce(undefined); // First save during enqueue
+      vi.mocked(storageAdapter.save).mockRejectedValueOnce(
+        new Error("Storage full"),
+      ); // Second save after network error
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events after network error",
+        expect.objectContaining({
+          error: "Storage full",
+        }),
+      );
+    });
+
+    it("should log warning when StorageQuotaExceededError during requeue", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
+      vi.mocked(storageAdapter.save).mockResolvedValueOnce(undefined);
+      vi.mocked(storageAdapter.save).mockRejectedValueOnce(
+        new StorageQuotaExceededError(5, 5),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Storage quota exceeded"),
+      );
+    });
+
+    it("should log error when restore fails", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.load).mockRejectedValue(
+        new Error("Failed to read storage"),
+      );
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.restore();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to restore events from storage",
+        expect.objectContaining({
+          error: "Failed to read storage",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in storage errors", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.save).mockRejectedValue("String error");
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events to storage",
+        expect.objectContaining({
+          error: "String error",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in clear errors", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.clear).mockRejectedValue({
+        code: "ERR_STORAGE",
+      });
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to clear storage after successful send",
+        expect.objectContaining({
+          error: "[object Object]",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in clear errors after 4xx", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 400 });
+      vi.mocked(storageAdapter.clear).mockRejectedValue("Clear failed");
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to clear storage after 4xx error",
+        expect.objectContaining({
+          error: "Clear failed",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in save after max retries", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
+      vi.mocked(storageAdapter.save).mockResolvedValueOnce(undefined);
+      vi.mocked(storageAdapter.save).mockRejectedValueOnce(null);
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events after max retries",
+        expect.objectContaining({
+          error: "null",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in save after network error", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(httpAdapter.send).mockRejectedValue(new Error("Network error"));
+      vi.mocked(storageAdapter.save).mockResolvedValueOnce(undefined);
+      vi.mocked(storageAdapter.save).mockRejectedValueOnce(undefined);
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("test"));
+      await dispatcher.flush();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to persist events after network error",
+        expect.objectContaining({
+          error: "undefined",
+        }),
+      );
+    });
+
+    it("should handle non-Error objects in restore errors", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const loggerSpy = vi.spyOn(logger, "error");
+
+      vi.mocked(storageAdapter.load).mockRejectedValue(123);
+
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter: logger }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.restore();
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "Failed to restore events from storage",
+        expect.objectContaining({
+          error: "123",
+        }),
+      );
+    });
+  });
+
+  describe("maxBufferSize", () => {
+    it("should apply FIFO eviction when limit exceeded during enqueue", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig({ maxBufferSize: 2 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.enqueue(createEvent("event2"));
+      await dispatcher.enqueue(createEvent("event3"));
+
+      // Should only save last 2 events
+      expect(storageAdapter.save).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "event2" }),
+          expect.objectContaining({ name: "event3" }),
+        ]),
+      );
+      expect(
+        (storageAdapter.save as ReturnType<typeof vi.fn>).mock.lastCall![0],
+      ).toHaveLength(2);
+    });
+
+    it("should apply limit when re-queuing after max retries", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
+
+      const dispatcher = new Dispatcher(
+        createConfig({ maxBufferSize: 2, maxRetries: 0 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.enqueue(createEvent("event2"));
+      await dispatcher.enqueue(createEvent("event3"));
+
+      // Clear the save calls from enqueue
+      vi.mocked(storageAdapter.save).mockClear();
+
+      await dispatcher.flush();
+
+      // After failed flush, should re-queue and apply limit
+      expect(storageAdapter.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "event2" }),
+          expect.objectContaining({ name: "event3" }),
+        ]),
+      );
+      expect(
+        (storageAdapter.save as ReturnType<typeof vi.fn>).mock.lastCall![0],
+      ).toHaveLength(2);
+    });
+
+    it("should not apply limit when under threshold", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig({ maxBufferSize: 10 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.enqueue(createEvent("event2"));
+
+      expect(storageAdapter.save).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "event1" }),
+          expect.objectContaining({ name: "event2" }),
+        ]),
+      );
+      expect(
+        (storageAdapter.save as ReturnType<typeof vi.fn>).mock.lastCall![0],
+      ).toHaveLength(2);
+    });
+
+    it("should work without limit when not configured", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(), // No limit
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.enqueue(createEvent("event2"));
+      await dispatcher.enqueue(createEvent("event3"));
+
+      // Should save all events
+      expect(storageAdapter.save).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "event1" }),
+          expect.objectContaining({ name: "event2" }),
+          expect.objectContaining({ name: "event3" }),
+        ]),
+      );
+      expect(
+        (storageAdapter.save as ReturnType<typeof vi.fn>).mock.lastCall![0],
+      ).toHaveLength(3);
+    });
+
+    it("should apply limit during restore", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+
+      (storageAdapter.load as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createEvent("event1"),
+        createEvent("event2"),
+        createEvent("event3"),
+        createEvent("event4"),
+        createEvent("event5"),
+      ]);
+
+      const dispatcher = new Dispatcher(
+        createConfig({ maxBufferSize: 2 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.restore();
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(1);
+
+      const sentEvents = (httpAdapter.send as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as Event<Record<string, unknown>>[];
+
+      expect(sentEvents).toHaveLength(2);
+      expect(sentEvents[0]).toMatchObject({ name: "event4" });
+      expect(sentEvents[1]).toMatchObject({ name: "event5" });
+    });
+  });
+
+  describe("configuration validation", () => {
+    it("should warn when maxBufferSize < maxBatchSize", () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      new Dispatcher(
+        {
+          ...createConfig({ maxBatchSize: 100, maxBufferSize: 50 }),
+          loggerAdapter: logger,
+        },
+        httpAdapter,
+        storageAdapter,
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "maxBufferSize (50) is less than maxBatchSize (100)",
+        ),
+      );
+    });
+
+    it("should not warn when maxBufferSize >= maxBatchSize", () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      new Dispatcher(
+        {
+          ...createConfig({ maxBatchSize: 10, maxBufferSize: 100 }),
+          loggerAdapter: logger,
+        },
+        httpAdapter,
+        storageAdapter,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should not warn when maxBufferSize is undefined", () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const logger = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      new Dispatcher(
+        { ...createConfig({ maxBatchSize: 10 }), loggerAdapter: logger },
+        httpAdapter,
+        storageAdapter,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 });

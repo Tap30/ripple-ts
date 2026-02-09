@@ -52,13 +52,30 @@ describe("SessionStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
     });
+  });
 
-    it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new SessionStorageAdapter({
-        persistedQueueLimit: 100,
+  describe("isAvailable", () => {
+    it("should return true when sessionStorage is available", async () => {
+      const available = await SessionStorageAdapter.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+        "test",
+      );
+      expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+      );
+    });
+
+    it("should return false when sessionStorage throws", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementation(() => {
+        throw new Error("SecurityError");
       });
 
-      expect(customAdapter).toBeInstanceOf(SessionStorageAdapter);
+      const available = await SessionStorageAdapter.isAvailable();
+
+      expect(available).toBe(false);
     });
   });
 
@@ -87,85 +104,6 @@ describe("SessionStorageAdapter", () => {
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
         "custom_events",
         JSON.stringify({ events: mockEvents, savedAt: 1000 }),
-      );
-      vi.useRealTimers();
-    });
-
-    it("should merge with existing persisted events", async () => {
-      vi.setSystemTime(2000);
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "existing_event",
-          payload: { old: "data" },
-          issuedAt: 500,
-          metadata: {},
-          sessionId: "session-old",
-          platform: null,
-        },
-      ];
-
-      vi.mocked(mockSessionStorage.getItem).mockReturnValue(
-        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
-      );
-
-      await adapter.save(mockEvents);
-
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify({
-          events: [...existingEvents, ...mockEvents],
-          savedAt: 2000,
-        }),
-      );
-      vi.useRealTimers();
-    });
-
-    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
-      vi.setSystemTime(3000);
-      const limitedAdapter = new SessionStorageAdapter({
-        persistedQueueLimit: 2,
-      });
-
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "event_1",
-          payload: {},
-          issuedAt: 1000,
-          metadata: {},
-          sessionId: "session-1",
-          platform: null,
-        },
-        {
-          name: "event_2",
-          payload: {},
-          issuedAt: 2000,
-          metadata: {},
-          sessionId: "session-2",
-          platform: null,
-        },
-      ];
-
-      vi.mocked(mockSessionStorage.getItem).mockReturnValue(
-        JSON.stringify({ events: existingEvents, savedAt: 2000 }),
-      );
-
-      const newEvent: RippleEvent = {
-        name: "event_3",
-        payload: {},
-        issuedAt: 3000,
-        metadata: {},
-        sessionId: "session-3",
-        platform: null,
-      };
-
-      await limitedAdapter.save([newEvent]);
-
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify({
-          events: [existingEvents[1], newEvent],
-          savedAt: 3000,
-        }),
       );
       vi.useRealTimers();
     });
@@ -243,6 +181,132 @@ describe("SessionStorageAdapter", () => {
 
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
         "custom_events",
+      );
+    });
+  });
+
+  describe("quota exceeded handling", () => {
+    const createMockEvents = (count: number): RippleEvent[] =>
+      Array.from({ length: count }, (_, i) => ({
+        name: `event${i}`,
+        payload: {},
+        metadata: {},
+        issuedAt: Date.now(),
+        sessionId: "s",
+        platform: null,
+      }));
+
+    it("should handle quota exceeded with retry", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementationOnce(() => {
+        const error = new Error("QuotaExceededError");
+
+        error.name = "QuotaExceededError";
+        throw error;
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Storage quota exceeded",
+      );
+    });
+
+    it("should handle quota exceeded retry error", async () => {
+      let callCount = 0;
+
+      vi.mocked(mockSessionStorage.setItem).mockImplementation(() => {
+        callCount++;
+        const error = new Error("QuotaExceededError");
+
+        error.name = "QuotaExceededError";
+        throw error;
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow();
+      expect(callCount).toBe(2);
+    });
+
+    it("should handle non-Error exceptions", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementationOnce(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "String error";
+      });
+
+      await expect(adapter.save(createMockEvents(1))).rejects.toThrow(
+        "String error",
+      );
+    });
+
+    it("should handle single event quota error", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementationOnce(() => {
+        const error = new Error("QuotaExceededError");
+
+        error.name = "QuotaExceededError";
+        throw error;
+      });
+
+      await expect(adapter.save(createMockEvents(1))).rejects.toThrow(
+        "QuotaExceededError",
+      );
+    });
+
+    it("should handle non-Error in retry", async () => {
+      let callCount = 0;
+
+      vi.mocked(mockSessionStorage.setItem).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = new Error("QuotaExceededError");
+
+          error.name = "QuotaExceededError";
+          throw error;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "Retry string error";
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Retry string error",
+      );
+    });
+
+    it("should handle Error in retry", async () => {
+      let callCount = 0;
+
+      vi.mocked(mockSessionStorage.setItem).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = new Error("QuotaExceededError");
+
+          error.name = "QuotaExceededError";
+          throw error;
+        }
+
+        throw new Error("Retry error");
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Retry error",
+      );
+    });
+
+    it("should handle non-QuotaExceededError", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementationOnce(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "Non-error value";
+      });
+
+      await expect(adapter.save(createMockEvents(1))).rejects.toThrow(
+        "Non-error value",
+      );
+    });
+
+    it("should handle non-quota Error", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementationOnce(() => {
+        throw new TypeError("Some other error");
+      });
+
+      await expect(adapter.save(createMockEvents(2))).rejects.toThrow(
+        "Some other error",
       );
     });
   });

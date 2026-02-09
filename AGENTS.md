@@ -62,8 +62,12 @@ await client.track("user.login", {
 - **Dynamic Rebatching** - Automatically rebatches accumulated events during
   flush for optimal throughput
 - **Retry Logic** - Exponential backoff with jitter
-- **Event Persistence** - Automatic storage of unsent events
-- **Race Condition Prevention** - Mutex-protected operations
+- **Event Persistence** - Automatic storage of unsent events with TTL and queue
+  limits
+- **Storage Availability Detection** - Static `isAvailable()` method on all
+  storage adapters for graceful degradation
+- **Race Condition Prevention** - Mutex-protected operations and atomic
+  IndexedDB transactions
 - **Custom Adapters** - Pluggable HTTP, storage, and logger implementations
 
 ## Technology Stack
@@ -88,7 +92,7 @@ pnpm clean          # Clean build artifacts
 - **Coverage**: 100% statements, branches, functions, lines
 - **Structure**: Tests co-located with source files `(\*.test.ts)`
 - **Environments**: `jsdom` for browser, node for Node.js
-- **Total**: 266 tests across all packages
+- **Total**: 180 tests across all packages (140 browser + 40 node)
 
 ## Code Guidelines
 
