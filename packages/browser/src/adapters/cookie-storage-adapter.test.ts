@@ -46,14 +46,6 @@ describe("CookieStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
     });
-
-    it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new CookieStorageAdapter({
-        persistedQueueLimit: 100,
-      });
-
-      expect(customAdapter).toBeInstanceOf(CookieStorageAdapter);
-    });
   });
 
   describe("isAvailable", () => {
@@ -147,7 +139,7 @@ describe("CookieStorageAdapter", () => {
       );
     });
 
-    it("should merge with existing persisted events", async () => {
+    it("should overwrite existing persisted events", async () => {
       const existingEvents: RippleEvent[] = [
         {
           name: "existing_event",
@@ -170,60 +162,7 @@ describe("CookieStorageAdapter", () => {
 
       await adapter.save(mockEvents);
 
-      const mergedEvents = [...existingEvents, ...mockEvents];
-      const expectedValue = encodeURIComponent(JSON.stringify(mergedEvents));
-
-      expect(cookieSetter).toHaveBeenCalledWith(
-        `ripple_events=${expectedValue}; max-age=604800; path=/; SameSite=Strict`,
-      );
-    });
-
-    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
-      const limitedAdapter = new CookieStorageAdapter({
-        persistedQueueLimit: 2,
-      });
-
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "event_1",
-          payload: {},
-          issuedAt: 1000,
-          metadata: {},
-          sessionId: "session-1",
-          platform: null,
-        },
-        {
-          name: "event_2",
-          payload: {},
-          issuedAt: 2000,
-          metadata: {},
-          sessionId: "session-2",
-          platform: null,
-        },
-      ];
-
-      const newEvent: RippleEvent = {
-        name: "event_3",
-        payload: {},
-        issuedAt: 3000,
-        metadata: {},
-        sessionId: "session-3",
-        platform: null,
-      };
-
-      const cookieSetter = vi.fn();
-      const existingValue = encodeURIComponent(JSON.stringify(existingEvents));
-
-      Object.defineProperty(document, "cookie", {
-        set: cookieSetter,
-        get: () => `ripple_events=${existingValue}`,
-        configurable: true,
-      });
-
-      await limitedAdapter.save([newEvent]);
-
-      const evictedEvents = [existingEvents[1], newEvent];
-      const expectedValue = encodeURIComponent(JSON.stringify(evictedEvents));
+      const expectedValue = encodeURIComponent(JSON.stringify(mockEvents));
 
       expect(cookieSetter).toHaveBeenCalledWith(
         `ripple_events=${expectedValue}; max-age=604800; path=/; SameSite=Strict`,
@@ -374,6 +313,107 @@ describe("CookieStorageAdapter", () => {
 
       expect(cookieSetter).toHaveBeenCalledWith(
         "custom_events=; max-age=0; path=/",
+      );
+    });
+  });
+
+  describe("quota exceeded handling", () => {
+    const createMockEvents = (count: number): RippleEvent[] =>
+      Array.from({ length: count }, (_, i) => ({
+        name: `event${i}`,
+        payload: {},
+        metadata: {},
+        issuedAt: Date.now(),
+        sessionId: "s",
+        platform: null,
+      }));
+
+    it("should handle quota exceeded with retry", async () => {
+      const cookieSetter = vi.fn((value: string) => {
+        if (value.length > 100) {
+          throw new Error("Cookie too large");
+        }
+      });
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "",
+        configurable: true,
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Cookie too large",
+      );
+    });
+
+    it("should handle quota exceeded retry error", async () => {
+      const cookieSetter = vi.fn(() => {
+        throw new Error("Cookie too large");
+      });
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "",
+        configurable: true,
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow();
+    });
+
+    it("should handle non-Error exceptions", async () => {
+      const cookieSetter = vi.fn(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "String error";
+      });
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "",
+        configurable: true,
+      });
+
+      await expect(adapter.save(createMockEvents(1))).rejects.toThrow(
+        "String error",
+      );
+    });
+
+    it("should handle single event quota error", async () => {
+      const cookieSetter = vi.fn(() => {
+        throw new Error("Cookie too large");
+      });
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "",
+        configurable: true,
+      });
+
+      await expect(adapter.save(createMockEvents(1))).rejects.toThrow(
+        "Cookie too large",
+      );
+    });
+
+    it("should handle non-Error in retry", async () => {
+      let callCount = 0;
+      const cookieSetter = vi.fn(() => {
+        callCount++;
+
+        if (callCount === 1) {
+          throw new Error("Cookie too large");
+        }
+
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "Retry string error";
+      });
+
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "",
+        configurable: true,
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Retry string error",
       );
     });
   });

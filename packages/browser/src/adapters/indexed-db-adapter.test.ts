@@ -76,14 +76,6 @@ describe("IndexedDBAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
     });
-
-    it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new IndexedDBAdapter({
-        persistedQueueLimit: 100,
-      });
-
-      expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
-    });
   });
 
   describe("isAvailable", () => {
@@ -452,121 +444,6 @@ describe("IndexedDBAdapter", () => {
       await expect(savePromise).rejects.toThrow("Failed to read data");
     });
 
-    it("should merge with existing persisted events", async () => {
-      vi.setSystemTime(2000);
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "existing_event",
-          payload: { old: "data" },
-          issuedAt: 500,
-          metadata: {},
-          sessionId: "session-old",
-          platform: null,
-        },
-      ];
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns existing events
-      Object.defineProperty(getRequest, "result", {
-        value: { events: existingEvents, savedAt: 1000 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: [...existingEvents, ...mockEvents], savedAt: 2000 },
-        "queue",
-      );
-    });
-
-    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
-      vi.setSystemTime(3000);
-      const limitedAdapter = new IndexedDBAdapter({
-        persistedQueueLimit: 2,
-      });
-
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "event_1",
-          payload: {},
-          issuedAt: 1000,
-          metadata: {},
-          sessionId: "session-1",
-          platform: null,
-        },
-        {
-          name: "event_2",
-          payload: {},
-          issuedAt: 2000,
-          metadata: {},
-          sessionId: "session-2",
-          platform: null,
-        },
-      ];
-
-      const newEvent: RippleEvent = {
-        name: "event_3",
-        payload: {},
-        issuedAt: 3000,
-        metadata: {},
-        sessionId: "session-3",
-        platform: null,
-      };
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = limitedAdapter.save([newEvent]);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns existing events
-      Object.defineProperty(getRequest, "result", {
-        value: { events: existingEvents, savedAt: 2000 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: [existingEvents[1], newEvent], savedAt: 3000 },
-        "queue",
-      );
-    });
-
     it("should discard expired data and save new events when TTL exceeded", async () => {
       const adapterWithTTL = new IndexedDBAdapter({ ttl: 1000 });
 
@@ -602,54 +479,6 @@ describe("IndexedDBAdapter", () => {
       // Should only save new events, discarding expired ones
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 5000 },
-        "queue",
-      );
-    });
-
-    it("should apply FIFO eviction on expired data when limit exceeded", async () => {
-      const adapterWithTTL = new IndexedDBAdapter({
-        ttl: 1000,
-        persistedQueueLimit: 2,
-      });
-
-      vi.setSystemTime(5000);
-
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const newEvents = [
-        { name: "event1" },
-        { name: "event2" },
-        { name: "event3" },
-      ] as RippleEvent[];
-
-      const savePromise = adapterWithTTL.save(newEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns expired data
-      Object.defineProperty(getRequest, "result", {
-        value: { events: [{ name: "old" }], savedAt: 1000 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      // Should only keep last 2 events
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: [{ name: "event2" }, { name: "event3" }], savedAt: 5000 },
         "queue",
       );
     });
@@ -1031,6 +860,103 @@ describe("IndexedDBAdapter", () => {
         { events: mockEvents, savedAt: 1000 },
         "custom_key",
       );
+    });
+
+    it("should handle single event quota error", async () => {
+      const adapter = new IndexedDBAdapter();
+      const singleEvent: RippleEvent[] = [
+        {
+          name: "event1",
+          payload: {},
+          metadata: {},
+          issuedAt: Date.now(),
+          sessionId: "s",
+          platform: null,
+        },
+      ];
+
+      const openRequest = {} as IDBOpenDBRequest;
+      const getRequest = {} as IDBRequest<unknown>;
+      const putRequest = {} as IDBRequest<IDBValidKey>;
+
+      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
+      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
+      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
+
+      const savePromise = adapter.save(singleEvent);
+
+      Object.defineProperty(openRequest, "result", { value: mockDB });
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      Object.defineProperty(getRequest, "result", { value: undefined });
+      getRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      const quotaError = new Error("QuotaExceededError");
+
+      quotaError.name = "QuotaExceededError";
+
+      const errorEvent = { target: { error: quotaError } } as unknown as Event;
+
+      putRequest.onerror?.(errorEvent);
+
+      await expect(savePromise).rejects.toThrow("Failed to write data");
+    });
+
+    it("should handle quota exceeded with retry for multiple events", async () => {
+      const adapter = new IndexedDBAdapter();
+      const largeMockEvents: RippleEvent[] = Array.from(
+        { length: 10 },
+        (_, i) => ({
+          name: `event${i}`,
+          payload: {},
+          metadata: {},
+          issuedAt: Date.now(),
+          sessionId: "s",
+          platform: null,
+        }),
+      );
+
+      const quotaError = new Error("QuotaExceededError");
+
+      quotaError.name = "QuotaExceededError";
+
+      const atomicSpy = vi
+        .spyOn(
+          adapter as unknown as {
+            _atomicReadWrite: (
+              db: IDBDatabase,
+              transform: (data: unknown) => unknown,
+            ) => Promise<void>;
+          },
+          "_atomicReadWrite",
+        )
+        .mockImplementationOnce((_db, transform) => {
+          transform(null);
+          return Promise.reject(quotaError);
+        })
+        .mockImplementationOnce((_db, transform) => {
+          transform(null);
+          return Promise.resolve();
+        });
+
+      const openSpy = vi
+        .spyOn(
+          adapter as unknown as { _openDB: () => Promise<IDBDatabase> },
+          "_openDB",
+        )
+        .mockResolvedValue({} as IDBDatabase);
+
+      await expect(adapter.save(largeMockEvents)).rejects.toThrow(
+        "Storage quota exceeded",
+      );
+
+      expect(atomicSpy).toHaveBeenCalledTimes(2);
+      openSpy.mockRestore();
+      atomicSpy.mockRestore();
     });
   });
 });

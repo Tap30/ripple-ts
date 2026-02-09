@@ -52,14 +52,6 @@ describe("LocalStorageAdapter", () => {
 
       expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
     });
-
-    it("should create instance with persistedQueueLimit", () => {
-      const customAdapter = new LocalStorageAdapter({
-        persistedQueueLimit: 100,
-      });
-
-      expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
-    });
   });
 
   describe("isAvailable", () => {
@@ -116,116 +108,59 @@ describe("LocalStorageAdapter", () => {
       vi.useRealTimers();
     });
 
-    it("should merge with existing persisted events", async () => {
-      vi.setSystemTime(2000);
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "existing_event",
-          payload: { old: "data" },
-          issuedAt: 500,
-          metadata: {},
-          sessionId: "session-old",
-          platform: null,
-        },
-      ];
+    it("should handle QuotaExceededError by dropping oldest half", async () => {
+      vi.setSystemTime(1000);
+      const events = Array.from({ length: 10 }, (_, i) => ({
+        name: `event_${i}`,
+        payload: {},
+        issuedAt: i,
+        metadata: {},
+        sessionId: `session-${i}`,
+        platform: null,
+      })) as RippleEvent[];
 
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
-        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
-      );
+      let callCount = 0;
 
-      await adapter.save(mockEvents);
+      vi.mocked(mockLocalStorage.setItem).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = new Error("QuotaExceededError");
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify({
-          events: [...existingEvents, ...mockEvents],
-          savedAt: 2000,
-        }),
-      );
-      vi.useRealTimers();
-    });
+          error.name = "QuotaExceededError";
 
-    it("should apply FIFO eviction when persistedQueueLimit is exceeded", async () => {
-      vi.setSystemTime(3000);
-      const limitedAdapter = new LocalStorageAdapter({
-        persistedQueueLimit: 2,
+          throw error;
+        }
       });
 
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "event_1",
-          payload: {},
-          issuedAt: 1000,
-          metadata: {},
-          sessionId: "session-1",
-          platform: null,
-        },
-        {
-          name: "event_2",
-          payload: {},
-          issuedAt: 2000,
-          metadata: {},
-          sessionId: "session-2",
-          platform: null,
-        },
-      ];
-
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
-        JSON.stringify({ events: existingEvents, savedAt: 2000 }),
+      await expect(adapter.save(events)).rejects.toThrow(
+        "Storage quota exceeded: dropped 5 oldest events, saved 5",
       );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledTimes(2);
+      // Second call should have only last 5 events
+      const secondCall = vi.mocked(mockLocalStorage.setItem).mock.calls[1];
 
-      const newEvent: RippleEvent = {
-        name: "event_3",
-        payload: {},
-        issuedAt: 3000,
-        metadata: {},
-        sessionId: "session-3",
-        platform: null,
+      if (!secondCall) {
+        throw new Error("Second call not found");
+      }
+
+      const savedData = JSON.parse(secondCall[1]) as {
+        events: RippleEvent[];
+        savedAt: number;
       };
 
-      await limitedAdapter.save([newEvent]);
-
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify({
-          events: [existingEvents[1], newEvent],
-          savedAt: 3000,
-        }),
-      );
+      expect(savedData.events).toHaveLength(5);
+      expect(savedData.events[0]?.name).toBe("event_5");
       vi.useRealTimers();
     });
 
-    it("should not evict when under persistedQueueLimit", async () => {
-      vi.setSystemTime(2000);
-      const limitedAdapter = new LocalStorageAdapter({
-        persistedQueueLimit: 5,
+    it("should throw non-quota errors", async () => {
+      vi.mocked(mockLocalStorage.setItem).mockImplementation(() => {
+        throw new Error("Some other error");
       });
 
-      const existingEvents: RippleEvent[] = [
-        {
-          name: "event_1",
-          payload: {},
-          issuedAt: 1000,
-          metadata: {},
-          sessionId: "session-1",
-          platform: null,
-        },
-      ];
-
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(
-        JSON.stringify({ events: existingEvents, savedAt: 1000 }),
+      await expect(adapter.save(mockEvents)).rejects.toThrow(
+        "Some other error",
       );
-
-      await limitedAdapter.save(mockEvents);
-
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "ripple_events",
-        JSON.stringify({
-          events: [...existingEvents, ...mockEvents],
-          savedAt: 2000,
-        }),
-      );
-      vi.useRealTimers();
     });
   });
 
@@ -279,7 +214,9 @@ describe("LocalStorageAdapter", () => {
     it("should handle invalid JSON gracefully", async () => {
       vi.mocked(mockLocalStorage.getItem).mockReturnValue("invalid json");
 
-      await expect(adapter.load()).rejects.toThrow();
+      const result = await adapter.load();
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -296,6 +233,68 @@ describe("LocalStorageAdapter", () => {
       await customAdapter.clear();
 
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("custom_events");
+    });
+  });
+
+  describe("quota exceeded handling", () => {
+    const createMockEvents = (count: number): RippleEvent[] =>
+      Array.from({ length: count }, (_, i) => ({
+        name: `event${i}`,
+        payload: {},
+        metadata: {},
+        issuedAt: Date.now(),
+        sessionId: "s",
+        platform: null,
+      }));
+
+    it("should handle non-Error in retry", async () => {
+      let callCount = 0;
+
+      vi.mocked(mockLocalStorage.setItem).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = new Error("QuotaExceededError");
+
+          error.name = "QuotaExceededError";
+          throw error;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "Retry string error";
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Retry string error",
+      );
+    });
+
+    it("should handle Error in retry", async () => {
+      let callCount = 0;
+
+      vi.mocked(mockLocalStorage.setItem).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = new Error("QuotaExceededError");
+
+          error.name = "QuotaExceededError";
+          throw error;
+        }
+
+        throw new Error("Retry error");
+      });
+
+      await expect(adapter.save(createMockEvents(10))).rejects.toThrow(
+        "Retry error",
+      );
+    });
+
+    it("should handle non-Error exception", async () => {
+      vi.mocked(mockLocalStorage.setItem).mockImplementationOnce(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw "Non-error value";
+      });
+
+      await expect(adapter.save(mockEvents)).rejects.toThrow("Non-error value");
     });
   });
 });

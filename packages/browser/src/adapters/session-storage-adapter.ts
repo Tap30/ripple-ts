@@ -1,4 +1,8 @@
-import type { Event as RippleEvent, StorageAdapter } from "@internals/core";
+import {
+  type Event as RippleEvent,
+  type StorageAdapter,
+  StorageQuotaExceededError,
+} from "@internals/core";
 
 type StorageData = {
   events: RippleEvent[];
@@ -8,7 +12,6 @@ type StorageData = {
 export type SessionStorageAdapterConfig = {
   key?: string;
   ttl?: number;
-  persistedQueueLimit?: number;
 };
 
 /**
@@ -18,7 +21,6 @@ export type SessionStorageAdapterConfig = {
 export class SessionStorageAdapter implements StorageAdapter {
   private readonly _key: string;
   private readonly _ttl: number | null;
-  private readonly _persistedQueueLimit: number | null;
 
   /**
    * Create a new SessionStorageAdapter instance.
@@ -28,7 +30,6 @@ export class SessionStorageAdapter implements StorageAdapter {
   constructor(config: SessionStorageAdapterConfig = {}) {
     this._key = config.key ?? "ripple_events";
     this._ttl = config.ttl ?? null;
-    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**
@@ -53,25 +54,53 @@ export class SessionStorageAdapter implements StorageAdapter {
    * Save events to sessionStorage.
    *
    * @param events Array of events to save
+   * @throws {StorageQuotaExceededError} When quota exceeded and events are dropped
    */
-  public async save(events: RippleEvent[]): Promise<void> {
-    const persistedEvents = await this.load();
+  public save(events: RippleEvent[]): Promise<void> {
+    try {
+      const data: StorageData = {
+        events,
+        savedAt: Date.now(),
+      };
 
-    let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
+      sessionStorage.setItem(this._key, JSON.stringify(data));
 
-    if (
-      this._persistedQueueLimit !== null &&
-      eventsToSave.length > this._persistedQueueLimit
-    ) {
-      eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+      return Promise.resolve();
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === "QuotaExceededError" &&
+        events.length > 1
+      ) {
+        try {
+          // Drop oldest half and retry
+          const reduced = events.slice(-Math.floor(events.length / 2));
+          const reducedData: StorageData = {
+            events: reduced,
+            savedAt: Date.now(),
+          };
+
+          sessionStorage.setItem(this._key, JSON.stringify(reducedData));
+
+          return Promise.reject(
+            new StorageQuotaExceededError(
+              reduced.length,
+              events.length - reduced.length,
+            ),
+          );
+        } catch (retryError) {
+          return Promise.reject(
+            retryError instanceof Error
+              ? retryError
+              : new Error(String(retryError)),
+          );
+        }
+      }
+
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
-
-    const data: StorageData = {
-      events: eventsToSave,
-      savedAt: Date.now(),
-    };
-
-    sessionStorage.setItem(this._key, JSON.stringify(data));
   }
 
   /**

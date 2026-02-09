@@ -38,6 +38,11 @@ export type DispatcherConfig = {
    * Logger for internal logging
    */
   loggerAdapter: LoggerAdapter;
+  /**
+   * Maximum size of the in-memory event buffer (optional).
+   * When limit is exceeded, oldest events are evicted using FIFO policy.
+   */
+  maxBufferSize?: number;
 };
 
 /**
@@ -75,6 +80,18 @@ export class Dispatcher<
     this._httpAdapter = httpAdapter;
     this._storageAdapter = storageAdapter;
     this._logger = config.loggerAdapter;
+
+    // Validate configuration
+    if (
+      config.maxBufferSize !== undefined &&
+      config.maxBufferSize < config.maxBatchSize
+    ) {
+      this._logger.warn(
+        `Configuration warning: maxBufferSize (${config.maxBufferSize}) is less than maxBatchSize (${config.maxBatchSize}). ` +
+          `This means the batch size will never be reached and events will be dropped unnecessarily. ` +
+          `Consider setting maxBufferSize >= maxBatchSize.`,
+      );
+    }
   }
 
   /**
@@ -87,12 +104,18 @@ export class Dispatcher<
     this._queue.enqueue(event);
 
     try {
-      await this._storageAdapter.save(this._queue.toArray());
+      const eventsToSave = this._applyQueueLimit(this._queue.toArray());
+
+      await this._storageAdapter.save(eventsToSave);
     } catch (err) {
-      this._logger.error("Failed to persist events to storage", {
-        error: err instanceof Error ? err.message : String(err),
-        queueSize: this._queue.size(),
-      });
+      if (err instanceof Error && err.name === "StorageQuotaExceededError") {
+        this._logger.warn(err.message);
+      } else {
+        this._logger.error("Failed to persist events to storage", {
+          error: err instanceof Error ? err.message : String(err),
+          queueSize: this._queue.size(),
+        });
+      }
     }
 
     if (this._queue.size() >= this._config.maxBatchSize) {
@@ -127,6 +150,23 @@ export class Dispatcher<
         await this._sendWithRetry(batch);
       }
     });
+  }
+
+  /**
+   * Apply persisted queue limit using FIFO eviction.
+   *
+   * @param events Events to apply limit to
+   * @returns Events after applying limit
+   */
+  private _applyQueueLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
+    if (
+      this._config.maxBufferSize !== undefined &&
+      events.length > this._config.maxBufferSize
+    ) {
+      return events.slice(-this._config.maxBufferSize);
+    }
+
+    return events;
   }
 
   /**
@@ -294,12 +334,18 @@ export class Dispatcher<
     this._queue.fromArray([...events, ...currentQueue]);
 
     try {
-      await this._storageAdapter.save(this._queue.toArray());
+      const eventsToSave = this._applyQueueLimit(this._queue.toArray());
+
+      await this._storageAdapter.save(eventsToSave);
     } catch (err) {
-      this._logger.error(errorMessage, {
-        error: err instanceof Error ? err.message : String(err),
-        eventsCount: this._queue.size(),
-      });
+      if (err instanceof Error && err.name === "StorageQuotaExceededError") {
+        this._logger.warn(err.message);
+      } else {
+        this._logger.error(errorMessage, {
+          error: err instanceof Error ? err.message : String(err),
+          eventsCount: this._queue.size(),
+        });
+      }
     }
   }
 
@@ -322,8 +368,9 @@ export class Dispatcher<
   public async restore(): Promise<void> {
     try {
       const stored = await this._storageAdapter.load();
+      const limited = this._applyQueueLimit(stored as Event<TMetadata>[]);
 
-      this._queue.fromArray(stored as Event<TMetadata>[]);
+      this._queue.fromArray(limited);
 
       if (this._queue.size() > 0) {
         this._scheduleFlush();

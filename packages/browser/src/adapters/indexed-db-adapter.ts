@@ -1,4 +1,8 @@
-import type { Event as RippleEvent, StorageAdapter } from "@internals/core";
+import {
+  type Event as RippleEvent,
+  type StorageAdapter,
+  StorageQuotaExceededError,
+} from "@internals/core";
 
 type StorageData = {
   events: RippleEvent[];
@@ -10,7 +14,6 @@ export type IndexedDBAdapterConfig = {
   storeName?: string;
   key?: string;
   ttl?: number;
-  persistedQueueLimit?: number;
 };
 
 /**
@@ -22,7 +25,6 @@ export class IndexedDBAdapter implements StorageAdapter {
   private readonly _storeName: string;
   private readonly _key: string;
   private readonly _ttl: number | null;
-  private readonly _persistedQueueLimit: number | null;
 
   private _dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -36,7 +38,6 @@ export class IndexedDBAdapter implements StorageAdapter {
     this._storeName = config.storeName ?? "events";
     this._key = config.key ?? "queue";
     this._ttl = config.ttl ?? null;
-    this._persistedQueueLimit = config.persistedQueueLimit ?? null;
   }
 
   /**
@@ -173,9 +174,7 @@ export class IndexedDBAdapter implements StorageAdapter {
         const putRequest = store.put(newData, this._key);
 
         putRequest.onerror = () =>
-          reject(
-            new Error(putRequest.error?.message ?? "Failed to write data"),
-          );
+          reject(putRequest.error ?? new Error("Failed to write data"));
         putRequest.onsuccess = () => resolve();
       };
     });
@@ -185,45 +184,42 @@ export class IndexedDBAdapter implements StorageAdapter {
    * Save events to IndexedDB.
    *
    * @param events Array of events to save
+   * @throws {StorageQuotaExceededError} When quota exceeded and events are dropped
    */
   public async save(events: RippleEvent[]): Promise<void> {
     const db = await this._openDB();
 
-    await this._atomicReadWrite(db, data => {
-      const persistedEvents: RippleEvent[] = data?.events ?? [];
-
-      // Check TTL before merging
-      if (data && this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
-        // Expired, start fresh
-        let eventsToSave = events;
-
-        if (
-          this._persistedQueueLimit !== null &&
-          eventsToSave.length > this._persistedQueueLimit
-        ) {
-          eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
-        }
-
+    try {
+      await this._atomicReadWrite(db, () => {
         return {
-          events: eventsToSave,
+          events,
           savedAt: Date.now(),
         };
-      }
-
-      let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
-
+      });
+    } catch (error) {
       if (
-        this._persistedQueueLimit !== null &&
-        eventsToSave.length > this._persistedQueueLimit
+        error instanceof Error &&
+        error.name === "QuotaExceededError" &&
+        events.length > 1
       ) {
-        eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+        // Drop oldest half and retry
+        const reduced = events.slice(-Math.floor(events.length / 2));
+
+        await this._atomicReadWrite(db, () => {
+          return {
+            events: reduced,
+            savedAt: Date.now(),
+          };
+        });
+
+        throw new StorageQuotaExceededError(
+          reduced.length,
+          events.length - reduced.length,
+        );
       }
 
-      return {
-        events: eventsToSave,
-        savedAt: Date.now(),
-      };
-    });
+      throw error;
+    }
   }
 
   /**
