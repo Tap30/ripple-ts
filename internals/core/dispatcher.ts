@@ -86,7 +86,14 @@ export class Dispatcher<
   public async enqueue(event: Event<TMetadata>): Promise<void> {
     this._queue.enqueue(event);
 
-    await this._storageAdapter.save(this._queue.toArray());
+    try {
+      await this._storageAdapter.save(this._queue.toArray());
+    } catch (err) {
+      this._logger.error("Failed to persist events to storage", {
+        error: err instanceof Error ? err.message : String(err),
+        queueSize: this._queue.size(),
+      });
+    }
 
     if (this._queue.size() >= this._config.maxBatchSize) {
       await this.flush();
@@ -143,66 +150,156 @@ export class Dispatcher<
         this._config.apiKeyHeader,
       );
 
-      if (response.status >= 200 && response.status < 300) {
-        await this._storageAdapter.clear();
-      } else if (response.status >= 400 && response.status < 500) {
-        // 4xx: Client error, no retry - drop events (they won't succeed without client-side fix)
-
-        this._logger.warn("4xx client error, dropping events", {
-          status: response.status,
-          eventsCount: events.length,
-        });
-
-        await this._storageAdapter.clear();
-      } else if (response.status >= 500 && attempt < this._config.maxRetries) {
-        // 5xx: Server error, retry with backoff
-
-        this._logger.warn("5xx server error, retrying", {
-          status: response.status,
-          attempt: attempt + 1,
-          maxRetries: this._config.maxRetries,
-        });
-
-        await delay(calculateBackoff(attempt));
-        await this._sendWithRetry(events, attempt + 1);
-      } else {
-        // 5xx: Max retries reached, re-queue and persist
-
-        this._logger.error("5xx server error, max retries reached", {
-          status: response.status,
-          maxRetries: this._config.maxRetries,
-          eventsCount: events.length,
-        });
-
-        const currentQueue = this._queue.toArray();
-
-        this._queue.fromArray([...events, ...currentQueue]);
-        await this._storageAdapter.save(this._queue.toArray());
-      }
+      await this._handleResponse(response, events, attempt);
     } catch (err) {
-      this._logger.error("Network error occurred", { err });
+      await this._handleNetworkError(err, events, attempt);
+    }
+  }
 
-      if (attempt < this._config.maxRetries) {
-        this._logger.warn("Network error, retrying", {
-          attempt: attempt + 1,
-          maxRetries: this._config.maxRetries,
-          error: err instanceof Error ? err.message : String(err),
-        });
+  /**
+   * Handle HTTP response based on status code.
+   *
+   * @param response HTTP response
+   * @param events Events that were sent
+   * @param attempt Current retry attempt
+   */
+  private async _handleResponse(
+    response: { status: number },
+    events: Event<TMetadata>[],
+    attempt: number,
+  ): Promise<void> {
+    if (response.status >= 200 && response.status < 300) {
+      await this._clearStorage("Failed to clear storage after successful send");
+    } else if (response.status >= 400 && response.status < 500) {
+      this._logger.warn("4xx client error, dropping events", {
+        status: response.status,
+        eventsCount: events.length,
+      });
 
-        await delay(calculateBackoff(attempt));
-        await this._sendWithRetry(events, attempt + 1);
-      } else {
-        this._logger.error("Network error, max retries reached", {
-          maxRetries: this._config.maxRetries,
-          eventsCount: events.length,
-          error: err instanceof Error ? err.message : String(err),
-        });
+      await this._clearStorage("Failed to clear storage after 4xx error");
+    } else if (response.status >= 500) {
+      await this._handleServerError(response.status, events, attempt);
+    } else {
+      // 1xx, 3xx: Unexpected status codes, treat as client error and drop
+      this._logger.warn("Unexpected status code, dropping events", {
+        status: response.status,
+        eventsCount: events.length,
+      });
 
-        const currentQueue = this._queue.toArray();
+      await this._clearStorage(
+        "Failed to clear storage after unexpected status",
+      );
+    }
+  }
 
-        this._queue.fromArray([...events, ...currentQueue]);
-        await this._storageAdapter.save(this._queue.toArray());
-      }
+  /**
+   * Handle 5xx server errors with retry logic.
+   *
+   * @param status HTTP status code
+   * @param events Events to retry
+   * @param attempt Current retry attempt
+   */
+  private async _handleServerError(
+    status: number,
+    events: Event<TMetadata>[],
+    attempt: number,
+  ): Promise<void> {
+    if (attempt < this._config.maxRetries) {
+      this._logger.warn("5xx server error, retrying", {
+        status,
+        attempt: attempt + 1,
+        maxRetries: this._config.maxRetries,
+      });
+
+      await delay(calculateBackoff(attempt));
+      await this._sendWithRetry(events, attempt + 1);
+    } else {
+      this._logger.error("5xx server error, max retries reached", {
+        status,
+        maxRetries: this._config.maxRetries,
+        eventsCount: events.length,
+      });
+
+      await this._requeueEvents(
+        events,
+        "Failed to persist events after max retries",
+      );
+    }
+  }
+
+  /**
+   * Handle network errors with retry logic.
+   *
+   * @param err Error that occurred
+   * @param events Events to retry
+   * @param attempt Current retry attempt
+   */
+  private async _handleNetworkError(
+    err: unknown,
+    events: Event<TMetadata>[],
+    attempt: number,
+  ): Promise<void> {
+    this._logger.error("Network error occurred", { err });
+
+    if (attempt < this._config.maxRetries) {
+      this._logger.warn("Network error, retrying", {
+        attempt: attempt + 1,
+        maxRetries: this._config.maxRetries,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      await delay(calculateBackoff(attempt));
+      await this._sendWithRetry(events, attempt + 1);
+    } else {
+      this._logger.error("Network error, max retries reached", {
+        maxRetries: this._config.maxRetries,
+        eventsCount: events.length,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
+      await this._requeueEvents(
+        events,
+        "Failed to persist events after network error",
+      );
+    }
+  }
+
+  /**
+   * Clear storage and log errors if clearing fails.
+   *
+   * @param errorMessage Error message to log on failure
+   */
+  private async _clearStorage(errorMessage: string): Promise<void> {
+    try {
+      await this._storageAdapter.clear();
+    } catch (err) {
+      this._logger.error(errorMessage, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Re-queue events and persist to storage.
+   *
+   * @param events Events to re-queue
+   * @param errorMessage Error message to log if save fails
+   */
+  private async _requeueEvents(
+    events: Event<TMetadata>[],
+    errorMessage: string,
+  ): Promise<void> {
+    const currentQueue = this._queue.toArray();
+
+    this._queue.fromArray([...events, ...currentQueue]);
+
+    try {
+      await this._storageAdapter.save(this._queue.toArray());
+    } catch (err) {
+      this._logger.error(errorMessage, {
+        error: err instanceof Error ? err.message : String(err),
+        eventsCount: this._queue.size(),
+      });
     }
   }
 
@@ -223,12 +320,18 @@ export class Dispatcher<
    * Called during initialization to recover unsent events.
    */
   public async restore(): Promise<void> {
-    const stored = await this._storageAdapter.load();
+    try {
+      const stored = await this._storageAdapter.load();
 
-    this._queue.fromArray(stored as Event<TMetadata>[]);
+      this._queue.fromArray(stored as Event<TMetadata>[]);
 
-    if (this._queue.size() > 0) {
-      this._scheduleFlush();
+      if (this._queue.size() > 0) {
+        this._scheduleFlush();
+      }
+    } catch (err) {
+      this._logger.error("Failed to restore events from storage", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
