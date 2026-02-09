@@ -24,6 +24,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   private readonly _ttl: number | null;
   private readonly _persistedQueueLimit: number | null;
 
+  private _dbPromise: Promise<IDBDatabase> | null = null;
+
   /**
    * Create a new IndexedDBAdapter instance.
    *
@@ -38,26 +40,56 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   /**
-   * Open or create the IndexedDB database.
+   * Open, create, or reuse the IndexedDB connection.
    *
    * @returns Promise resolving to the database instance
    */
   private _openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this._dbName, 1);
+    if (!this._dbPromise) {
+      this._dbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(this._dbName, 1);
 
-      request.onerror = () =>
-        reject(new Error(request.error?.message ?? "Failed to open database"));
-      request.onsuccess = () => resolve(request.result);
+        request.onblocked = () => {
+          // Handle tabs with older versions of the DB
+        };
 
-      request.onupgradeneeded = event => {
-        const db = (event.target as IDBOpenDBRequest).result;
+        request.onerror = () => {
+          // Reset so we can retry later
+          this._dbPromise = null;
 
-        if (!db.objectStoreNames.contains(this._storeName)) {
-          db.createObjectStore(this._storeName);
-        }
-      };
-    });
+          reject(
+            new Error(request.error?.message ?? "Failed to open IndexedDB"),
+          );
+        };
+
+        request.onsuccess = () => {
+          const db = request.result;
+
+          // Reset promise on unexpected close so next operation reopens
+          db.onclose = () => {
+            this._dbPromise = null;
+          };
+
+          // Reset promise on version change from another tab
+          db.onversionchange = () => {
+            db.close();
+            this._dbPromise = null;
+          };
+
+          resolve(db);
+        };
+
+        request.onupgradeneeded = event => {
+          const db = (event.target as IDBOpenDBRequest).result;
+
+          if (!db.objectStoreNames.contains(this._storeName)) {
+            db.createObjectStore(this._storeName);
+          }
+        };
+      });
+    }
+
+    return this._dbPromise;
   }
 
   private _write(db: IDBDatabase, data: StorageData): Promise<void> {

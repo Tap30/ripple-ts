@@ -148,7 +148,7 @@ describe("IndexedDBAdapter", () => {
       Object.defineProperty(openRequest, "error", { value: null });
       openRequest.onerror?.(new Event("error"));
 
-      await expect(savePromise).rejects.toThrow("Failed to open database");
+      await expect(savePromise).rejects.toThrow("Failed to open IndexedDB");
     });
 
     it("should handle save error", async () => {
