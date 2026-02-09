@@ -1,5 +1,37 @@
 # @tapsioss/ripple-node
 
+## 0.8.0
+### Minor Changes
+
+
+
+- [#24](https://github.com/Tap30/ripple-ts/pull/24) [`f54bb12`](https://github.com/Tap30/ripple-ts/commit/f54bb12b1f477c6205677ac5254f2b55ea05e7a2) Thanks [@mimshins](https://github.com/mimshins)! - **BREAKING CHANGE:** Fix critical event duplication bug by moving queue limit logic to dispatcher
+  
+  - Fix: Storage adapters no longer merge events, eliminating exponential duplication bug
+  - Refactor: `maxBufferSize` moved from storage adapter configs to client/dispatcher config
+  - Refactor: Storage adapters now simply save what they're given (no merge, no limit logic)
+  - Feat: Dispatcher applies FIFO eviction before saving to storage
+  - **Impact:** High-throughput offline scenarios now have linear I/O instead of exponential growth
+  - **Migration:** Remove `maxBufferSize` from storage adapter constructors and add it to client config instead
+
+### Patch Changes
+
+
+
+- [#24](https://github.com/Tap30/ripple-ts/pull/24) [`f54bb12`](https://github.com/Tap30/ripple-ts/commit/f54bb12b1f477c6205677ac5254f2b55ea05e7a2) Thanks [@mimshins](https://github.com/mimshins)! - - Fix: Apply `maxBufferSize` limit during restore from storage to prevent silent event loss
+  - Fix: Preserve original error type in IndexedDB adapter for proper QuotaExceededError retry handling
+  - Feat: Add runtime validation warning when `maxBufferSize < maxBatchSize`
+  - Test: Add comprehensive storage quota error handling test coverage
+
+
+- [#24](https://github.com/Tap30/ripple-ts/pull/24) [`f54bb12`](https://github.com/Tap30/ripple-ts/commit/f54bb12b1f477c6205677ac5254f2b55ea05e7a2) Thanks [@mimshins](https://github.com/mimshins)! - Fix: Add comprehensive error handling for storage operations.
+  
+  - Wrap all storage adapter operations (`save()`, `load()`, `clear()`) in try-catch blocks
+  - Log storage errors via logger adapter instead of throwing unhandled rejections
+  - Handle errors during enqueue, flush, restore, and retry operations
+  - Support both Error objects and non-Error values in error logging
+  - Prevent application crashes from storage failures (QuotaExceededError, SecurityError, etc.)
+
 ## 0.7.0
 ### Minor Changes
 
