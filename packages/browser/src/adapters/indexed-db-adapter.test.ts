@@ -303,7 +303,10 @@ describe("IndexedDBAdapter", () => {
 
       await savePromise;
 
-      expect(indexedDB.open).toHaveBeenCalledWith("ripple_db", 1);
+      expect(indexedDB.open).toHaveBeenCalledWith(
+        "ripple_db",
+        IndexedDBAdapter.SCHEMA_VERSION,
+      );
       expect(mockDB.transaction).toHaveBeenCalled();
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 1000 },
@@ -854,7 +857,10 @@ describe("IndexedDBAdapter", () => {
 
       await savePromise;
 
-      expect(indexedDB.open).toHaveBeenCalledWith("custom_db", 1);
+      expect(indexedDB.open).toHaveBeenCalledWith(
+        "custom_db",
+        IndexedDBAdapter.SCHEMA_VERSION,
+      );
       expect(mockDB.transaction).toHaveBeenCalled();
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 1000 },

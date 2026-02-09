@@ -26,6 +26,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   private readonly _key: string;
   private readonly _ttl: number | null;
 
+  public static readonly SCHEMA_VERSION = 2;
+
   private _dbPromise: Promise<IDBDatabase> | null = null;
 
   /**
@@ -83,7 +85,10 @@ export class IndexedDBAdapter implements StorageAdapter {
   private _openDB(): Promise<IDBDatabase> {
     if (!this._dbPromise) {
       this._dbPromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(this._dbName, 1);
+        const request = indexedDB.open(
+          this._dbName,
+          IndexedDBAdapter.SCHEMA_VERSION,
+        );
 
         request.onblocked = () => {
           // Handle tabs with older versions of the DB
