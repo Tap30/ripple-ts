@@ -56,6 +56,37 @@ describe("CookieStorageAdapter", () => {
     });
   });
 
+  describe("isAvailable", () => {
+    it("should return true when cookies are available", async () => {
+      const available = await CookieStorageAdapter.isAvailable();
+
+      expect(available).toBe(true);
+    });
+
+    it("should return false when cookies throw", async () => {
+      Object.defineProperty(document, "cookie", {
+        get: () => {
+          throw new Error("Cookies disabled");
+        },
+        set: () => {
+          throw new Error("Cookies disabled");
+        },
+        configurable: true,
+      });
+
+      const available = await CookieStorageAdapter.isAvailable();
+
+      expect(available).toBe(false);
+
+      // Restore
+      Object.defineProperty(document, "cookie", {
+        value: "",
+        writable: true,
+        configurable: true,
+      });
+    });
+  });
+
   describe("save", () => {
     it("should save events to cookie", async () => {
       const cookieSetter = vi.fn();

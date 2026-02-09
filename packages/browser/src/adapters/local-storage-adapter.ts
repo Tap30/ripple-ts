@@ -32,6 +32,24 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   /**
+   * Check if localStorage is available.
+   *
+   * @returns Promise resolving to true if localStorage is available
+   */
+  public static async isAvailable(): Promise<boolean> {
+    try {
+      const testKey = "__ripple_test__";
+
+      localStorage.setItem(testKey, "test");
+      localStorage.removeItem(testKey);
+
+      return await Promise.resolve(true);
+    } catch {
+      return await Promise.resolve(false);
+    }
+  }
+
+  /**
    * Save events to localStorage.
    *
    * @param events Array of events to save

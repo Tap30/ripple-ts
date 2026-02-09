@@ -27,6 +27,27 @@ export class CookieStorageAdapter implements StorageAdapter {
   }
 
   /**
+   * Check if cookies are available.
+   *
+   * @returns Promise resolving to true if cookies are available
+   */
+  public static async isAvailable(): Promise<boolean> {
+    try {
+      const testKey = "__ripple_test__";
+
+      document.cookie = `${testKey}=test; max-age=1`;
+
+      const available = document.cookie.includes(testKey);
+
+      document.cookie = `${testKey}=; max-age=0`;
+
+      return await Promise.resolve(available);
+    } catch {
+      return await Promise.resolve(false);
+    }
+  }
+
+  /**
    * Save events to a cookie.
    *
    * @param events Array of events to save

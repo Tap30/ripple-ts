@@ -62,6 +62,31 @@ describe("SessionStorageAdapter", () => {
     });
   });
 
+  describe("isAvailable", () => {
+    it("should return true when sessionStorage is available", async () => {
+      const available = await SessionStorageAdapter.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+        "test",
+      );
+      expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+      );
+    });
+
+    it("should return false when sessionStorage throws", async () => {
+      vi.mocked(mockSessionStorage.setItem).mockImplementation(() => {
+        throw new Error("SecurityError");
+      });
+
+      const available = await SessionStorageAdapter.isAvailable();
+
+      expect(available).toBe(false);
+    });
+  });
+
   describe("save", () => {
     it("should save events to sessionStorage with timestamp", async () => {
       vi.setSystemTime(1000);

@@ -62,6 +62,31 @@ describe("LocalStorageAdapter", () => {
     });
   });
 
+  describe("isAvailable", () => {
+    it("should return true when localStorage is available", async () => {
+      const available = await LocalStorageAdapter.isAvailable();
+
+      expect(available).toBe(true);
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+        "test",
+      );
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(
+        "__ripple_test__",
+      );
+    });
+
+    it("should return false when localStorage throws", async () => {
+      vi.mocked(mockLocalStorage.setItem).mockImplementation(() => {
+        throw new Error("QuotaExceededError");
+      });
+
+      const available = await LocalStorageAdapter.isAvailable();
+
+      expect(available).toBe(false);
+    });
+  });
+
   describe("save", () => {
     it("should save events to localStorage with timestamp", async () => {
       vi.setSystemTime(1000);

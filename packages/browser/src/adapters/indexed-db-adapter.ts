@@ -40,6 +40,41 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   /**
+   * Check if IndexedDB is available.
+   *
+   * @returns Promise resolving to true if IndexedDB is available
+   */
+  public static async isAvailable(): Promise<boolean> {
+    try {
+      if (!("indexedDB" in globalThis)) {
+        return false;
+      }
+
+      const testDb = "__ripple_test__";
+      const request = indexedDB.open(testDb);
+
+      return new Promise(resolve => {
+        request.onsuccess = () => {
+          request.result.close();
+
+          try {
+            indexedDB.deleteDatabase(testDb);
+          } catch {
+            // Ignore cleanup errors
+          }
+
+          resolve(true);
+        };
+
+        request.onerror = () => resolve(false);
+        request.onblocked = () => resolve(false);
+      });
+    } catch {
+      return await Promise.resolve(false);
+    }
+  }
+
+  /**
    * Open, create, or reuse the IndexedDB connection.
    *
    * @returns Promise resolving to the database instance
@@ -92,18 +127,6 @@ export class IndexedDBAdapter implements StorageAdapter {
     return this._dbPromise;
   }
 
-  private _write(db: IDBDatabase, data: StorageData): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(this._storeName, "readwrite");
-      const store = transaction.objectStore(this._storeName);
-      const request = store.put(data, this._key);
-
-      request.onerror = () =>
-        reject(new Error(request.error?.message ?? "Failed to write data"));
-      request.onsuccess = () => resolve();
-    });
-  }
-
   private _read(db: IDBDatabase): Promise<StorageData | null> {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(this._storeName, "readonly");
@@ -132,6 +155,32 @@ export class IndexedDBAdapter implements StorageAdapter {
     });
   }
 
+  private _atomicReadWrite(
+    db: IDBDatabase,
+    transform: (data: StorageData | null) => StorageData,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(this._storeName, "readwrite");
+      const store = transaction.objectStore(this._storeName);
+      const getRequest = store.get(this._key);
+
+      getRequest.onerror = () =>
+        reject(new Error(getRequest.error?.message ?? "Failed to read data"));
+
+      getRequest.onsuccess = () => {
+        const data = getRequest.result as StorageData | undefined;
+        const newData = transform(data ?? null);
+        const putRequest = store.put(newData, this._key);
+
+        putRequest.onerror = () =>
+          reject(
+            new Error(putRequest.error?.message ?? "Failed to write data"),
+          );
+        putRequest.onsuccess = () => resolve();
+      };
+    });
+  }
+
   /**
    * Save events to IndexedDB.
    *
@@ -139,23 +188,42 @@ export class IndexedDBAdapter implements StorageAdapter {
    */
   public async save(events: RippleEvent[]): Promise<void> {
     const db = await this._openDB();
-    const data = await this._read(db);
 
-    const persistedEvents: RippleEvent[] = data?.events ?? [];
+    await this._atomicReadWrite(db, data => {
+      const persistedEvents: RippleEvent[] = data?.events ?? [];
 
-    let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
+      // Check TTL before merging
+      if (data && this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
+        // Expired, start fresh
+        let eventsToSave = events;
 
-    if (
-      this._persistedQueueLimit !== null &&
-      eventsToSave.length > this._persistedQueueLimit
-    ) {
-      eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
-    }
+        if (
+          this._persistedQueueLimit !== null &&
+          eventsToSave.length > this._persistedQueueLimit
+        ) {
+          eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+        }
 
-    await this._write(db, {
-      events: eventsToSave,
-      savedAt: Date.now(),
-    } satisfies StorageData);
+        return {
+          events: eventsToSave,
+          savedAt: Date.now(),
+        };
+      }
+
+      let eventsToSave: RippleEvent[] = [...persistedEvents, ...events];
+
+      if (
+        this._persistedQueueLimit !== null &&
+        eventsToSave.length > this._persistedQueueLimit
+      ) {
+        eventsToSave = eventsToSave.slice(-this._persistedQueueLimit);
+      }
+
+      return {
+        events: eventsToSave,
+        savedAt: Date.now(),
+      };
+    });
   }
 
   /**

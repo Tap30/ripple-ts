@@ -277,6 +277,72 @@ const client = new RippleClient({
 | **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues         |
 | **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | ✅ Yes              | Small queues, cross-domain |
 
+### Storage Availability Detection
+
+All storage adapters provide a static `isAvailable()` method to check if the
+storage mechanism is accessible before creating an instance. This is useful for:
+
+- Detecting private/incognito browsing mode restrictions
+- Handling disabled storage APIs (user settings, browser policies)
+- Gracefully degrading when storage is unavailable
+
+```ts
+import {
+  LocalStorageAdapter,
+  SessionStorageAdapter,
+  IndexedDBAdapter,
+  CookieStorageAdapter,
+} from "@tapsioss/ripple-browser";
+
+// Check availability before creating adapter
+if (await IndexedDBAdapter.isAvailable()) {
+  const adapter = new IndexedDBAdapter();
+  // Use IndexedDB
+} else if (await LocalStorageAdapter.isAvailable()) {
+  const adapter = new LocalStorageAdapter();
+  // Fall back to localStorage
+} else {
+  // Use in-memory storage or disable tracking
+  console.warn("No storage available");
+}
+
+// Example: Graceful degradation strategy
+async function createStorageAdapter() {
+  if (await IndexedDBAdapter.isAvailable()) {
+    return new IndexedDBAdapter({ persistedQueueLimit: 10000 });
+  }
+
+  if (await LocalStorageAdapter.isAvailable()) {
+    return new LocalStorageAdapter({ persistedQueueLimit: 1000 });
+  }
+
+  if (await SessionStorageAdapter.isAvailable()) {
+    return new SessionStorageAdapter({ persistedQueueLimit: 500 });
+  }
+
+  // Last resort: cookies (very limited capacity)
+  if (await CookieStorageAdapter.isAvailable()) {
+    return new CookieStorageAdapter({ persistedQueueLimit: 10 });
+  }
+
+  throw new Error("No storage mechanism available");
+}
+
+const client = new RippleClient({
+  apiKey: "your-api-key",
+  endpoint: "https://api.example.com/events",
+  storageAdapter: await createStorageAdapter(),
+});
+```
+
+**Common scenarios where storage may be unavailable:**
+
+- Safari private browsing (throws on `localStorage.setItem`)
+- Firefox private browsing (limited IndexedDB quota)
+- User disabled cookies or storage in browser settings
+- Browser extensions blocking storage APIs
+- Incognito/private mode in various browsers
+
 ### TTL (Time-to-Live) Support
 
 LocalStorageAdapter, SessionStorageAdapter, and IndexedDBAdapter support

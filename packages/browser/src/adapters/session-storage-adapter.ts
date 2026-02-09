@@ -32,6 +32,24 @@ export class SessionStorageAdapter implements StorageAdapter {
   }
 
   /**
+   * Check if sessionStorage is available.
+   *
+   * @returns Promise resolving to true if sessionStorage is available
+   */
+  public static async isAvailable(): Promise<boolean> {
+    try {
+      const testKey = "__ripple_test__";
+
+      sessionStorage.setItem(testKey, "test");
+      sessionStorage.removeItem(testKey);
+
+      return await Promise.resolve(true);
+    } catch {
+      return await Promise.resolve(false);
+    }
+  }
+
+  /**
    * Save events to sessionStorage.
    *
    * @param events Array of events to save
