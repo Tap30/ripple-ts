@@ -1,6 +1,6 @@
 ---
-"@tapsioss/ripple-browser": major
-"@tapsioss/ripple-node": major
+"@tapsioss/ripple-browser": minor
+"@tapsioss/ripple-node": minor
 ---
 
 **BREAKING CHANGE:** Fix critical event duplication bug by moving queue limit logic to dispatcher
