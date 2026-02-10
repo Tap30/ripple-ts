@@ -33,11 +33,9 @@
     "url": "https://github.com/Tap30/ripple-ts/issues"
   },
   "scripts": {
-    "clear": "shx rm -rf dist",
     "test": "vitest run --root .",
     "test:watch": "vitest --root .",
-    "bundle": "tsdown",
-    "build": "run-s clear bundle",
+    "build": "tsdown",
     "release": "pnpm publish . --tag latest --access public --no-git-checks"
   }
 }
