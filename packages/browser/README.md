@@ -293,22 +293,11 @@ import {
   SessionStorageAdapter,
   IndexedDBAdapter,
   CookieStorageAdapter,
+  NoOpStorageAdapter,
 } from "@tapsioss/ripple-browser";
 
-// Check availability before creating adapter
-if (await IndexedDBAdapter.isAvailable()) {
-  const adapter = new IndexedDBAdapter();
-  // Use IndexedDB
-} else if (await LocalStorageAdapter.isAvailable()) {
-  const adapter = new LocalStorageAdapter();
-  // Fall back to localStorage
-} else {
-  // Use in-memory storage or disable tracking
-  console.warn("No storage available");
-}
-
 // Example: Graceful degradation strategy
-async function createStorageAdapter() {
+async function createStorageAdapter(): StorageAdapter {
   if (await IndexedDBAdapter.isAvailable()) {
     return new IndexedDBAdapter();
   }
@@ -326,7 +315,7 @@ async function createStorageAdapter() {
     return new CookieStorageAdapter();
   }
 
-  throw new Error("No storage mechanism available");
+  return new NoOpStorageAdapter();
 }
 
 const client = new RippleClient({
