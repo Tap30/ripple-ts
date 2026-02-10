@@ -50,7 +50,7 @@ export class IndexedDBAdapter implements StorageAdapter {
   public static async isAvailable(): Promise<boolean> {
     try {
       if (!("indexedDB" in globalThis)) {
-        return false;
+        return await Promise.resolve(false);
       }
 
       const testDb = "__ripple_test__";
