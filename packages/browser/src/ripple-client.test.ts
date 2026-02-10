@@ -210,7 +210,7 @@ describe("RippleClient", () => {
       await client.init();
       await client.init();
 
-      expect(mockStorageAdapter.load).toHaveBeenCalledTimes(2);
+      expect(mockStorageAdapter.load).toHaveBeenCalledTimes(1);
     });
 
     it("should handle dispose before init", () => {

@@ -4,6 +4,7 @@ import { type StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
 import { ConsoleLoggerAdopter } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
+import { Mutex } from "./mutex.ts";
 import type { Event, EventPayload, Platform } from "./types.ts";
 
 /**
@@ -68,6 +69,8 @@ export abstract class Client<
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
 
+  private readonly _initMutex = new Mutex();
+
   private _sessionId: string | null = null;
   private _initialized = false;
 
@@ -123,33 +126,35 @@ export abstract class Client<
 
   /**
    * Track an event.
+   * If called before initialization, the operation is queued and executed after init() completes.
    *
    * @param name Event name/identifier
    * @param payload Event data payload
    * @param metadata Event-specific metadata
-   * @throws Error if client is not initialized
    */
   public async track<K extends keyof TEvents>(
     name: K,
     payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
-    if (!this._initialized) {
-      throw new Error(
-        "Client not initialized. Call init() before tracking events.",
-      );
-    }
+    const trackEvent = async () => {
+      const event: Event<TMetadata> = {
+        name: name as string,
+        metadata: this._metadataManager.merge(metadata),
+        payload: payload ?? null,
+        issuedAt: Date.now(),
+        sessionId: this._sessionId,
+        platform: this._getPlatform(),
+      };
 
-    const event: Event<TMetadata> = {
-      name: name as string,
-      metadata: this._metadataManager.merge(metadata),
-      payload: payload ?? null,
-      issuedAt: Date.now(),
-      sessionId: this._sessionId,
-      platform: this._getPlatform(),
+      await this._dispatcher.enqueue(event);
     };
 
-    await this._dispatcher.enqueue(event);
+    if (!this._initialized) {
+      await this._initMutex.runAtomic(trackEvent);
+    } else {
+      await trackEvent();
+    }
   }
 
   /**
@@ -207,9 +212,18 @@ export abstract class Client<
    * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    await this._dispatcher.restore();
+    if (this._initialized) {
+      return await Promise.resolve();
+    }
 
-    this._initialized = true;
+    await this._initMutex.runAtomic(async () => {
+      if (this._initialized) {
+        return await Promise.resolve();
+      }
+
+      await this._dispatcher.restore();
+      this._initialized = true;
+    });
   }
 
   /**
