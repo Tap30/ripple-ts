@@ -562,8 +562,8 @@ Creates a new RippleClient instance.
 
 #### `async init(): Promise<void>`
 
-Initializes the client and restores persisted events. **Must be called before
-tracking events**, otherwise `track()` will throw an error to prevent data loss.
+Initializes the client and restores persisted events. Events tracked before
+initialization are automatically queued and processed after `init()` completes.
 
 #### `async track(name: string, payload?: EventPayload, metadata?: TMetadata): Promise<void>`
 

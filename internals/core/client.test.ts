@@ -162,15 +162,57 @@ describe("Client", () => {
 
       expect(storageAdapter.load).toHaveBeenCalled();
     });
+
+    it("should not re-initialize if already initialized", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient(undefined, undefined, storageAdapter);
+
+      await client.init();
+      await client.init();
+
+      expect(storageAdapter.load).toHaveBeenCalledTimes(1);
+    });
+
+    it("should handle concurrent init calls", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient(undefined, undefined, storageAdapter);
+
+      await Promise.all([client.init(), client.init(), client.init()]);
+
+      expect(storageAdapter.load).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("track", () => {
-    it("should throw error if not initialized", async () => {
-      const client = createTestClient();
+    it("should queue events before initialization", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient(undefined, undefined, storageAdapter);
 
-      await expect(client.track("test_event")).rejects.toThrow(
-        "Client not initialized. Call init() before tracking events.",
-      );
+      const trackPromise = client.track("test_event", { key: "value" });
+
+      await client.init();
+      await trackPromise;
+
+      const savedEvents = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]).toMatchObject({
+        name: "test_event",
+        payload: { key: "value" },
+      });
+    });
+
+    it("should queue multiple events before initialization", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient(undefined, undefined, storageAdapter);
+
+      const track1 = client.track("event1", { key: "value1" });
+      const track2 = client.track("event2", { key: "value2" });
+
+      await client.init();
+      await Promise.all([track1, track2]);
+
+      expect(storageAdapter.save).toHaveBeenCalledTimes(2);
     });
 
     it("should track simple event", async () => {
