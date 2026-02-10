@@ -270,12 +270,13 @@ const client = new RippleClient({
 
 ## Storage Adapters
 
-| Adapter                   | Capacity   | Persistence  | Performance | TTL Support | Queue Limit Support | Use Case                   |
-| ------------------------- | ---------- | ------------ | ----------- | ----------- | ------------------- | -------------------------- |
-| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes      | ✅ Yes              | Small event queues         |
-| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes      | ✅ Yes              | Temporary tracking         |
-| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues         |
-| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via maxAge  | ✅ Yes              | Small queues, cross-domain |
+| Adapter                   | Capacity   | Persistence  | Performance | TTL Support  | Queue Limit Support | Use Case                                        |
+| ------------------------- | ---------- | ------------ | ----------- | ------------ | ------------------- | ----------------------------------------------- |
+| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes       | ✅ Yes              | Small event queues                              |
+| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes       | ✅ Yes              | Temporary tracking                              |
+| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes       | ✅ Yes              | Large event queues                              |
+| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via `maxAge` | ✅ Yes              | Small queues, cross-domain                      |
+| **NoOpStorageAdapter**    | Unlimited  | -            | -           | -            | -                   | When persistence is not needed or not supported |
 
 ### Storage Availability Detection
 
@@ -543,14 +544,18 @@ const client1 = new RippleClient({
   apiKey: "key1",
   endpoint: "url1",
   sessionStoreKey: "app1_session",
-  storageAdapter: new IndexedDBAdapter("app1_db", "events", "queue"),
+  storageAdapter: new IndexedDBAdapter({
+    dbName: "app1_db",
+    storeName: "events",
+    key: "queue",
+  }),
 });
 
 const client2 = new RippleClient({
   apiKey: "key2",
   endpoint: "url2",
   sessionStoreKey: "app2_session",
-  storageAdapter: new LocalStorageAdapter("app2_events"),
+  storageAdapter: new LocalStorageAdapter({ key: "app2_events" }),
 });
 ```
 
@@ -684,7 +689,7 @@ class SchemaTransformAdapter implements HttpAdapter {
 
     return this.baseAdapter.send(
       endpoint,
-      transformedEvents as any,
+      transformedEvents as unknown as Event,
       headers,
       apiKeyHeader,
     );

@@ -1,6 +1,9 @@
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
-import type { StorageAdapter } from "./adapters/storage-adapter.ts";
+import {
+  StorageQuotaExceededError,
+  type StorageAdapter,
+} from "./adapters/storage-adapter.ts";
 import { Mutex } from "./mutex.ts";
 import { Queue } from "./queue.ts";
 import type { Event } from "./types.ts";
@@ -108,7 +111,7 @@ export class Dispatcher<
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
-      if (err instanceof Error && err.name === "StorageQuotaExceededError") {
+      if (err instanceof StorageQuotaExceededError) {
         this._logger.warn(err.message);
       } else {
         this._logger.error("Failed to persist events to storage", {
@@ -338,7 +341,7 @@ export class Dispatcher<
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
-      if (err instanceof Error && err.name === "StorageQuotaExceededError") {
+      if (err instanceof StorageQuotaExceededError) {
         this._logger.warn(err.message);
       } else {
         this._logger.error(errorMessage, {
