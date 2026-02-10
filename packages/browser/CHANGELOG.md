@@ -1,5 +1,32 @@
 # @tapsioss/ripple-browser
 
+## 0.9.0
+### Minor Changes
+
+
+
+- [#28](https://github.com/Tap30/ripple-ts/pull/28) [`9eca791`](https://github.com/Tap30/ripple-ts/commit/9eca7913d518974cbfba38df46df3f96092efcc9) Thanks [@mimshins](https://github.com/mimshins)! - Improved initialization behavior with automatic pre-init operation queuing
+  
+  Previously, calling `track()` before `init()` would throw an error. Now, track operations are automatically queued and processed after initialization completes.
+  
+  **What changed:**
+  
+  - `track()` no longer throws an error when called before `init()`
+  - Operations are queued using a mutex and executed after `init()` completes
+  - `init()` can be called multiple times safely (subsequent calls are no-ops)
+  
+  **Migration:**
+  No code changes required. Existing code continues to work. You can now safely call `track()` before `init()` if needed, and the SDK will handle queuing automatically.
+  
+  **Benefits:**
+  
+  - Better developer experience - no need to ensure strict initialization order
+  - Prevents race conditions
+  - Thread-safe operation queuing
+
+
+- [#26](https://github.com/Tap30/ripple-ts/pull/26) [`34806bb`](https://github.com/Tap30/ripple-ts/commit/34806bb95cfb3e8d160448289e1f22d5f50c2baa) Thanks [@mimshins](https://github.com/mimshins)! - Feat: Add no-operation storage adapter that discards all events.
+
 ## 0.8.0
 ### Minor Changes
 
