@@ -514,6 +514,76 @@ describe("Dispatcher", () => {
 
       expect(httpAdapter.send).toHaveBeenCalled();
     });
+
+    it("should cancel pending retry delays on disposal", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      let sendCount = 0;
+
+      vi.mocked(httpAdapter.send).mockImplementation(() => {
+        sendCount++;
+
+        return Promise.resolve({ status: 500 });
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig({ maxRetries: 3 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      const flushPromise = dispatcher.flush();
+
+      // Wait for first send attempt
+      await new Promise<void>(resolve => {
+        setTimeout(() => {
+          resolve();
+        }, 10);
+      });
+
+      // Dispose to abort retry delays
+      dispatcher.dispose();
+      await flushPromise;
+
+      // Should only have attempted once before disposal aborted retries
+      expect(sendCount).toBe(1);
+    });
+
+    it("should cancel network error retry delays on disposal", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      let sendCount = 0;
+
+      vi.mocked(httpAdapter.send).mockImplementation(() => {
+        sendCount++;
+
+        return Promise.reject(new Error("Network error"));
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig({ maxRetries: 3 }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      await dispatcher.enqueue(createEvent("event1"));
+      const flushPromise = dispatcher.flush();
+
+      // Wait for first send attempt
+      await new Promise<void>(resolve => {
+        setTimeout(() => {
+          resolve();
+        }, 10);
+      });
+
+      // Dispose to abort retry delays
+      dispatcher.dispose();
+      await flushPromise;
+
+      // Should only have attempted once before disposal aborted retries
+      expect(sendCount).toBe(1);
+    });
   });
 
   describe("storage error handling", () => {

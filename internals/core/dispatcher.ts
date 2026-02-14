@@ -7,7 +7,7 @@ import {
 import { Mutex } from "./mutex.ts";
 import { Queue } from "./queue.ts";
 import type { Event } from "./types.ts";
-import { calculateBackoff, delay } from "./utils.ts";
+import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
 
 /**
  * Configuration for the Dispatcher.
@@ -62,6 +62,7 @@ export class Dispatcher<
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _flushMutex = new Mutex();
   private _disposed = false;
+  private _retryAbortController = new AbortController();
 
   private readonly _config: DispatcherConfig;
   private readonly _httpAdapter: HttpAdapter;
@@ -258,8 +259,19 @@ export class Dispatcher<
         maxRetries: this._config.maxRetries,
       });
 
-      await delay(calculateBackoff(attempt));
-      await this._sendWithRetry(events, attempt + 1);
+      try {
+        await delay(
+          calculateBackoff(attempt),
+          this._retryAbortController.signal,
+        );
+        await this._sendWithRetry(events, attempt + 1);
+      } catch (err) {
+        /* v8 ignore next -- @preserve */
+        if (err instanceof DelayAbortedError) return;
+
+        /* v8 ignore next -- @preserve */
+        throw err;
+      }
     } else {
       this._logger.error("5xx server error, max retries reached", {
         status,
@@ -286,6 +298,9 @@ export class Dispatcher<
     events: Event<TMetadata>[],
     attempt: number,
   ): Promise<void> {
+    /* v8 ignore next -- @preserve */
+    if (err instanceof DelayAbortedError) return;
+
     this._logger.error("Network error occurred", { err });
 
     if (attempt < this._config.maxRetries) {
@@ -295,13 +310,24 @@ export class Dispatcher<
         error: err instanceof Error ? err.message : String(err),
       });
 
-      await delay(calculateBackoff(attempt));
-      await this._sendWithRetry(events, attempt + 1);
+      try {
+        await delay(
+          calculateBackoff(attempt),
+          this._retryAbortController.signal,
+        );
+        await this._sendWithRetry(events, attempt + 1);
+      } catch (delayErr) {
+        /* v8 ignore next -- @preserve */
+        if (delayErr instanceof DelayAbortedError) return;
+
+        /* v8 ignore next -- @preserve */
+        throw delayErr;
+      }
     } else {
       this._logger.error("Network error, max retries reached", {
         maxRetries: this._config.maxRetries,
         eventsCount: events.length,
-        /* v8 ignore next */
+        /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
       });
 
@@ -350,7 +376,7 @@ export class Dispatcher<
         this._logger.warn(err.message);
       } else {
         this._logger.error(errorMessage, {
-          /* v8 ignore next */
+          /* v8 ignore next -- @preserve */
           error: err instanceof Error ? err.message : String(err),
           eventsCount: this._queue.size(),
         });
@@ -399,6 +425,7 @@ export class Dispatcher<
    */
   public dispose(): void {
     this._disposed = true;
+    this._retryAbortController.abort();
 
     if (this._timer) {
       clearTimeout(this._timer);

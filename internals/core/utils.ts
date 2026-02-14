@@ -14,12 +14,35 @@ export const calculateBackoff = (attempt: number): number => {
 };
 
 /**
+ * Error thrown when a delay is aborted via AbortSignal.
+ */
+export class DelayAbortedError extends Error {
+  constructor() {
+    super("Delay aborted");
+
+    this.name = "DelayAbortedError";
+  }
+}
+
+/**
  * Delay execution for the specified duration.
  *
  * @param ms Milliseconds to delay
+ * @param signal Optional AbortSignal to cancel the delay
  */
-export const delay = (ms: number): Promise<void> => {
-  return new Promise<void>(resolve => {
-    setTimeout(resolve, ms);
+export const delay = (ms: number, signal?: AbortSignal): Promise<void> => {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DelayAbortedError());
+
+      return;
+    }
+
+    const timeout = setTimeout(resolve, ms);
+
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timeout);
+      reject(new DelayAbortedError());
+    });
   });
 };

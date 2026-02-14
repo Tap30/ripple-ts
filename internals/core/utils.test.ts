@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { calculateBackoff, delay } from "./utils.ts";
+import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
 
 describe("utils", () => {
   describe("calculateBackoff", () => {
@@ -88,6 +88,25 @@ describe("utils", () => {
       expect(resolved).toBe(true);
 
       vi.useRealTimers();
+    });
+
+    it("should reject when signal is already aborted", async () => {
+      const controller = new AbortController();
+
+      controller.abort();
+
+      await expect(delay(100, controller.signal)).rejects.toThrow(
+        DelayAbortedError,
+      );
+    });
+
+    it("should cancel delay when signal is aborted", async () => {
+      const controller = new AbortController();
+      const promise = delay(100, controller.signal);
+
+      setTimeout(() => controller.abort(), 10);
+
+      await expect(promise).rejects.toThrow(DelayAbortedError);
     });
   });
 });
