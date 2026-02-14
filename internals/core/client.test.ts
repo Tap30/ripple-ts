@@ -140,6 +140,90 @@ describe("Client", () => {
       }).toThrow("`endpoint` must be provided in `config`.");
     });
 
+    it("should throw error if flushInterval is negative", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          flushInterval: -1,
+        });
+      }).toThrow("`flushInterval` must be a positive number.");
+    });
+
+    it("should throw error if flushInterval is zero", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          flushInterval: 0,
+        });
+      }).toThrow("`flushInterval` must be a positive number.");
+    });
+
+    it("should throw error if maxBatchSize is negative", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          maxBatchSize: -1,
+        });
+      }).toThrow("`maxBatchSize` must be a positive number.");
+    });
+
+    it("should throw error if maxBatchSize is zero", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          maxBatchSize: 0,
+        });
+      }).toThrow("`maxBatchSize` must be a positive number.");
+    });
+
+    it("should throw error if maxRetries is negative", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          maxRetries: -1,
+        });
+      }).toThrow("`maxRetries` must be a non-negative number.");
+    });
+
+    it("should throw error if maxBufferSize is negative", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          maxBufferSize: -1,
+        });
+      }).toThrow("`maxBufferSize` must be a positive number.");
+    });
+
+    it("should throw error if maxBufferSize is zero", () => {
+      expect(() => {
+        new TestClient({
+          apiKey: "test-key",
+          endpoint: "https://api.test.com/events",
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+          maxBufferSize: 0,
+        });
+      }).toThrow("`maxBufferSize` must be a positive number.");
+    });
+
     it("should create client with valid config", () => {
       const client = createTestClient();
 

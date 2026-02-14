@@ -94,6 +94,22 @@ export abstract class Client<
       throw new Error("`endpoint` must be provided in `config`.");
     }
 
+    if (config.flushInterval !== undefined && config.flushInterval <= 0) {
+      throw new Error("`flushInterval` must be a positive number.");
+    }
+
+    if (config.maxBatchSize !== undefined && config.maxBatchSize <= 0) {
+      throw new Error("`maxBatchSize` must be a positive number.");
+    }
+
+    if (config.maxRetries !== undefined && config.maxRetries < 0) {
+      throw new Error("`maxRetries` must be a non-negative number.");
+    }
+
+    if (config.maxBufferSize !== undefined && config.maxBufferSize <= 0) {
+      throw new Error("`maxBufferSize` must be a positive number.");
+    }
+
     this._logger =
       config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
