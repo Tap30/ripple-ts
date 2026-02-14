@@ -61,6 +61,7 @@ export class Dispatcher<
   private _queue = new Queue<Event<TMetadata>>();
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _flushMutex = new Mutex();
+  private _disposed = false;
 
   private readonly _config: DispatcherConfig;
   private readonly _httpAdapter: HttpAdapter;
@@ -104,6 +105,12 @@ export class Dispatcher<
    * @param event The event to enqueue
    */
   public async enqueue(event: Event<TMetadata>): Promise<void> {
+    if (this._disposed) {
+      this._logger.warn("Cannot enqueue event: Dispatcher has been disposed");
+
+      return;
+    }
+
     this._queue.enqueue(event);
 
     try {
@@ -357,7 +364,7 @@ export class Dispatcher<
    * Does nothing if a flush is already scheduled.
    */
   private _scheduleFlush(): void {
-    if (this._timer) return;
+    if (this._disposed || this._timer) return;
 
     this._timer = setTimeout(() => {
       void this.flush();
@@ -369,6 +376,8 @@ export class Dispatcher<
    * Called during initialization to recover unsent events.
    */
   public async restore(): Promise<void> {
+    this._disposed = false;
+
     try {
       const stored = await this._storageAdapter.load();
       const limited = this._applyQueueLimit(stored as Event<TMetadata>[]);
@@ -390,6 +399,8 @@ export class Dispatcher<
    * Should be called when disposing the client.
    */
   public dispose(): void {
+    this._disposed = true;
+
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
