@@ -3,7 +3,7 @@ import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 /**
  * Default console logger implementation.
  */
-export class ConsoleLoggerAdopter implements LoggerAdapter {
+export class ConsoleLoggerAdapter implements LoggerAdapter {
   private readonly _level: LogLevel;
   private readonly _levelOrder = [
     LogLevel.DEBUG,

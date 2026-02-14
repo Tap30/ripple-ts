@@ -4,7 +4,7 @@ export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
 
 export {
-  ConsoleLoggerAdopter,
+  ConsoleLoggerAdapter,
   LogLevel,
   NoOpLoggerAdapter,
   type ClientConfig,

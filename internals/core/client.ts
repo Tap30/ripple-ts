@@ -2,7 +2,7 @@ import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { type StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
-import { ConsoleLoggerAdopter } from "./logger.ts";
+import { ConsoleLoggerAdapter } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import { Mutex } from "./mutex.ts";
 import type { Event, EventPayload, Platform } from "./types.ts";
@@ -95,7 +95,7 @@ export abstract class Client<
     }
 
     this._logger =
-      config.loggerAdapter ?? new ConsoleLoggerAdopter(LogLevel.WARN);
+      config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {

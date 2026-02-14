@@ -7,7 +7,7 @@ export * from "./adapters/session-storage-adapter.ts";
 export * from "./ripple-client.ts";
 
 export {
-  ConsoleLoggerAdopter,
+  ConsoleLoggerAdapter,
   LogLevel,
   NoOpLoggerAdapter,
   type ClientConfig,

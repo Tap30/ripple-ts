@@ -1,5 +1,5 @@
 import {
-  ConsoleLoggerAdopter,
+  ConsoleLoggerAdapter,
   FetchHttpAdapter,
   IndexedDBAdapter,
   LogLevel,
@@ -15,7 +15,7 @@ const client = new RippleClient({
   sessionStoreKey: "my_app_session",
   httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new IndexedDBAdapter(),
-  loggerAdapter: new ConsoleLoggerAdopter(LogLevel.DEBUG),
+  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
 });
 
 await client.init();
@@ -287,7 +287,7 @@ const testRetryBtn = createButton({
         maxRetries: 2,
         httpAdapter: new FetchHttpAdapter(),
         storageAdapter: new IndexedDBAdapter(),
-        loggerAdapter: new ConsoleLoggerAdopter(LogLevel.WARN),
+        loggerAdapter: new ConsoleLoggerAdapter(LogLevel.WARN),
       });
 
       await errorClient.init();
