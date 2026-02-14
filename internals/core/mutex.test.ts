@@ -164,4 +164,43 @@ describe("Mutex", () => {
 
     expect(results).toEqual(["sync", "async", "sync2"]);
   });
+
+  it("should resolve queued tasks when released", async () => {
+    const mutex = new Mutex();
+    const results: string[] = [];
+
+    const task1 = mutex.runAtomic(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 50);
+      });
+
+      results.push("task1");
+    });
+
+    const task2 = mutex.runAtomic(async () => {
+      results.push("task2");
+
+      await Promise.resolve();
+    });
+
+    const task3 = mutex.runAtomic(async () => {
+      results.push("task3");
+
+      await Promise.resolve();
+    });
+
+    await new Promise(resolve => {
+      setTimeout(resolve, 10);
+    });
+
+    mutex.release();
+
+    await Promise.all([task1, task2, task3]);
+
+    expect(results).toContain("task1");
+    expect(results).toContain("task2");
+    expect(results).toContain("task3");
+    expect(results.length).toBe(3);
+    expect(mutex.isLocked).toBe(false);
+  });
 });

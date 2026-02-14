@@ -76,6 +76,7 @@ export class Mutex {
    * Used for cleanup during disposal.
    */
   public release(): void {
+    this._taskQueue.forEach(resolve => resolve());
     this._isLocked = false;
     this._taskQueue = [];
   }
