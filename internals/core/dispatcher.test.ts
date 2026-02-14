@@ -732,6 +732,62 @@ describe("Dispatcher", () => {
 
       expect(() => dispatcher.dispose()).not.toThrow();
     });
+
+    it("should prevent enqueue after disposal", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const loggerAdapter = new NoOpLoggerAdapter();
+      const warnSpy = vi.spyOn(loggerAdapter, "warn");
+      const dispatcher = new Dispatcher(
+        createConfig({ loggerAdapter }),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      dispatcher.dispose();
+      await dispatcher.enqueue(createEvent("test"));
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Cannot enqueue event: Dispatcher has been disposed",
+      );
+      expect(storageAdapter.save).not.toHaveBeenCalled();
+    });
+
+    it("should prevent scheduling flush after disposal", async () => {
+      vi.useFakeTimers();
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      dispatcher.dispose();
+      await dispatcher.enqueue(createEvent("test"));
+
+      vi.advanceTimersByTime(10000);
+
+      expect(httpAdapter.send).not.toHaveBeenCalled();
+    });
+
+    it("should allow restore after disposal", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      vi.mocked(storageAdapter.load).mockResolvedValue([createEvent("test")]);
+
+      const dispatcher = new Dispatcher(
+        createConfig(),
+        httpAdapter,
+        storageAdapter,
+      );
+
+      dispatcher.dispose();
+      await dispatcher.restore();
+      await dispatcher.enqueue(createEvent("new_event"));
+
+      expect(storageAdapter.save).toHaveBeenCalled();
+    });
   });
 
   describe("edge cases", () => {
