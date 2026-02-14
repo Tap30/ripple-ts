@@ -774,6 +774,7 @@ describe("Dispatcher", () => {
     it("should allow restore after disposal", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
+
       vi.mocked(storageAdapter.load).mockResolvedValue([createEvent("test")]);
 
       const dispatcher = new Dispatcher(
