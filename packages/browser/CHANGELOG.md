@@ -1,5 +1,59 @@
 # @tapsioss/ripple-browser
 
+## 1.0.0
+### Major Changes
+
+
+
+- [`aa268ea`](https://github.com/Tap30/ripple-ts/commit/aa268ea05ba137c54c2896ca3b8d18183f1e7f4b) Thanks [@mimshins](https://github.com/mimshins)! - BREAKING CHANGE: Add validation to prevent invalid Dispatcher configuration
+  
+  The Dispatcher constructor now throws an error if `maxBufferSize < maxBatchSize`. This configuration was previously allowed but would cause events to be dropped unnecessarily since the batch size could never be reached.
+  
+  If you're using this configuration, update it to ensure `maxBufferSize >= maxBatchSize`:
+  
+  ```diff
+  const dispatcher = new Dispatcher({
+    maxBatchSize: 100,
+  - maxBufferSize: 50,  // Invalid - will throw error
+  + maxBufferSize: 100, // Valid - buffer can hold at least one full batch
+  });
+  ```
+
+
+- [`6c90393`](https://github.com/Tap30/ripple-ts/commit/6c90393ae53bcc587b36677b75ee75b6c864d054) Thanks [@mimshins](https://github.com/mimshins)! - BREAKING CHANGE: Rename `ConsoleLoggerAdopter` to `ConsoleLoggerAdapter` to fix typo
+  
+  If you're using the logger directly, update your imports:
+  
+  ```diff
+  - import { ConsoleLoggerAdopter } from '@tapsioss/ripple-browser';
+  + import { ConsoleLoggerAdapter } from '@tapsioss/ripple-browser';
+  
+  - const logger = new ConsoleLoggerAdopter(LogLevel.DEBUG);
+  + const logger = new ConsoleLoggerAdapter(LogLevel.DEBUG);
+  ```
+
+### Patch Changes
+
+
+
+- [`684f87a`](https://github.com/Tap30/ripple-ts/commit/684f87a644594239c05e7008dda091bf5bfc2656) Thanks [@mimshins](https://github.com/mimshins)! - Fix race condition in client initialization when track() is called before init()
+
+
+
+- [`705a71c`](https://github.com/Tap30/ripple-ts/commit/705a71c4eb56a610b8d8584dd165874cd474b619) Thanks [@mimshins](https://github.com/mimshins)! - Add validation for negative configuration values. The client constructor now throws errors when `flushInterval`, `maxBatchSize`, or `maxBufferSize` are zero or negative, or when `maxRetries` is negative.
+
+
+
+- [`95ec7b2`](https://github.com/Tap30/ripple-ts/commit/95ec7b25faede6033c2e9b37332a358e4197e106) Thanks [@mimshins](https://github.com/mimshins)! - Fix memory leak in Dispatcher by preventing timer scheduling after disposal
+
+
+
+- [`e51dcd9`](https://github.com/Tap30/ripple-ts/commit/e51dcd9cf26501f6a25931dbea490dbc594f60bf) Thanks [@mimshins](https://github.com/mimshins)! - Fix inconsistent error handling in storage adapters. Changed from `Promise.reject()` to `throw` for consistent async/await error handling in LocalStorageAdapter, SessionStorageAdapter, and CookieStorageAdapter.
+
+
+
+- [`827706f`](https://github.com/Tap30/ripple-ts/commit/827706f11768e7aa14db888c89a154bfe6d7ddc2) Thanks [@mimshins](https://github.com/mimshins)! - Fix unsafe mutex release that could cause hanging promises during disposal. The mutex now properly resolves all queued tasks before clearing, preventing deadlocks when the dispatcher is disposed.
+
 ## 0.9.0
 ### Minor Changes
 
