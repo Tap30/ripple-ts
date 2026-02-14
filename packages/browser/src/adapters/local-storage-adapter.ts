@@ -56,7 +56,9 @@ export class LocalStorageAdapter implements StorageAdapter {
    * @param events Array of events to save
    * @throws {StorageQuotaExceededError} When quota exceeded and events are dropped
    */
-  public save(events: RippleEvent[]): Promise<void> {
+  public async save(events: RippleEvent[]): Promise<void> {
+    await Promise.resolve();
+
     try {
       const data: StorageData = {
         events,
@@ -64,8 +66,6 @@ export class LocalStorageAdapter implements StorageAdapter {
       };
 
       localStorage.setItem(this._key, JSON.stringify(data));
-
-      return Promise.resolve();
     } catch (error) {
       if (
         error instanceof Error &&
@@ -82,24 +82,18 @@ export class LocalStorageAdapter implements StorageAdapter {
 
           localStorage.setItem(this._key, JSON.stringify(reducedData));
 
-          return Promise.reject(
-            new StorageQuotaExceededError(
-              reduced.length,
-              events.length - reduced.length,
-            ),
+          throw new StorageQuotaExceededError(
+            reduced.length,
+            events.length - reduced.length,
           );
         } catch (retryError) {
-          return Promise.reject(
-            retryError instanceof Error
-              ? retryError
-              : new Error(String(retryError)),
-          );
+          throw retryError instanceof Error
+            ? retryError
+            : new Error(String(retryError));
         }
       }
 
-      return Promise.reject(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
 

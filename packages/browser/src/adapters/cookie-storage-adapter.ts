@@ -54,13 +54,13 @@ export class CookieStorageAdapter implements StorageAdapter {
    * @param events Array of events to save
    * @throws {StorageQuotaExceededError} When size limit exceeded and events are dropped
    */
-  public save(events: Event[]): Promise<void> {
+  public async save(events: Event[]): Promise<void> {
+    await Promise.resolve();
+
     try {
       const value = encodeURIComponent(JSON.stringify(events));
 
       document.cookie = `${this._key}=${value}; max-age=${this._maxAge}; path=/; SameSite=Strict`;
-
-      return Promise.resolve();
     } catch (error) {
       // Cookie size limit (~4KB) - drop oldest half and retry
       if (events.length > 1) {
@@ -70,24 +70,18 @@ export class CookieStorageAdapter implements StorageAdapter {
 
           document.cookie = `${this._key}=${value}; max-age=${this._maxAge}; path=/; SameSite=Strict`;
 
-          return Promise.reject(
-            new StorageQuotaExceededError(
-              reduced.length,
-              events.length - reduced.length,
-            ),
+          throw new StorageQuotaExceededError(
+            reduced.length,
+            events.length - reduced.length,
           );
         } catch (retryError) {
-          return Promise.reject(
-            retryError instanceof Error
-              ? retryError
-              : new Error(String(retryError)),
-          );
+          throw retryError instanceof Error
+            ? retryError
+            : new Error(String(retryError));
         }
       }
 
-      return Promise.reject(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
 
