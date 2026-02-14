@@ -105,7 +105,7 @@ export abstract class Client<
       flushInterval: config.flushInterval ?? 5000,
       maxBatchSize: config.maxBatchSize ?? 10,
       maxRetries: config.maxRetries ?? 3,
-      maxBufferSize: config.maxBufferSize,
+      maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
       loggerAdapter: this._logger,
     };
 

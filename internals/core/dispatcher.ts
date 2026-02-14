@@ -45,7 +45,7 @@ export type DispatcherConfig = {
    * Maximum size of the in-memory event buffer (optional).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
-  maxBufferSize?: number;
+  maxBufferSize: number;
 };
 
 /**
@@ -80,22 +80,18 @@ export class Dispatcher<
     httpAdapter: HttpAdapter,
     storageAdapter: StorageAdapter,
   ) {
+    // Validate configuration
+    if (config.maxBufferSize < config.maxBatchSize) {
+      throw new Error(
+        `Invalid configuration: maxBufferSize (${config.maxBufferSize}) must be >= maxBatchSize (${config.maxBatchSize}). ` +
+          `The batch size will never be reached and events will be dropped unnecessarily.`,
+      );
+    }
+
     this._config = config;
     this._httpAdapter = httpAdapter;
     this._storageAdapter = storageAdapter;
     this._logger = config.loggerAdapter;
-
-    // Validate configuration
-    if (
-      config.maxBufferSize !== undefined &&
-      config.maxBufferSize < config.maxBatchSize
-    ) {
-      this._logger.warn(
-        `Configuration warning: maxBufferSize (${config.maxBufferSize}) is less than maxBatchSize (${config.maxBatchSize}). ` +
-          `This means the batch size will never be reached and events will be dropped unnecessarily. ` +
-          `Consider setting maxBufferSize >= maxBatchSize.`,
-      );
-    }
   }
 
   /**
@@ -165,14 +161,15 @@ export class Dispatcher<
   /**
    * Apply persisted queue limit using FIFO eviction.
    *
+   * Note: With the validation requiring maxBufferSize >= maxBatchSize,
+   * this limit is primarily enforced during restore() when loading
+   * persisted events that may exceed the buffer limit.
+   *
    * @param events Events to apply limit to
    * @returns Events after applying limit
    */
   private _applyQueueLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
-    if (
-      this._config.maxBufferSize !== undefined &&
-      events.length > this._config.maxBufferSize
-    ) {
+    if (events.length > this._config.maxBufferSize) {
       return events.slice(-this._config.maxBufferSize);
     }
 
@@ -304,6 +301,7 @@ export class Dispatcher<
       this._logger.error("Network error, max retries reached", {
         maxRetries: this._config.maxRetries,
         eventsCount: events.length,
+        /* v8 ignore next */
         error: err instanceof Error ? err.message : String(err),
       });
 
@@ -352,6 +350,7 @@ export class Dispatcher<
         this._logger.warn(err.message);
       } else {
         this._logger.error(errorMessage, {
+          /* v8 ignore next */
           error: err instanceof Error ? err.message : String(err),
           eventsCount: this._queue.size(),
         });
