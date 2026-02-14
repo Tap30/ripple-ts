@@ -7,7 +7,7 @@
  */
 export const calculateBackoff = (attempt: number): number => {
   const baseDelay = 1000;
-  const exponential = baseDelay * Math.pow(2, attempt);
+  const exponential = Math.min(baseDelay * Math.pow(2, attempt), 30000);
   const jitter = Math.random() * 1000;
 
   return exponential + jitter;
