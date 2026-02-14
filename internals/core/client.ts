@@ -126,7 +126,7 @@ export abstract class Client<
 
   /**
    * Track an event.
-   * If called before initialization, the operation is queued and executed after init() completes.
+   * Automatically initializes the client if not already initialized.
    *
    * @param name Event name/identifier
    * @param payload Event data payload
@@ -137,24 +137,18 @@ export abstract class Client<
     payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
-    const trackEvent = async () => {
-      const event: Event<TMetadata> = {
-        name: name as string,
-        metadata: this._metadataManager.merge(metadata),
-        payload: payload ?? null,
-        issuedAt: Date.now(),
-        sessionId: this._sessionId,
-        platform: this._getPlatform(),
-      };
+    await this.init();
 
-      await this._dispatcher.enqueue(event);
+    const event: Event<TMetadata> = {
+      name: name as string,
+      metadata: this._metadataManager.merge(metadata),
+      payload: payload ?? null,
+      issuedAt: Date.now(),
+      sessionId: this._sessionId,
+      platform: this._getPlatform(),
     };
 
-    if (!this._initialized) {
-      await this._initMutex.runAtomic(trackEvent);
-    } else {
-      await trackEvent();
-    }
+    await this._dispatcher.enqueue(event);
   }
 
   /**
