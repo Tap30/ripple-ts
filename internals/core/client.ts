@@ -243,6 +243,7 @@ export abstract class Client<
   public dispose(): void {
     this._dispatcher.dispose();
     this._metadataManager.clear();
+    this._initMutex.release();
     this._sessionId = null;
     this._initialized = false;
   }
