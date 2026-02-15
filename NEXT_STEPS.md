@@ -1,6 +1,5 @@
 # Next Steps
 
-- Add integration tests for disposal scenarios
 - Add telemetry/monitoring hooks for production debugging
 - Add optional rate limiting (e.g., max events per second)
 - `Queue.toArray()` Creates Unnecessary Copies
