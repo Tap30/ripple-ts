@@ -105,7 +105,7 @@ export class Dispatcher<
     if (this._disposed) {
       this._logger.warn("Cannot enqueue event: Dispatcher has been disposed");
 
-      return;
+      return Promise.resolve();
     }
 
     this._queue.enqueue(event);
