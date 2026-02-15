@@ -73,6 +73,7 @@ export abstract class Client<
 
   private _sessionId: string | null = null;
   private _initialized = false;
+  private _disposed = false;
 
   /**
    * Create a new Client instance.
@@ -153,6 +154,12 @@ export abstract class Client<
     payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
+    if (this._disposed) {
+      this._logger.warn("Cannot track event: Client has been disposed");
+
+      return Promise.resolve();
+    }
+
     await this.init();
 
     const event: Event<TMetadata> = {
@@ -232,6 +239,8 @@ export abstract class Client<
       }
 
       await this._dispatcher.restore();
+
+      this._disposed = false;
       this._initialized = true;
     });
   }
@@ -244,6 +253,7 @@ export abstract class Client<
     this._dispatcher.dispose();
     this._metadataManager.clear();
     this._initMutex.release();
+    this._disposed = true;
     this._sessionId = null;
     this._initialized = false;
   }

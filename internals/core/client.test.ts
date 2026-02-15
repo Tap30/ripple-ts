@@ -583,6 +583,41 @@ describe("Client", () => {
       }).not.toThrow();
     });
 
+    it("should drop track calls after dispose without re-init", async () => {
+      const client = createTestClient();
+
+      await client.init();
+      client.dispose();
+
+      // Track should be silently dropped
+      await client.track("user_signup", {
+        email: "test@example.com",
+        plan: "premium",
+      });
+
+      // Verify no events were enqueued
+      expect(client["_dispatcher"]["_queue"].size()).toBe(0);
+    });
+
+    it("should allow tracking after dispose and explicit re-init", async () => {
+      const client = createTestClient();
+
+      await client.init();
+      client.dispose();
+
+      // Explicitly re-init
+      await client.init();
+
+      // Track should work now
+      await client.track("user_signup", {
+        email: "test@example.com",
+        plan: "premium",
+      });
+
+      // Verify event was enqueued
+      expect(client["_dispatcher"]["_queue"].size()).toBe(1);
+    });
+
     it("should allow subclasses to override _setSessionId", () => {
       class TestClient extends Client<Record<string, EventPayload>> {
         protected _getPlatform(): Platform | null {
