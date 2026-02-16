@@ -231,16 +231,16 @@ export abstract class Client<
   public async init(): Promise<void> {
     if (this._initialized) return await Promise.resolve();
 
-    if (this._disposed) this._initMutex.reset();
+    if (this._disposed) {
+      this._disposed = false;
+      this._initMutex.reset();
+    }
 
     await this._initMutex.runAtomic(async () => {
-      if (this._initialized) {
-        return await Promise.resolve();
-      }
+      if (this._initialized) return await Promise.resolve();
 
       await this._dispatcher.restore();
 
-      this._disposed = false;
       this._initialized = true;
     });
   }
