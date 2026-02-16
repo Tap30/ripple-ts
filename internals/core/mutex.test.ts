@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Mutex } from "./mutex.ts";
+import { Mutex, MutexDisposedError } from "./mutex.ts";
 
 describe("Mutex", () => {
   it("should allow single task to run immediately", async () => {
@@ -202,5 +202,162 @@ describe("Mutex", () => {
     expect(results).toContain("task3");
     expect(results.length).toBe(3);
     expect(mutex.isLocked).toBe(false);
+  });
+
+  it("should reject new tasks after disposal", async () => {
+    const mutex = new Mutex();
+
+    mutex.release();
+
+    await expect(
+      mutex.runAtomic(async () => {
+        return Promise.resolve("should not execute");
+      }),
+    ).rejects.toThrow(MutexDisposedError);
+  });
+
+  it("should reject new tasks with correct error message", async () => {
+    const mutex = new Mutex();
+
+    mutex.release();
+
+    await expect(
+      mutex.runAtomic(async () => {
+        return Promise.resolve("should not execute");
+      }),
+    ).rejects.toThrow("Mutex has been disposed");
+  });
+
+  it("should allow queued tasks to complete but reject new ones after disposal", async () => {
+    const mutex = new Mutex();
+    const results: string[] = [];
+
+    const task1 = mutex.runAtomic(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 30);
+      });
+
+      results.push("task1");
+    });
+
+    const task2 = mutex.runAtomic(async () => {
+      results.push("task2");
+
+      return Promise.resolve();
+    });
+
+    await new Promise(resolve => {
+      setTimeout(resolve, 10);
+    });
+
+    mutex.release();
+
+    await Promise.all([task1, task2]);
+
+    expect(results).toContain("task1");
+    expect(results).toContain("task2");
+    expect(results.length).toBe(2);
+
+    await expect(
+      mutex.runAtomic(async () => {
+        results.push("task3");
+
+        return Promise.resolve();
+      }),
+    ).rejects.toThrow(MutexDisposedError);
+
+    expect(results.length).toBe(2);
+  });
+
+  it("should handle disposal with empty queue", async () => {
+    const mutex = new Mutex();
+
+    mutex.release();
+
+    expect(mutex.isLocked).toBe(false);
+
+    await expect(
+      mutex.runAtomic(async () => {
+        return Promise.resolve("test");
+      }),
+    ).rejects.toThrow(MutexDisposedError);
+  });
+
+  it("should handle multiple disposal calls safely", async () => {
+    const mutex = new Mutex();
+
+    mutex.release();
+    mutex.release();
+    mutex.release();
+
+    await expect(
+      mutex.runAtomic(async () => {
+        return Promise.resolve("test");
+      }),
+    ).rejects.toThrow(MutexDisposedError);
+  });
+
+  it("should allow reuse after reset", async () => {
+    const mutex = new Mutex();
+    let executed = false;
+
+    mutex.release();
+
+    await expect(
+      mutex.runAtomic(async () => {
+        return Promise.resolve("should not execute");
+      }),
+    ).rejects.toThrow(MutexDisposedError);
+
+    mutex.reset();
+
+    await mutex.runAtomic(async () => {
+      executed = true;
+
+      return Promise.resolve();
+    });
+
+    expect(executed).toBe(true);
+  });
+
+  it("should reset all internal state", async () => {
+    const mutex = new Mutex();
+
+    const task1 = mutex.runAtomic(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 50);
+      });
+    });
+
+    await new Promise(resolve => {
+      setTimeout(resolve, 10);
+    });
+
+    expect(mutex.isLocked).toBe(true);
+
+    mutex.release();
+    mutex.reset();
+
+    expect(mutex.isLocked).toBe(false);
+
+    await task1;
+
+    const result = await mutex.runAtomic(async () => {
+      return Promise.resolve("works");
+    });
+
+    expect(result).toBe("works");
+  });
+
+  it("should handle reset without prior disposal", async () => {
+    const mutex = new Mutex();
+
+    mutex.reset();
+
+    const result = await mutex.runAtomic(async () => {
+      return Promise.resolve("test");
+    });
+
+    expect(result).toBe("test");
   });
 });

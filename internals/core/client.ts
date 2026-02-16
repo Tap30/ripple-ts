@@ -229,9 +229,9 @@ export abstract class Client<
    * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    if (this._initialized) {
-      return await Promise.resolve();
-    }
+    if (this._initialized) return await Promise.resolve();
+
+    if (this._disposed) this._initMutex.reset();
 
     await this._initMutex.runAtomic(async () => {
       if (this._initialized) {

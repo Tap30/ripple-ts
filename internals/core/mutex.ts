@@ -1,10 +1,23 @@
 /**
+ * Error thrown when attempting to acquire a disposed mutex.
+ */
+export class MutexDisposedError extends Error {
+  constructor() {
+    super("Mutex has been disposed");
+
+    this.name = "MutexDisposedError";
+  }
+}
+
+/**
  * A Mutex (Mutual Exclusion) class to ensure a task runs exclusively.
  * It prevents race conditions in asynchronous code by ensuring only one task
  * can access a shared resource at a time.
  */
 export class Mutex {
   private _isLocked: boolean = false;
+  private _disposed: boolean = false;
+
   private _taskQueue: Array<() => void> = [];
 
   /**
@@ -22,6 +35,10 @@ export class Mutex {
    * is called and it's this task's turn to run.
    */
   private _acquireLock(): Promise<void> {
+    if (this._disposed) {
+      return Promise.reject(new MutexDisposedError());
+    }
+
     if (!this._isLocked) {
       this._isLocked = true;
 
@@ -76,7 +93,17 @@ export class Mutex {
    * Used for cleanup during disposal.
    */
   public release(): void {
+    this._disposed = true;
+    this._isLocked = false;
     this._taskQueue.forEach(resolve => resolve());
+    this._taskQueue = [];
+  }
+
+  /**
+   * Reset the mutex to its initial state, allowing it to be reused after disposal.
+   */
+  public reset(): void {
+    this._disposed = false;
     this._isLocked = false;
     this._taskQueue = [];
   }

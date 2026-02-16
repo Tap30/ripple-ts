@@ -400,8 +400,17 @@ export class Dispatcher<
    * Restore persisted events from storage.
    * Called during initialization to recover unsent events.
    */
-  public async restore(): Promise<void> {
+  /**
+   * Reset internal state for reinitialization after disposal.
+   */
+  private _reset(): void {
     this._disposed = false;
+    this._flushMutex.reset();
+    this._retryAbortController = new AbortController();
+  }
+
+  public async restore(): Promise<void> {
+    this._reset();
 
     try {
       const stored = await this._storageAdapter.load();
