@@ -606,6 +606,12 @@ const noopStorage = new NoOpStorageAdapter();
 By default, events are persisted to `.ripple_events.json` in the current working
 directory.
 
+## Ripple Guides and Best Practices
+
+- [Security Best Practices](https://github.com/Tap30/ripple/blob/main/guides/SECURITY.md)
+- [Disaster Recovery](https://github.com/Tap30/ripple/blob/main/guides/DISASTER_RECOVERY.md)
+- [Performance Tuning](https://github.com/Tap30/ripple/blob/main/guides/PERFORMANCE_TUNING.md)
+
 ## Design and API Contract
 
 Read the

@@ -40,3 +40,44 @@
   client disposal.
 
   **Suggestion**: Add `AbortController` support to the `HttpAdapter` interface.
+
+- No Validation of Restored Events
+
+  **Location:** `internals/core/dispatcher.ts:408`
+
+  **Issue:** Events loaded from storage are not validated for schema
+  correctness.
+
+  ```typescript
+  const stored = await this._storageAdapter.load();
+  const limited = this._applyQueueLimit(stored as Event<TMetadata>[]);
+  this._queue.fromArray(limited);
+  ```
+
+  **Impact:** Corrupted storage data could cause runtime errors or send
+  malformed events.
+
+  **Recommendation:** Add schema validation:
+
+  ```typescript
+  const stored = await this._storageAdapter.load();
+  const validated = stored.filter(
+    e => e && typeof e.name === "string" && typeof e.issuedAt === "number",
+  );
+  if (validated.length < stored.length) {
+    this._logger.warn(
+      `Dropped ${stored.length - validated.length} invalid events`,
+    );
+  }
+  ```
+
+- Storage Quota Attacks
+
+  **Current:** Malicious code could fill storage quota by tracking massive
+  events.
+
+  **Mitigation:** `maxBufferSize` provides some protection, but no per-event
+  size limit exists.
+
+  **Recommendation:** Add optional `maxEventSize` configuration to reject
+  oversized events.
