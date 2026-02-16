@@ -187,7 +187,7 @@ and attached to all events.
 import {
   RippleClient,
   IndexedDBAdapter,
-  SessionStorageAdapter,
+  LocalStorageAdapter,
 } from "@tapsioss/ripple-browser";
 
 // Use IndexedDB for large event queues
@@ -197,10 +197,10 @@ const client = new RippleClient({
   storageAdapter: new IndexedDBAdapter(),
 });
 
-// Or use sessionStorage for temporary tracking
-const sessionClient = new RippleClient({
+// Or use localStorage for persistent tracking
+const persistentClient = new RippleClient({
   ...config,
-  storageAdapter: new SessionStorageAdapter(),
+  storageAdapter: new LocalStorageAdapter(),
 });
 ```
 
@@ -270,13 +270,11 @@ const client = new RippleClient({
 
 ## Storage Adapters
 
-| Adapter                   | Capacity   | Persistence  | Performance | TTL Support  | Queue Limit Support | Use Case                                        |
-| ------------------------- | ---------- | ------------ | ----------- | ------------ | ------------------- | ----------------------------------------------- |
-| **LocalStorageAdapter**   | ~5-10MB    | Permanent    | Good        | ✅ Yes       | ✅ Yes              | Small event queues                              |
-| **SessionStorageAdapter** | ~5-10MB    | Session only | Good        | ✅ Yes       | ✅ Yes              | Temporary tracking                              |
-| **IndexedDBAdapter**      | ~50MB-1GB+ | Permanent    | Excellent   | ✅ Yes       | ✅ Yes              | Large event queues                              |
-| **CookieStorageAdapter**  | ~4KB       | Configurable | Fair        | Via `maxAge` | ✅ Yes              | Small queues, cross-domain                      |
-| **NoOpStorageAdapter**    | Unlimited  | -            | -           | -            | -                   | When persistence is not needed or not supported |
+| Adapter                 | Capacity   | Persistence | Performance | TTL Support | Queue Limit Support | Use Case                                        |
+| ----------------------- | ---------- | ----------- | ----------- | ----------- | ------------------- | ----------------------------------------------- |
+| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Good        | ✅ Yes      | ✅ Yes              | Small to medium event queues                    |
+| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues                              |
+| **NoOpStorageAdapter**  | Unlimited  | -           | -           | -           | -                   | When persistence is not needed or not supported |
 
 ### Storage Availability Detection
 
@@ -290,9 +288,7 @@ storage mechanism is accessible before creating an instance. This is useful for:
 ```ts
 import {
   LocalStorageAdapter,
-  SessionStorageAdapter,
   IndexedDBAdapter,
-  CookieStorageAdapter,
   NoOpStorageAdapter,
 } from "@tapsioss/ripple-browser";
 
@@ -304,15 +300,6 @@ async function createStorageAdapter(): StorageAdapter {
 
   if (await LocalStorageAdapter.isAvailable()) {
     return new LocalStorageAdapter();
-  }
-
-  if (await SessionStorageAdapter.isAvailable()) {
-    return new SessionStorageAdapter();
-  }
-
-  // Last resort: cookies (very limited capacity)
-  if (await CookieStorageAdapter.isAvailable()) {
-    return new CookieStorageAdapter();
   }
 
   return new NoOpStorageAdapter();
@@ -336,24 +323,19 @@ const client = new RippleClient({
 
 ### TTL (Time-to-Live) Support
 
-LocalStorageAdapter, SessionStorageAdapter, and IndexedDBAdapter support
-optional TTL to automatically expire stored events:
+LocalStorageAdapter and IndexedDBAdapter support optional TTL to automatically
+expire stored events:
 
 ```ts
 import {
   LocalStorageAdapter,
-  SessionStorageAdapter,
   IndexedDBAdapter,
 } from "@tapsioss/ripple-browser";
 
 // Events expire after 1 hour (3600000ms)
 const localStorage = new LocalStorageAdapter({ ttl: 3600000 });
-const sessionStorage = new SessionStorageAdapter({ ttl: 3600000 });
 const indexedDB = new IndexedDBAdapter({ ttl: 3600000 });
 ```
-
-CookieStorageAdapter uses the native `maxAge` parameter (in seconds) for
-expiration, so no additional TTL is needed.
 
 ### Buffer Size Limit
 

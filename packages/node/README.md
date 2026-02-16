@@ -55,7 +55,7 @@ yarn add @tapsioss/ripple-node
 import {
   RippleClient,
   FetchHttpAdapter,
-  FileStorageAdapter,
+  NoOpStorageAdapter,
   ConsoleLoggerAdapter,
   LogLevel,
 } from "@tapsioss/ripple-node";
@@ -71,7 +71,7 @@ const client = new RippleClient<ServerEvents>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter(),
+  storageAdapter: new NoOpStorageAdapter(),
   loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO), // Optional: Enable logging
 });
 
@@ -217,23 +217,23 @@ const client = new RippleClient({
 ### Multiple Client Instances
 
 When using multiple Ripple instances in the same Node.js application, configure
-unique storage paths to prevent conflicts:
+unique storage to prevent conflicts:
 
 ```ts
-import { RippleClient, FileStorageAdapter } from "@tapsioss/ripple-node";
+import { RippleClient, NoOpStorageAdapter } from "@tapsioss/ripple-node";
 
 // Analytics service
 const analyticsClient = new RippleClient({
   apiKey: "analytics-key",
   endpoint: "https://analytics.example.com/events",
-  storageAdapter: new FileStorageAdapter("./analytics_events.json"),
+  storageAdapter: new NoOpStorageAdapter(),
 });
 
 // Marketing service
 const marketingClient = new RippleClient({
   apiKey: "marketing-key",
   endpoint: "https://marketing.example.com/events",
-  storageAdapter: new FileStorageAdapter("./marketing_events.json"),
+  storageAdapter: new NoOpStorageAdapter(),
 });
 
 // Both clients can operate independently without conflicts

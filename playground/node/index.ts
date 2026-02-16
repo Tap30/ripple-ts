@@ -5,8 +5,8 @@ import { appendFileSync, writeFileSync } from "node:fs";
 
 import {
   FetchHttpAdapter,
-  FileStorageAdapter,
   LogLevel,
+  NoOpStorageAdapter,
   RippleClient,
   type LoggerAdapter,
 } from "@tapsioss/ripple-node";
@@ -89,12 +89,12 @@ const client = new RippleClient({
   maxRetries: 3,
   flushInterval: 5000,
   httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter("ripple.storage.json"),
+  storageAdapter: new NoOpStorageAdapter(),
   loggerAdapter: new HybridLogger("ripple.log", LogLevel.DEBUG),
 });
 
 await client.init();
-log("✓ Client initialized with FileStorage");
+log("✓ Client initialized with NoOpStorage");
 
 separator();
 log("Test Case 2: Basic Event Tracking");
@@ -181,19 +181,19 @@ await client.flush();
 log("✓ Manually flushed events");
 
 separator();
-log("Test Case 8: Custom File Path");
+log("Test Case 8: Multiple Client Instances");
 
 const customPathClient = new RippleClient({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
   httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new FileStorageAdapter("custom.storage.json"),
+  storageAdapter: new NoOpStorageAdapter(),
 });
 
 await customPathClient.init();
-await customPathClient.track("custom_path_test", { path: "custom" });
+await customPathClient.track("custom_client_test", { instance: "secondary" });
 await customPathClient.flush();
-log("✓ Tested custom file path storage");
+log("✓ Tested multiple client instances");
 
 separator();
 log("Test Case 9: Error Handling (Invalid Endpoint)");
@@ -204,7 +204,7 @@ try {
     apiKey: "test-api-key",
     maxRetries: 2,
     httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new FileStorageAdapter("error.storage.json"),
+    storageAdapter: new NoOpStorageAdapter(),
     loggerAdapter: new HybridLogger("ripple-error.log", LogLevel.WARN),
   });
 
