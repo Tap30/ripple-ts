@@ -117,4 +117,11 @@ export class CookieStorageAdapter implements StorageAdapter {
 
     document.cookie = `${this._key}=; max-age=0; path=/`;
   }
+
+  /**
+   * Close the adapter and release resources.
+   */
+  public close(): Promise<void> {
+    return Promise.resolve();
+  }
 }

@@ -31,4 +31,10 @@ describe("NoOpStorageAdapter", () => {
 
     await expect(adapter.clear()).resolves.toBeUndefined();
   });
+
+  it("should close without error", async () => {
+    const adapter = new NoOpStorageAdapter();
+
+    await expect(adapter.close()).resolves.toBeUndefined();
+  });
 });

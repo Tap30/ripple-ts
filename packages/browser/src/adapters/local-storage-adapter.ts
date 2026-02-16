@@ -130,4 +130,11 @@ export class LocalStorageAdapter implements StorageAdapter {
 
     return Promise.resolve();
   }
+
+  /**
+   * Close the adapter and release resources.
+   */
+  public close(): Promise<void> {
+    return Promise.resolve();
+  }
 }

@@ -53,4 +53,11 @@ export class FileStorageAdapter implements StorageAdapter {
       await Promise.resolve();
     }
   }
+
+  /**
+   * Close the adapter and release resources.
+   */
+  public close(): Promise<void> {
+    return Promise.resolve();
+  }
 }

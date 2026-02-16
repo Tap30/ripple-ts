@@ -128,4 +128,11 @@ export class SessionStorageAdapter implements StorageAdapter {
 
     sessionStorage.removeItem(this._key);
   }
+
+  /**
+   * Close the adapter and release resources.
+   */
+  public close(): Promise<void> {
+    return Promise.resolve();
+  }
 }

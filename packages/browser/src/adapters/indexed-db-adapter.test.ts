@@ -39,6 +39,7 @@ describe("IndexedDBAdapter", () => {
         contains: vi.fn().mockReturnValue(true),
       } as unknown as DOMStringList,
       createObjectStore: vi.fn(),
+      close: vi.fn(),
     } as unknown as IDBDatabase;
 
     Object.defineProperty(global, "indexedDB", {
@@ -963,6 +964,38 @@ describe("IndexedDBAdapter", () => {
       expect(atomicSpy).toHaveBeenCalledTimes(2);
       openSpy.mockRestore();
       atomicSpy.mockRestore();
+    });
+  });
+
+  describe("close", () => {
+    it("should close database connection", async () => {
+      const openRequest = {} as IDBOpenDBRequest;
+      const getRequest = {} as IDBRequest<unknown>;
+
+      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
+      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
+
+      const loadPromise = adapter.load();
+
+      Object.defineProperty(openRequest, "result", { value: mockDB });
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      Object.defineProperty(getRequest, "result", { value: undefined });
+      getRequest.onsuccess?.(new Event("success"));
+
+      await loadPromise;
+
+      await adapter.close();
+
+      expect(mockDB.close).toHaveBeenCalled();
+    });
+
+    it("should handle close when no connection exists", async () => {
+      const newAdapter = new IndexedDBAdapter();
+
+      await expect(newAdapter.close()).resolves.toBeUndefined();
     });
   });
 });

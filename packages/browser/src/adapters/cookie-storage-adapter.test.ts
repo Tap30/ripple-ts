@@ -417,4 +417,10 @@ describe("CookieStorageAdapter", () => {
       );
     });
   });
+
+  describe("close", () => {
+    it("should close without error", async () => {
+      await expect(adapter.close()).resolves.toBeUndefined();
+    });
+  });
 });

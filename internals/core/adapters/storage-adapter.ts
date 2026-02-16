@@ -42,4 +42,9 @@ export interface StorageAdapter {
    * Clear all persisted events from storage.
    */
   clear(): Promise<void>;
+
+  /**
+   * Close the storage adapter and release resources.
+   */
+  close(): Promise<void>;
 }

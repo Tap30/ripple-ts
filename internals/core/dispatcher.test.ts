@@ -22,6 +22,7 @@ const createMockStorageAdapter = (): StorageAdapter => ({
   save: vi.fn().mockResolvedValue(undefined),
   load: vi.fn().mockResolvedValue([]),
   clear: vi.fn().mockResolvedValue(undefined),
+  close: vi.fn().mockResolvedValue(undefined),
 });
 
 const createConfig = (

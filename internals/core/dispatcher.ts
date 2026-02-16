@@ -434,5 +434,6 @@ export class Dispatcher<
 
     this._queue.clear();
     this._flushMutex.release();
+    void this._storageAdapter.close();
   }
 }

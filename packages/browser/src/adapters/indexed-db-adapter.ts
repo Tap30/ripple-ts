@@ -257,4 +257,16 @@ export class IndexedDBAdapter implements StorageAdapter {
       request.onsuccess = () => resolve();
     });
   }
+
+  /**
+   * Close the database connection and release resources.
+   */
+  public async close(): Promise<void> {
+    if (this._dbPromise) {
+      const db = await this._dbPromise;
+
+      db.close();
+      this._dbPromise = null;
+    }
+  }
 }

@@ -297,4 +297,10 @@ describe("LocalStorageAdapter", () => {
       await expect(adapter.save(mockEvents)).rejects.toThrow("Non-error value");
     });
   });
+
+  describe("close", () => {
+    it("should close without error", async () => {
+      await expect(adapter.close()).resolves.toBeUndefined();
+    });
+  });
 });
