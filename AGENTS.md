@@ -23,7 +23,7 @@ ripple-ts/
 
 - **Client** - Abstract base class with type-safe metadata management
 - **MetadataManager** - Type-safe global metadata handling
-- **Dispatcher** - Queue management, batching, retry logic with race condition
+- **Dispatcher** - Buffer management, batching, retry logic with race condition
   prevention
 - **Adapters** - Pluggable HTTP, storage, and logger implementations
 
@@ -62,7 +62,7 @@ await client.track("user.login", {
 - **Dynamic Rebatching** - Automatically rebatches accumulated events during
   flush for optimal throughput
 - **Retry Logic** - Exponential backoff with jitter
-- **Event Persistence** - Automatic storage of unsent events with TTL and queue
+- **Event Persistence** - Automatic storage of unsent events with TTL and buffer
   limits
 - **Storage Availability Detection** - Static `isAvailable()` method on all
   storage adapters for graceful degradation

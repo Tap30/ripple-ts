@@ -2,9 +2,9 @@
 
 - Add telemetry/monitoring hooks for production debugging
 - Add optional rate limiting (e.g., max events per second)
-- `Queue.toArray()` Creates Unnecessary Copies
+- `Buffer.toArray()` Creates Unnecessary Copies
 
-  **File**: `internals/core/queue.ts`
+  **File**: `internals/core/buffer.ts`
 
   **Issue**: `toArray()` is O(n) and called multiple times per flush cycle.
 
@@ -50,7 +50,7 @@
 
   ```typescript
   const stored = await this._storageAdapter.load();
-  const limited = this._applyQueueLimit(stored as Event<TMetadata>[]);
+  const limited = this._applyBufferLimit(stored as Event<TMetadata>[]);
   this._queue.fromArray(limited);
   ```
 

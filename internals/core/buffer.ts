@@ -11,15 +11,15 @@ type Node<T> = {
 /**
  * FIFO queue implementation using a singly linked list.
  *
- * @template T The type of elements in the queue
+ * @template T The type of elements in the buffer
  */
-export class Queue<T> {
+export class Buffer<T> {
   private _head: Node<T> | null = null;
   private _tail: Node<T> | null = null;
   private _length = 0;
 
   /**
-   * Add an element to the end of the queue.
+   * Add an element to the end of the buffer.
    *
    * @param value The value to enqueue
    */
@@ -37,9 +37,9 @@ export class Queue<T> {
   }
 
   /**
-   * Remove and return the element at the front of the queue.
+   * Remove and return the element at the front of the buffer.
    *
-   * @returns The dequeued value, or null if queue is empty
+   * @returns The dequeued value, or null if buffer is empty
    */
   public dequeue(): T | null {
     if (!this._head) return null;
@@ -56,9 +56,9 @@ export class Queue<T> {
   }
 
   /**
-   * Convert the queue to an array.
+   * Convert the buffer to an array.
    *
-   * @returns Array containing all queue elements in order
+   * @returns Array containing all buffer elements in order
    */
   public toArray(): T[] {
     const result: T[] = [];
@@ -73,10 +73,10 @@ export class Queue<T> {
   }
 
   /**
-   * Populate the queue from an array.
-   * Clears existing queue contents first.
+   * Populate the buffer from an array.
+   * Clears existing buffer contents first.
    *
-   * @param items Array of items to add to the queue
+   * @param items Array of items to add to the buffer
    */
   public fromArray(items: T[]): void {
     this.clear();
@@ -87,7 +87,7 @@ export class Queue<T> {
   }
 
   /**
-   * Remove all elements from the queue.
+   * Remove all elements from the buffer.
    */
   public clear(): void {
     this._head = this._tail = null;
@@ -95,18 +95,18 @@ export class Queue<T> {
   }
 
   /**
-   * Get the number of elements in the queue.
+   * Get the number of elements in the buffer.
    *
-   * @returns The queue size
+   * @returns The buffer size
    */
   public size(): number {
     return this._length;
   }
 
   /**
-   * Check if the queue is empty.
+   * Check if the buffer is empty.
    *
-   * @returns True if queue has no elements
+   * @returns True if buffer has no elements
    */
   public isEmpty(): boolean {
     return this._length === 0;

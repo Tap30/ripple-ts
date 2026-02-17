@@ -55,7 +55,7 @@ describe("Dispatcher", () => {
   });
 
   describe("enqueue", () => {
-    it("should add event to queue and persist", async () => {
+    it("should add event to buffer and persist", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -146,7 +146,7 @@ describe("Dispatcher", () => {
       expect(storageAdapter.clear).toHaveBeenCalled();
     });
 
-    it("should do nothing if queue is empty", async () => {
+    it("should do nothing if buffer is empty", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -175,7 +175,7 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(1);
     });
 
-    it("should rebatch events when queue exceeds maxBatchSize", async () => {
+    it("should rebatch events when buffer exceeds maxBatchSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -806,7 +806,7 @@ describe("Dispatcher", () => {
       expect(lastCall[4]?.name).toBe("event25");
     });
 
-    it("should apply limit when queue exceeds maxBufferSize", async () => {
+    it("should apply limit when buffer exceeds maxBufferSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const persistedEvents = Array.from({ length: 15 }, (_, i) =>

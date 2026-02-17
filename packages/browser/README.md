@@ -17,9 +17,9 @@ for browsers.
 
 ## Features
 
-- 🚀 **High Performance**: Efficient queue management with O(1) operations
+- 🚀 **High Performance**: Efficient buffer management with O(1) operations
 - 📦 **Automatic Batching**: Configurable batch size and flush intervals
-- 🔄 **Dynamic Rebatching**: Optimizes throughput when queue grows during
+- 🔄 **Dynamic Rebatching**: Optimizes throughput when buffer grows during
   offline/retry scenarios
 - 🔄 **Retry Logic**: Exponential backoff with jitter
 - 🔐 **Session Tracking**: Automatic session ID generation and management
@@ -272,11 +272,11 @@ const client = new RippleClient({
 
 ## Storage Adapters
 
-| Adapter                 | Capacity   | Persistence | Performance | TTL Support | Queue Limit Support | Use Case                                        |
-| ----------------------- | ---------- | ----------- | ----------- | ----------- | ------------------- | ----------------------------------------------- |
-| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Good        | ✅ Yes      | ✅ Yes              | Small to medium event queues                    |
-| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Excellent   | ✅ Yes      | ✅ Yes              | Large event queues                              |
-| **NoOpStorageAdapter**  | Unlimited  | -           | -           | -           | -                   | When persistence is not needed or not supported |
+| Adapter                 | Capacity   | Persistence | Performance | TTL Support | Buffer Limit Support | Use Case                                        |
+| ----------------------- | ---------- | ----------- | ----------- | ----------- | -------------------- | ----------------------------------------------- |
+| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Good        | ✅ Yes      | ✅ Yes               | Small to medium event queues                    |
+| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Excellent   | ✅ Yes      | ✅ Yes               | Large event queues                              |
+| **NoOpStorageAdapter**  | Unlimited  | -           | -           | -           | -                    | When persistence is not needed or not supported |
 
 ### Storage Availability Detection
 
@@ -377,7 +377,7 @@ These two parameters serve different purposes and work together:
 
 **`maxBatchSize` (default: 10)** - Controls **when** events are sent
 
-- Triggers immediate flush when queue reaches this size
+- Triggers immediate flush when buffer reaches this size
 - Determines how many events are sent in a single HTTP request
 - Affects network efficiency and latency
 
@@ -536,7 +536,7 @@ const client2 = new RippleClient({
 
 ### Resource Management
 
-- Each instance has its own flush timer and queue
+- Each instance has its own flush timer and buffer
 - Always call `dispose()` when instances are no longer needed
 - Consider memory usage with many concurrent instances
 

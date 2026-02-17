@@ -17,9 +17,9 @@ for Node.js.
 
 ## Features
 
-- 🚀 **High Performance**: Efficient queue management with O(1) operations
+- 🚀 **High Performance**: Efficient buffer management with O(1) operations
 - 📦 **Automatic Batching**: Configurable batch size and flush intervals
-- 🔄 **Dynamic Rebatching**: Optimizes throughput when queue grows during
+- 🔄 **Dynamic Rebatching**: Optimizes throughput when buffer grows during
   offline/retry scenarios
 - 🔄 **Retry Logic**: Exponential backoff with jitter
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
@@ -350,7 +350,7 @@ const client2 = new RippleClient({
 
 ### Resource Management
 
-- Each instance has its own flush timer and queue
+- Each instance has its own flush timer and buffer
 - Always call `dispose()` when instances are no longer needed
 - Consider memory usage with many concurrent instances
 

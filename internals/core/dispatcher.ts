@@ -4,8 +4,8 @@ import {
   StorageQuotaExceededError,
   type StorageAdapter,
 } from "./adapters/storage-adapter.ts";
+import { Buffer } from "./buffer.ts";
 import { Mutex } from "./mutex.ts";
-import { Queue } from "./queue.ts";
 import type { Event } from "./types.ts";
 import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
 
@@ -58,7 +58,7 @@ export type DispatcherConfig = {
 export class Dispatcher<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
-  private _queue = new Queue<Event<TMetadata>>();
+  private _queue = new Buffer<Event<TMetadata>>();
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _flushMutex = new Mutex();
   private _disposed = false;
@@ -96,7 +96,7 @@ export class Dispatcher<
   }
 
   /**
-   * Add an event to the queue.
+   * Add an event to the buffer.
    * Triggers auto-flush if batch size threshold is reached.
    *
    * @param event The event to enqueue
@@ -111,7 +111,7 @@ export class Dispatcher<
     this._queue.enqueue(event);
 
     try {
-      const eventsToSave = this._applyQueueLimit(this._queue.toArray());
+      const eventsToSave = this._applyBufferLimit(this._queue.toArray());
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
@@ -160,7 +160,7 @@ export class Dispatcher<
   }
 
   /**
-   * Apply persisted queue limit using FIFO eviction.
+   * Apply persisted buffer limit using FIFO eviction.
    *
    * Note: With the validation requiring maxBufferSize >= maxBatchSize,
    * this limit is primarily enforced during restore() when loading
@@ -169,7 +169,7 @@ export class Dispatcher<
    * @param events Events to apply limit to
    * @returns Events after applying limit
    */
-  private _applyQueueLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
+  private _applyBufferLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
     if (events.length > this._config.maxBufferSize) {
       return events.slice(-this._config.maxBufferSize);
     }
@@ -363,12 +363,12 @@ export class Dispatcher<
     events: Event<TMetadata>[],
     errorMessage: string,
   ): Promise<void> {
-    const currentQueue = this._queue.toArray();
+    const currentBuffer = this._queue.toArray();
 
-    this._queue.fromArray([...events, ...currentQueue]);
+    this._queue.fromArray([...events, ...currentBuffer]);
 
     try {
-      const eventsToSave = this._applyQueueLimit(this._queue.toArray());
+      const eventsToSave = this._applyBufferLimit(this._queue.toArray());
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
@@ -414,7 +414,7 @@ export class Dispatcher<
 
     try {
       const stored = await this._storageAdapter.load();
-      const limited = this._applyQueueLimit(stored as Event<TMetadata>[]);
+      const limited = this._applyBufferLimit(stored as Event<TMetadata>[]);
 
       this._queue.fromArray(limited);
 
