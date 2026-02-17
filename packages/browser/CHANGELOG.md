@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 1.0.1
+### Patch Changes
+
+
+
+- [`6efec3d`](https://github.com/Tap30/ripple-ts/commit/6efec3dcd6ba50c6eeed44e1812694c455ef9399) Thanks [@mimshins](https://github.com/mimshins)! - Fix race condition in `init()` when called multiple times after `dispose()`. Previously, if `restore()` took longer to complete, concurrent `init()` calls could reset the mutex while it was actively being used, potentially corrupting the initialization process.
+
 ## 1.0.0
 
 ### Major Changes
