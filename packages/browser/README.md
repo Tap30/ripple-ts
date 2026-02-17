@@ -178,8 +178,10 @@ await client.track("product.viewed", {
 });
 ```
 
-**Note**: Platform information (browser, device, OS) is automatically detected
-and attached to all events.
+> [!NOTE]
+>
+> Platform information (browser, device, OS) is automatically detected and
+> attached to all events.
 
 ### Custom Storage Adapters
 
@@ -385,9 +387,11 @@ These two parameters serve different purposes and work together:
 - Drops oldest events when exceeded (FIFO)
 - Prevents unbounded memory growth
 
-**Important**: `maxBufferSize` should always be **greater than or equal to**
-`maxBatchSize`. If `maxBufferSize` is smaller, the batch size will never be
-reached and events will be dropped unnecessarily.
+> [!IMPORTANT]
+>
+> `maxBufferSize` should always be **greater than or equal to** `maxBatchSize`.
+> If `maxBufferSize` is smaller, the batch size will never be reached and events
+> will be dropped unnecessarily.
 
 ```ts
 // ✅ Good: Buffer is 10x batch size

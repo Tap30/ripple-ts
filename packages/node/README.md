@@ -334,17 +334,17 @@ Each client instance should use separate file paths to prevent data conflicts:
 const client1 = new RippleClient({ apiKey: "key1", endpoint: "url1" });
 const client2 = new RippleClient({ apiKey: "key2", endpoint: "url2" });
 
-// ✅ Good: Isolated storage paths
+// ✅ Good: Isolated storages
 const client1 = new RippleClient({
   apiKey: "key1",
   endpoint: "url1",
-  storageAdapter: new FileStorageAdapter("./service1_events.json"),
+  storageAdapter: new FileStorageAdapter(),
 });
 
 const client2 = new RippleClient({
   apiKey: "key2",
   endpoint: "url2",
-  storageAdapter: new FileStorageAdapter("./service2_events.json"),
+  storageAdapter: new RedisStorageAdapter(),
 });
 ```
 
@@ -372,12 +372,12 @@ const sharedHttpAdapter = new FetchHttpAdapter();
 
 const client1 = new RippleClient({
   httpAdapter: sharedHttpAdapter, // ✅ Safe to share
-  storageAdapter: new FileStorageAdapter("./client1.json"), // ✅ Separate storage
+  storageAdapter: new FileStorageAdapter(), // ✅ Separate storage
 });
 
 const client2 = new RippleClient({
   httpAdapter: sharedHttpAdapter, // ✅ Safe to share
-  storageAdapter: new FileStorageAdapter("./client2.json"), // ✅ Separate storage
+  storageAdapter: new RedisStorageAdapter(), // ✅ Separate storage
 });
 ```
 
@@ -502,7 +502,7 @@ const client = new RippleClient({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
-  storageAdapter: new FileStorageAdapter(),
+  storageAdapter: new SqlLiteStorageAdapter(),
 });
 ```
 
@@ -588,23 +588,16 @@ this when you're done using the client (e.g., during graceful shutdown).
 
 ## Storage Adapters
 
-| Adapter                | Capacity  | Persistence | Use Case                          |
-| ---------------------- | --------- | ----------- | --------------------------------- |
-| **FileStorageAdapter** | Unlimited | Permanent   | Default, persistent event storage |
-| **NoOpStorageAdapter** | N/A       | None        | When persistence is not needed    |
+| Adapter                | Capacity | Persistence | Use Case                       |
+| ---------------------- | -------- | ----------- | ------------------------------ |
+| **NoOpStorageAdapter** | N/A      | None        | When persistence is not needed |
 
 ```ts
-import { FileStorageAdapter, NoOpStorageAdapter } from "@tapsioss/ripple-node";
-
-// Persistent storage (default)
-const fileStorage = new FileStorageAdapter("./events.json");
+import { NoOpStorageAdapter } from "@tapsioss/ripple-node";
 
 // No persistence - events are discarded if not sent
 const noopStorage = new NoOpStorageAdapter();
 ```
-
-By default, events are persisted to `.ripple_events.json` in the current working
-directory.
 
 ## Ripple Guides and Best Practices
 
