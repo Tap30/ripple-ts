@@ -43,6 +43,7 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
     this._metadata = {};
   }
 
+  // TODO: update this method to add default value for metadata.
   /**
    * Merge shared metadata with event-specific metadata.
    *

@@ -51,7 +51,7 @@
   ```typescript
   const stored = await this._storageAdapter.load();
   const limited = this._applyBufferLimit(stored as Event<TMetadata>[]);
-  this._queue.fromArray(limited);
+  this._buffer.fromArray(limited);
   ```
 
   **Impact:** Corrupted storage data could cause runtime errors or send

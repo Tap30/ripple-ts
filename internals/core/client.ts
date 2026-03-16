@@ -207,6 +207,7 @@ export abstract class Client<
     return this._sessionId;
   }
 
+  // TODO: remove this function. make the field protected instead.
   /**
    * Set the session ID.
    * Default implementation for base client - runtime packages can override.

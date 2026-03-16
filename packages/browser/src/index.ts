@@ -8,6 +8,7 @@ export {
   ConsoleLoggerAdapter,
   LogLevel,
   NoOpLoggerAdapter,
+  StorageQuotaExceededError,
   type ClientConfig,
   type Event,
   type EventPayload,

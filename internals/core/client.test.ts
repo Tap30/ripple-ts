@@ -518,6 +518,7 @@ describe("Client", () => {
 
       await client.init();
 
+      // FIXME: internal exposure
       // Manually set a session ID to test disposal
       client["_sessionId"] = "test-session-123";
       expect(client.getSessionId()).toBe("test-session-123");
@@ -531,6 +532,8 @@ describe("Client", () => {
 
       // First init
       await client.init();
+
+      // FIXME: internal exposure
       // Manually set session ID to simulate session management
       client["_sessionId"] = "session-1";
       expect(client.getSessionId()).toBe("session-1");
@@ -596,8 +599,9 @@ describe("Client", () => {
         plan: "premium",
       });
 
+      // FIXME: internal exposure
       // Verify no events were enqueued
-      expect(client["_dispatcher"]["_queue"].size()).toBe(0);
+      expect(client["_dispatcher"]["_buffer"].size()).toBe(0);
     });
 
     it("should allow tracking after dispose and explicit re-init", async () => {
@@ -615,8 +619,9 @@ describe("Client", () => {
         plan: "premium",
       });
 
+      // FIXME: internal exposure
       // Verify event was enqueued
-      expect(client["_dispatcher"]["_queue"].size()).toBe(1);
+      expect(client["_dispatcher"]["_buffer"].size()).toBe(1);
     });
 
     it("should allow subclasses to override _setSessionId", () => {

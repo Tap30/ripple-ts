@@ -30,6 +30,8 @@ export class IndexedDBAdapter implements StorageAdapter {
 
   private _dbPromise: Promise<IDBDatabase> | null = null;
 
+  // TODO: explain the config object fields
+  // TODO: explain how ttl works in our implementation
   /**
    * Create a new IndexedDBAdapter instance.
    *
@@ -83,6 +85,8 @@ export class IndexedDBAdapter implements StorageAdapter {
    * @returns Promise resolving to the database instance
    */
   private _openDB(): Promise<IDBDatabase> {
+    // TODO: investigate the case with no schema version specified
+    // TODO: investigate every single case with schema version
     if (!this._dbPromise) {
       this._dbPromise = new Promise((resolve, reject) => {
         const request = indexedDB.open(
@@ -90,6 +94,7 @@ export class IndexedDBAdapter implements StorageAdapter {
           IndexedDBAdapter.SCHEMA_VERSION,
         );
 
+        // TODO: complete this
         request.onblocked = () => {
           // Handle tabs with older versions of the DB
         };
@@ -106,6 +111,8 @@ export class IndexedDBAdapter implements StorageAdapter {
         request.onsuccess = () => {
           const db = request.result;
 
+          // TODO: investigate abort
+
           // Reset promise on unexpected close so next operation reopens
           db.onclose = () => {
             this._dbPromise = null;
@@ -120,6 +127,7 @@ export class IndexedDBAdapter implements StorageAdapter {
           resolve(db);
         };
 
+        // TODO: investigate this event
         request.onupgradeneeded = event => {
           const db = (event.target as IDBOpenDBRequest).result;
 

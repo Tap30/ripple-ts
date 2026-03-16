@@ -13,7 +13,7 @@ export class ConsoleLoggerAdapter implements LoggerAdapter {
     LogLevel.NONE,
   ] as const;
 
-  public constructor(level: LogLevel = LogLevel.WARN) {
+  constructor(level: LogLevel = LogLevel.WARN) {
     this._level = level;
   }
 

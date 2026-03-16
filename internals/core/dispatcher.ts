@@ -58,7 +58,7 @@ export type DispatcherConfig = {
 export class Dispatcher<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
-  private _queue = new Buffer<Event<TMetadata>>();
+  private _buffer = new Buffer<Event<TMetadata>>();
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _flushMutex = new Mutex();
   private _disposed = false;
@@ -108,10 +108,10 @@ export class Dispatcher<
       return Promise.resolve();
     }
 
-    this._queue.enqueue(event);
+    this._buffer.enqueue(event);
 
     try {
-      const eventsToSave = this._applyBufferLimit(this._queue.toArray());
+      const eventsToSave = this._applyBufferLimit(this._buffer.toArray());
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
@@ -120,12 +120,12 @@ export class Dispatcher<
       } else {
         this._logger.error("Failed to persist events to storage", {
           error: err instanceof Error ? err.message : String(err),
-          queueSize: this._queue.size(),
+          queueSize: this._buffer.size(),
         });
       }
     }
 
-    if (this._queue.size() >= this._config.maxBatchSize) {
+    if (this._buffer.size() >= this._config.maxBatchSize) {
       await this.flush();
     } else {
       this._scheduleFlush();
@@ -145,11 +145,11 @@ export class Dispatcher<
         this._timer = null;
       }
 
-      if (this._queue.isEmpty()) return;
+      if (this._buffer.isEmpty()) return;
 
-      const allEvents = this._queue.toArray();
+      const allEvents = this._buffer.toArray();
 
-      this._queue.clear();
+      this._buffer.clear();
 
       for (let i = 0; i < allEvents.length; i += this._config.maxBatchSize) {
         const batch = allEvents.slice(i, i + this._config.maxBatchSize);
@@ -363,12 +363,12 @@ export class Dispatcher<
     events: Event<TMetadata>[],
     errorMessage: string,
   ): Promise<void> {
-    const currentBuffer = this._queue.toArray();
+    const currentBuffer = this._buffer.toArray();
 
-    this._queue.fromArray([...events, ...currentBuffer]);
+    this._buffer.fromArray([...events, ...currentBuffer]);
 
     try {
-      const eventsToSave = this._applyBufferLimit(this._queue.toArray());
+      const eventsToSave = this._applyBufferLimit(this._buffer.toArray());
 
       await this._storageAdapter.save(eventsToSave);
     } catch (err) {
@@ -378,7 +378,7 @@ export class Dispatcher<
         this._logger.error(errorMessage, {
           /* v8 ignore next -- @preserve */
           error: err instanceof Error ? err.message : String(err),
-          eventsCount: this._queue.size(),
+          eventsCount: this._buffer.size(),
         });
       }
     }
@@ -397,10 +397,6 @@ export class Dispatcher<
   }
 
   /**
-   * Restore persisted events from storage.
-   * Called during initialization to recover unsent events.
-   */
-  /**
    * Reset internal state for reinitialization after disposal.
    */
   private _reset(): void {
@@ -409,6 +405,10 @@ export class Dispatcher<
     this._retryAbortController = new AbortController();
   }
 
+  /**
+   * Restore persisted events from storage.
+   * Called during initialization to recover unsent events.
+   */
   public async restore(): Promise<void> {
     this._reset();
 
@@ -416,9 +416,9 @@ export class Dispatcher<
       const stored = await this._storageAdapter.load();
       const limited = this._applyBufferLimit(stored as Event<TMetadata>[]);
 
-      this._queue.fromArray(limited);
+      this._buffer.fromArray(limited);
 
-      if (this._queue.size() > 0) {
+      if (this._buffer.size() > 0) {
         this._scheduleFlush();
       }
     } catch (err) {
@@ -441,7 +441,7 @@ export class Dispatcher<
       this._timer = null;
     }
 
-    this._queue.clear();
+    this._buffer.clear();
     this._flushMutex.release();
     void this._storageAdapter.close();
   }
