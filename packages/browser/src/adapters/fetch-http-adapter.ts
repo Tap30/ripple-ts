@@ -34,7 +34,10 @@ export class FetchHttpAdapter implements HttpAdapter {
 
     try {
       data = (await response.json()) as unknown;
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       // Ignore JSON parsing errors
       data = undefined;
     }

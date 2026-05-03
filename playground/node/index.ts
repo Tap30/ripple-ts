@@ -214,7 +214,10 @@ try {
   log(
     "✓ Tracked event to invalid endpoint (check ripple-error.log for retry logs)",
   );
-} catch {
+  // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+  // Older iOS Safari versions don't support optional catch binding.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+} catch (_) {
   log("✓ Error handling test completed (expected failure)");
 }
 

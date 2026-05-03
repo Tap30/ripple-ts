@@ -45,7 +45,10 @@ export class LocalStorageAdapter implements StorageAdapter {
       localStorage.removeItem(testKey);
 
       return Promise.resolve(true);
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return Promise.resolve(false);
     }
   }
@@ -117,7 +120,10 @@ export class LocalStorageAdapter implements StorageAdapter {
       }
 
       return data.events;
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return [];
     }
   }

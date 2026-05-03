@@ -64,7 +64,10 @@ export class IndexedDBAdapter implements StorageAdapter {
 
           try {
             indexedDB.deleteDatabase(testDb);
-          } catch {
+            // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+            // Older iOS Safari versions don't support optional catch binding.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          } catch (_) {
             // Ignore cleanup errors
           }
 
@@ -74,7 +77,10 @@ export class IndexedDBAdapter implements StorageAdapter {
         request.onerror = () => resolve(false);
         request.onblocked = () => resolve(false);
       });
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return await Promise.resolve(false);
     }
   }
