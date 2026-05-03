@@ -1,5 +1,6 @@
 import type { Event, HttpResponse } from "../types.ts";
 
+// TODO: improve args and convert it to object
 /**
  * Abstract interface for HTTP communication.
  * Implement this interface to use custom HTTP clients (axios, fetch, gRPC, etc.).

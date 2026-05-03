@@ -1,5 +1,7 @@
 import type { Event, HttpAdapter, HttpResponse } from "@internals/core";
 
+// TODO: consider idle callback and improve main thread workload
+// TODO: improve args
 /**
  * HTTP adapter implementation using the Fetch API.
  * Uses keepalive flag to ensure requests complete even during page navigation.
