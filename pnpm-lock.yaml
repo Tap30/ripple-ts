@@ -92,9 +92,6 @@ importers:
       typescript-eslint:
         specifier: ^8.48.1
         version: 8.48.1(eslint@9.39.1)(typescript@5.9.3)
-      vite:
-        specifier: ^7.3.2
-        version: 7.3.2(@types/node@24.10.1)(tsx@4.21.0)
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.9.3)(vite@7.3.2(@types/node@24.10.1)(tsx@4.21.0))
