@@ -23,6 +23,8 @@ try {
 }
 ```
 
+**After:**
+
 ```ts
 try {
   // ... some code that might throw

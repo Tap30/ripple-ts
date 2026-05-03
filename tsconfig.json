@@ -33,6 +33,8 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedSideEffectImports": true,
 
+    "types": ["node"],
+
     "paths": {
       // Browser package
       "@tapsioss/ripple-browser": ["./packages/browser/src/index.ts"],

@@ -188,15 +188,15 @@ export class Dispatcher<
     attempt: number = 0,
   ): Promise<void> {
     try {
-      const response = await this._httpAdapter.send(
-        this._config.endpoint,
+      const response = await this._httpAdapter.send({
         events,
-        {
+        endpoint: this._config.endpoint,
+        headers: {
           [this._config.apiKeyHeader]: this._config.apiKey,
           "Content-Type": "application/json",
         },
-        this._config.apiKeyHeader,
-      );
+        apiKeyHeader: this._config.apiKeyHeader,
+      });
 
       await this._handleResponse(response, events, attempt);
     } catch (err) {

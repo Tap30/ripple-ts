@@ -1,26 +1,24 @@
-import type { Event, HttpAdapter, HttpResponse } from "@internals/core";
+import type {
+  HttpAdapter,
+  HttpAdapterContext,
+  HttpResponse,
+} from "@internals/core";
 
 // TODO: consider idle callback and improve main thread workload
-// TODO: improve args
 /**
  * HTTP adapter implementation using the Fetch API.
  * Uses keepalive flag to ensure requests complete even during page navigation.
  */
 export class FetchHttpAdapter implements HttpAdapter {
   /**
-   * Send events using Fetch API.
+   * Send events using the provided adapter context.
    *
-   * @param endpoint The API endpoint URL
-   * @param events Array of events to send
-   * @param headers Headers to include in the request
-   * @param apiKeyHeader The header name used for API key (unused, kept for interface compatibility)
+   * @param context System context and configuration needed by the adapter
+   * to construct and perform the HTTP request.
    * @returns Promise resolving to HTTP response
    */
-  public async send(
-    endpoint: string,
-    events: Event[],
-    headers: Record<string, string>,
-  ): Promise<HttpResponse> {
+  public async send(ctx: HttpAdapterContext): Promise<HttpResponse> {
+    const { events, endpoint, headers } = ctx;
     const body = JSON.stringify({ events });
 
     const response = await fetch(endpoint, {

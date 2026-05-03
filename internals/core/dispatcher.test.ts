@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HttpAdapter } from "./adapters/http-adapter.ts";
+import type {
+  HttpAdapter,
+  HttpAdapterContext,
+} from "./adapters/http-adapter.ts";
 import {
   StorageQuotaExceededError,
   type StorageAdapter,
@@ -81,13 +84,17 @@ describe("Dispatcher", () => {
       await dispatcher.enqueue(createEvent("event2"));
 
       expect(httpAdapter.send).toHaveBeenCalledWith(
-        config.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({ name: "event1" }),
-          expect.objectContaining({ name: "event2" }),
-        ]),
-        expect.objectContaining({ [config.apiKeyHeader]: config.apiKey }),
-        config.apiKeyHeader,
+        expect.objectContaining({
+          apiKeyHeader: config.apiKeyHeader,
+          headers: expect.objectContaining({
+            [config.apiKeyHeader]: config.apiKey,
+          }) as object,
+          endpoint: config.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({ name: "event1" }),
+            expect.objectContaining({ name: "event2" }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
     });
 
@@ -396,13 +403,15 @@ describe("Dispatcher", () => {
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(httpAdapter.send).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([
-          expect.objectContaining({ name: "event1" }),
-          expect.objectContaining({ name: "event2" }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          headers: expect.any(Object) as object,
+          endpoint: expect.any(String) as string,
+          events: expect.arrayContaining([
+            expect.objectContaining({ name: "event1" }),
+            expect.objectContaining({ name: "event2" }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
     });
 

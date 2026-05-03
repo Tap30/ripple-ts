@@ -8,6 +8,7 @@ describe("FetchHttpAdapter", () => {
   let adapter: FetchHttpAdapter;
   let mockEvents: RippleEvent[];
   let endpoint: string;
+  let apiKeyHeader: string;
   let headers: Record<string, string>;
 
   beforeEach(() => {
@@ -16,9 +17,10 @@ describe("FetchHttpAdapter", () => {
     adapter = new FetchHttpAdapter();
 
     endpoint = "https://api.test.com/events";
+    apiKeyHeader = "X-API-Key";
     headers = {
       "Content-Type": "application/json",
-      "X-API-Key": "test-key",
+      [apiKeyHeader]: "test-key",
     };
 
     mockEvents = [
@@ -48,7 +50,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await adapter.send(endpoint, mockEvents, headers);
+      const result = await adapter.send({
+        endpoint,
+        headers,
+        apiKeyHeader,
+        events: mockEvents,
+      });
 
       expect(fetch).toHaveBeenCalledWith(endpoint, {
         method: "POST",
@@ -67,7 +74,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await adapter.send(endpoint, mockEvents, headers);
+      const result = await adapter.send({
+        endpoint,
+        headers,
+        apiKeyHeader,
+        events: mockEvents,
+      });
 
       expect(result.status).toBe(200);
       expect(result.data).toEqual({ success: true });
@@ -81,7 +93,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await adapter.send(endpoint, mockEvents, headers);
+      const result = await adapter.send({
+        endpoint,
+        headers,
+        apiKeyHeader,
+        events: mockEvents,
+      });
 
       expect(result.status).toBe(500);
     });
@@ -94,7 +111,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await adapter.send(endpoint, mockEvents, headers);
+      const result = await adapter.send({
+        endpoint,
+        headers,
+        apiKeyHeader,
+        events: mockEvents,
+      });
 
       expect(result.status).toBe(200);
       expect(result.data).toBeUndefined();
@@ -108,7 +130,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      await adapter.send(endpoint, [], headers);
+      await adapter.send({
+        endpoint,
+        headers,
+        apiKeyHeader,
+        events: [],
+      });
 
       expect(fetch).toHaveBeenCalledWith(
         endpoint,
@@ -131,7 +158,12 @@ describe("FetchHttpAdapter", () => {
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
-      await adapter.send(endpoint, mockEvents, customHeaders);
+      await adapter.send({
+        endpoint,
+        apiKeyHeader,
+        headers: customHeaders,
+        events: mockEvents,
+      });
 
       expect(fetch).toHaveBeenCalledWith(
         endpoint,

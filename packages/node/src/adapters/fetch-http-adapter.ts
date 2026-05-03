@@ -1,4 +1,8 @@
-import type { Event, HttpAdapter, HttpResponse } from "@internals/core";
+import type {
+  HttpAdapter,
+  HttpAdapterContext,
+  HttpResponse,
+} from "@internals/core";
 
 /**
  * HTTP adapter implementation using Node.js fetch API.
@@ -6,19 +10,14 @@ import type { Event, HttpAdapter, HttpResponse } from "@internals/core";
  */
 export class FetchHttpAdapter implements HttpAdapter {
   /**
-   * Send events using Node.js fetch API.
+   * Send events using the provided adapter context.
    *
-   * @param endpoint The API endpoint URL
-   * @param events Array of events to send
-   * @param headers Headers to include in the request
-   * @param apiKeyHeader The header name used for API key (unused in Node.js)
+   * @param context System context and configuration needed by the adapter
+   * to construct and perform the HTTP request.
    * @returns Promise resolving to HTTP response
    */
-  public async send(
-    endpoint: string,
-    events: Event[],
-    headers: Record<string, string>,
-  ): Promise<HttpResponse> {
+  public async send(ctx: HttpAdapterContext): Promise<HttpResponse> {
+    const { events, headers, endpoint } = ctx;
     const body = JSON.stringify({ events });
 
     const response = await fetch(endpoint, {

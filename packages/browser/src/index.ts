@@ -13,6 +13,7 @@ export {
   type Event,
   type EventPayload,
   type HttpAdapter,
+  type HttpAdapterContext,
   type HttpResponse,
   type LoggerAdapter,
   type NativePlatform,
