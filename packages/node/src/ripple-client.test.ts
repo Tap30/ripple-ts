@@ -342,9 +342,9 @@ describe("RippleClient", () => {
       await client.init();
       client.setMetadata("userId", "456");
 
-      expect(async () => {
-        await client.track("page_view", { page: "/home" });
-      }).not.toThrow();
+      await expect(
+        client.track("page_view", { page: "/home" }),
+      ).resolves.not.toThrow();
 
       expect(client.getMetadata()).toEqual({ userId: "456" });
     });

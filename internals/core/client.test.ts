@@ -567,12 +567,12 @@ describe("Client", () => {
       await client.init();
       client.setMetadata("userId", "456");
 
-      expect(async () => {
-        await client.track("user_signup", {
+      await expect(
+        client.track("user_signup", {
           email: "test2@example.com",
           plan: "basic",
-        });
-      }).not.toThrow();
+        }),
+      ).resolves.not.toThrow();
 
       expect(client.getMetadata()).toEqual({ userId: "456" });
     });
