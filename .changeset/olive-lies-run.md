@@ -3,7 +3,7 @@
 "@tapsioss/ripple-node": patch
 ---
 
-# Enhance browser compatibility by updating error handling syntax
+**Enhance browser compatibility by updating error handling syntax.**
 
 This change refactors `catch {}` blocks to `catch (_) {}` to ensure broader compatibility, specifically for legacy iOS browsers that do not support optional catch binding (a feature introduced in ES2019).
 

@@ -70,11 +70,7 @@ export class LocalStorageAdapter implements StorageAdapter {
 
       localStorage.setItem(this._key, JSON.stringify(data));
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "QuotaExceededError" &&
-        events.length > 1
-      ) {
+      if (error instanceof StorageQuotaExceededError && events.length > 1) {
         try {
           // Drop oldest half and retry
           const reduced = events.slice(-Math.floor(events.length / 2));

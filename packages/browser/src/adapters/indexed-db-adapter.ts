@@ -9,10 +9,30 @@ type StorageData = {
   savedAt: number;
 };
 
+/**
+ * Configuration options for the IndexedDBAdapter.
+ */
 export type IndexedDBAdapterConfig = {
+  /**
+   * The name of the IndexedDB database (default: "ripple_db").
+   */
   dbName?: string;
+  /**
+   * The name of the object store (default: "events").
+   */
   storeName?: string;
+  /**
+   * The key under which to store the events (default: "queue").
+   */
   key?: string;
+  /**
+   * Time-to-live in milliseconds.
+   *
+   * Design Intention: The TTL acts as a "session" timeout for the entire batch.
+   * Because the `savedAt` timestamp is overwritten on every `save()` operation,
+   * frequent saves will continually reset the expiration timer for all stored
+   * events. Events will only expire if no saves occur for the duration of the TTL.
+   */
   ttl?: number;
 };
 
@@ -30,8 +50,6 @@ export class IndexedDBAdapter implements StorageAdapter {
 
   private _dbPromise: Promise<IDBDatabase> | null = null;
 
-  // TODO: explain the config object fields
-  // TODO: explain how ttl works in our implementation
   /**
    * Create a new IndexedDBAdapter instance.
    *
@@ -91,8 +109,6 @@ export class IndexedDBAdapter implements StorageAdapter {
    * @returns Promise resolving to the database instance
    */
   private _openDB(): Promise<IDBDatabase> {
-    // TODO: investigate the case with no schema version specified
-    // TODO: investigate every single case with schema version
     if (!this._dbPromise) {
       this._dbPromise = new Promise((resolve, reject) => {
         const request = indexedDB.open(
@@ -100,9 +116,11 @@ export class IndexedDBAdapter implements StorageAdapter {
           IndexedDBAdapter.SCHEMA_VERSION,
         );
 
-        // TODO: complete this
         request.onblocked = () => {
           // Handle tabs with older versions of the DB
+          this._dbPromise = null;
+
+          reject(new Error("IndexedDB upgrade blocked by another tab"));
         };
 
         request.onerror = () => {
@@ -117,7 +135,10 @@ export class IndexedDBAdapter implements StorageAdapter {
         request.onsuccess = () => {
           const db = request.result;
 
-          // TODO: investigate abort
+          // Reset promise on unexpected abort so next operation reopens
+          db.onabort = () => {
+            this._dbPromise = null;
+          };
 
           // Reset promise on unexpected close so next operation reopens
           db.onclose = () => {
@@ -133,7 +154,6 @@ export class IndexedDBAdapter implements StorageAdapter {
           resolve(db);
         };
 
-        // TODO: investigate this event
         request.onupgradeneeded = event => {
           const db = (event.target as IDBOpenDBRequest).result;
 
@@ -155,6 +175,7 @@ export class IndexedDBAdapter implements StorageAdapter {
 
       request.onerror = () =>
         reject(new Error(request.error?.message ?? "Failed to read data"));
+
       request.onsuccess = () => {
         const data = request.result as StorageData | undefined;
 
@@ -165,7 +186,12 @@ export class IndexedDBAdapter implements StorageAdapter {
         }
 
         if (this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
-          void this.clear().then(() => resolve(null));
+          this.clear()
+            .catch(err =>
+              // eslint-disable-next-line no-console
+              console.error("Failed to clear expired TTL data:", err),
+            )
+            .finally(() => resolve(null));
 
           return;
         }
@@ -182,6 +208,15 @@ export class IndexedDBAdapter implements StorageAdapter {
     return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(this._storeName, "readwrite");
       const store = transaction.objectStore(this._storeName);
+
+      transaction.oncomplete = () => resolve();
+
+      transaction.onerror = () =>
+        reject(transaction.error || new Error("Transaction failed"));
+
+      transaction.onabort = () =>
+        reject(transaction.error || new Error("Transaction aborted"));
+
       const getRequest = store.get(this._key);
 
       getRequest.onerror = () =>
@@ -194,7 +229,6 @@ export class IndexedDBAdapter implements StorageAdapter {
 
         putRequest.onerror = () =>
           reject(putRequest.error ?? new Error("Failed to write data"));
-        putRequest.onsuccess = () => resolve();
       };
     });
   }
@@ -216,11 +250,7 @@ export class IndexedDBAdapter implements StorageAdapter {
         };
       });
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "QuotaExceededError" &&
-        events.length > 1
-      ) {
+      if (error instanceof StorageQuotaExceededError && events.length > 1) {
         // Drop oldest half and retry
         const reduced = events.slice(-Math.floor(events.length / 2));
 
@@ -261,14 +291,22 @@ export class IndexedDBAdapter implements StorageAdapter {
   public async clear(): Promise<void> {
     const db = await this._openDB();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(this._storeName, "readwrite");
       const store = transaction.objectStore(this._storeName);
+
+      transaction.oncomplete = () => resolve();
+
+      transaction.onerror = () =>
+        reject(transaction.error || new Error("Transaction failed"));
+
+      transaction.onabort = () =>
+        reject(transaction.error || new Error("Transaction aborted"));
+
       const request = store.delete(this._key);
 
       request.onerror = () =>
         reject(new Error(request.error?.message ?? "Failed to clear data"));
-      request.onsuccess = () => resolve();
     });
   }
 

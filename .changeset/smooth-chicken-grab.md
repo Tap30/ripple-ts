@@ -3,7 +3,7 @@
 "@tapsioss/ripple-node": minor
 ---
 
-# Replace multiple `HttpAdapter.send` parameters with a context object
+**Replace multiple `HttpAdapter.send` parameters with a context object.**
 
 This refactor simplifies the `HttpAdapter` interface by consolidating multiple parameters
 into a single context object named `HttpAdapterContext`.
