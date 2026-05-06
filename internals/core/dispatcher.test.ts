@@ -51,6 +51,16 @@ const createEvent = (name: string): Event<TestMetadata> => ({
   platform: null,
 });
 
+const createDispatcher = (opts: {
+  config: DispatcherConfig;
+  httpAdapter: HttpAdapter;
+  storageAdapter: StorageAdapter;
+}): Dispatcher => {
+  const { config, httpAdapter, storageAdapter } = opts ?? {};
+
+  return new Dispatcher(config, httpAdapter, storageAdapter);
+};
+
 describe("Dispatcher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,11 +71,12 @@ describe("Dispatcher", () => {
     it("should add event to buffer and persist", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("test"));
 
@@ -78,7 +89,11 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const config = createConfig({ maxBatchSize: 2 });
-      const dispatcher = new Dispatcher(config, httpAdapter, storageAdapter);
+      const dispatcher = createDispatcher({
+        config,
+        httpAdapter,
+        storageAdapter,
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.enqueue(createEvent("event2"));
@@ -100,13 +115,15 @@ describe("Dispatcher", () => {
 
     it("should schedule flush when batch size not reached", async () => {
       vi.useFakeTimers();
+
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ flushInterval: 1000 }),
+      const config = createConfig({ flushInterval: 1000 });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await vi.advanceTimersByTimeAsync(1000);
@@ -115,17 +132,20 @@ describe("Dispatcher", () => {
     });
 
     it("should not enqueue after disposal", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
       const logger = new NoOpLoggerAdapter();
       const warnSpy = vi.spyOn(logger, "warn");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       dispatcher.dispose();
+
       await dispatcher.enqueue(createEvent("test"));
 
       expect(warnSpy).toHaveBeenCalledWith(
@@ -156,11 +176,12 @@ describe("Dispatcher", () => {
     it("should do nothing if buffer is empty", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.flush();
 
@@ -170,11 +191,12 @@ describe("Dispatcher", () => {
     it("should handle concurrent flush calls", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await Promise.all([dispatcher.flush(), dispatcher.flush()]);
@@ -185,11 +207,12 @@ describe("Dispatcher", () => {
     it("should rebatch events when buffer exceeds maxBatchSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ maxBatchSize: 2 }),
+      const config = createConfig({ maxBatchSize: 2 });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.enqueue(createEvent("event2"));
@@ -204,15 +227,17 @@ describe("Dispatcher", () => {
     it("should retry on 5xx server error", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>)
+      vi.mocked(httpAdapter.send)
         .mockResolvedValueOnce({ status: 500 })
         .mockResolvedValueOnce({ status: 200 });
+
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -223,17 +248,20 @@ describe("Dispatcher", () => {
     it("should not retry on 4xx client error and drop events", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        status: 400,
-      });
-      const storageAdapter = createMockStorageAdapter();
       const logger = new NoOpLoggerAdapter();
       const warnSpy = vi.spyOn(logger, "warn");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({
+        status: 400,
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -249,17 +277,20 @@ describe("Dispatcher", () => {
     it("should drop events on unexpected status codes (3xx)", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        status: 301,
-      });
-      const storageAdapter = createMockStorageAdapter();
       const logger = new NoOpLoggerAdapter();
       const warnSpy = vi.spyOn(logger, "warn");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({
+        status: 301,
+      });
+
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -275,15 +306,17 @@ describe("Dispatcher", () => {
     it("should retry on exception", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>)
+      vi.mocked(httpAdapter.send)
         .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce({ status: 200 });
+
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -294,15 +327,17 @@ describe("Dispatcher", () => {
     it("should retry on non-Error exception", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>)
+      vi.mocked(httpAdapter.send)
         .mockRejectedValueOnce("string error")
         .mockResolvedValueOnce({ status: 200 });
+
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -313,15 +348,17 @@ describe("Dispatcher", () => {
     it("should re-queue events after max retries", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(httpAdapter.send).mockResolvedValue({
         status: 500,
       });
+
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 2 }),
+      const config = createConfig({ maxRetries: 2 });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -335,17 +372,18 @@ describe("Dispatcher", () => {
     it("should re-queue events after max retries on network error", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("Network error"),
-      );
-      const storageAdapter = createMockStorageAdapter();
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 2, loggerAdapter: logger }),
+
+      vi.mocked(httpAdapter.send).mockRejectedValue(new Error("Network error"));
+
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxRetries: 2, loggerAdapter: logger });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -362,17 +400,20 @@ describe("Dispatcher", () => {
 
     it("should apply exponential backoff", async () => {
       vi.useFakeTimers();
+
       const httpAdapter = createMockHttpAdapter();
 
-      (httpAdapter.send as ReturnType<typeof vi.fn>)
+      vi.mocked(httpAdapter.send)
         .mockResolvedValueOnce({ status: 500 })
         .mockResolvedValueOnce({ status: 200 });
+
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       const flushPromise = dispatcher.flush();
@@ -388,16 +429,19 @@ describe("Dispatcher", () => {
   describe("restore", () => {
     it("should load persisted events and schedule flush", async () => {
       vi.useFakeTimers();
+
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const events = [createEvent("event1"), createEvent("event2")];
+      const config = createConfig({ flushInterval: 1000 });
 
-      storageAdapter.load = vi.fn().mockResolvedValue(events);
-      const dispatcher = new Dispatcher(
-        createConfig({ flushInterval: 1000 }),
+      vi.mocked(storageAdapter.load).mockResolvedValue(events);
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.restore();
       await vi.advanceTimersByTimeAsync(1000);
@@ -418,11 +462,12 @@ describe("Dispatcher", () => {
     it("should handle empty storage", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.restore();
       await dispatcher.flush();
@@ -431,17 +476,20 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when restore fails", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.load = vi.fn().mockRejectedValue(new Error("Load error"));
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.load).mockRejectedValue(new Error("Load error"));
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.restore();
 
@@ -452,17 +500,20 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in restore errors", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.load = vi.fn().mockRejectedValue("string error");
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.load).mockRejectedValue("string error");
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.restore();
 
@@ -476,6 +527,7 @@ describe("Dispatcher", () => {
   describe("dispose", () => {
     it("should cancel scheduled flush", async () => {
       vi.useFakeTimers();
+
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -485,7 +537,9 @@ describe("Dispatcher", () => {
       );
 
       await dispatcher.enqueue(createEvent("event1"));
+
       dispatcher.dispose();
+
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(httpAdapter.send).not.toHaveBeenCalled();
@@ -494,11 +548,12 @@ describe("Dispatcher", () => {
     it("should allow multiple dispose calls", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      const config = createConfig();
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       expect(() => {
         dispatcher.dispose();
@@ -510,15 +565,18 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const events = [createEvent("event1")];
+      const config = createConfig();
 
-      storageAdapter.load = vi.fn().mockResolvedValue(events);
-      const dispatcher = new Dispatcher(
-        createConfig(),
+      vi.mocked(storageAdapter.load).mockResolvedValue(events);
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       dispatcher.dispose();
+
       await dispatcher.restore();
       await dispatcher.flush();
 
@@ -526,8 +584,11 @@ describe("Dispatcher", () => {
     });
 
     it("should cancel pending retry delays on disposal", async () => {
-      const httpAdapter = createMockHttpAdapter();
       let sendCount = 0;
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxRetries: 3 });
 
       vi.mocked(httpAdapter.send).mockImplementation(() => {
         sendCount++;
@@ -535,12 +596,11 @@ describe("Dispatcher", () => {
         return Promise.resolve({ status: 500 });
       });
 
-      const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 3 }),
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       const flushPromise = dispatcher.flush();
@@ -554,6 +614,7 @@ describe("Dispatcher", () => {
 
       // Dispose to abort retry delays
       dispatcher.dispose();
+
       await flushPromise;
 
       // Should only have attempted once before disposal aborted retries
@@ -561,8 +622,11 @@ describe("Dispatcher", () => {
     });
 
     it("should cancel network error retry delays on disposal", async () => {
-      const httpAdapter = createMockHttpAdapter();
       let sendCount = 0;
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxRetries: 3 });
 
       vi.mocked(httpAdapter.send).mockImplementation(() => {
         sendCount++;
@@ -570,12 +634,11 @@ describe("Dispatcher", () => {
         return Promise.reject(new Error("Network error"));
       });
 
-      const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 3 }),
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       const flushPromise = dispatcher.flush();
@@ -598,17 +661,20 @@ describe("Dispatcher", () => {
 
   describe("storage error handling", () => {
     it("should log error when save fails during enqueue", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.save = vi.fn().mockRejectedValue(new Error("Save error"));
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.save).mockRejectedValue(new Error("Save error"));
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
 
@@ -619,19 +685,22 @@ describe("Dispatcher", () => {
     });
 
     it("should log warning when StorageQuotaExceededError during enqueue", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.save = vi
-        .fn()
-        .mockRejectedValue(new StorageQuotaExceededError(5, 2));
       const logger = new NoOpLoggerAdapter();
       const warnSpy = vi.spyOn(logger, "warn");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.save).mockRejectedValue(
+        new StorageQuotaExceededError(5, 2),
+      );
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
 
@@ -641,19 +710,22 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when clear fails after successful send", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.clear = vi
-        .fn()
-        .mockRejectedValue(new Error("Clear error"));
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.clear).mockRejectedValue(
+        new Error("Clear error"),
+      );
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -665,23 +737,23 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when clear fails after 4xx error", async () => {
-      const httpAdapter = createMockHttpAdapter();
-
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        status: 400,
-      });
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.clear = vi
-        .fn()
-        .mockRejectedValue(new Error("Clear error"));
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 400 });
+      vi.mocked(storageAdapter.clear).mockRejectedValue(
+        new Error("Clear error"),
+      );
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -693,24 +765,23 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when save fails after max retries", async () => {
-      const httpAdapter = createMockHttpAdapter();
-
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        status: 500,
-      });
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.save = vi
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValue(new Error("Save error"));
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 1, loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxRetries: 1, loggerAdapter: logger });
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
+      vi.mocked(storageAdapter.save)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValue(new Error("Save error"));
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -722,24 +793,26 @@ describe("Dispatcher", () => {
     });
 
     it("should log warning when StorageQuotaExceededError during requeue", async () => {
-      const httpAdapter = createMockHttpAdapter();
-
-      (httpAdapter.send as ReturnType<typeof vi.fn>).mockResolvedValue({
-        status: 500,
-      });
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.save = vi
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValue(new StorageQuotaExceededError(5, 2));
       const logger = new NoOpLoggerAdapter();
       const warnSpy = vi.spyOn(logger, "warn");
-      const dispatcher = new Dispatcher(
-        createConfig({ maxRetries: 1, loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxRetries: 1, loggerAdapter: logger });
+
+      vi.mocked(httpAdapter.send).mockResolvedValue({
+        status: 500,
+      });
+
+      vi.mocked(storageAdapter.save)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValue(new StorageQuotaExceededError(5, 2));
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -750,17 +823,20 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in storage errors", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.save = vi.fn().mockRejectedValue("string error");
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.save).mockRejectedValue("string error");
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
 
@@ -771,17 +847,20 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in clear errors", async () => {
-      const httpAdapter = createMockHttpAdapter();
-      const storageAdapter = createMockStorageAdapter();
-
-      storageAdapter.clear = vi.fn().mockRejectedValue("string error");
       const logger = new NoOpLoggerAdapter();
       const errorSpy = vi.spyOn(logger, "error");
-      const dispatcher = new Dispatcher(
-        createConfig({ loggerAdapter: logger }),
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ loggerAdapter: logger });
+
+      vi.mocked(storageAdapter.clear).mockRejectedValue("string error");
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.enqueue(createEvent("event1"));
       await dispatcher.flush();
@@ -797,17 +876,18 @@ describe("Dispatcher", () => {
     it("should apply FIFO eviction when buffer limit exceeded", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const dispatcher = new Dispatcher(
-        createConfig({ maxBatchSize: 10, maxBufferSize: 12 }),
+      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 12 });
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       for (let i = 1; i <= 25; i++) {
         await dispatcher.enqueue(createEvent(`event${i}`));
       }
 
-      const lastCall = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
+      const lastCall = vi.mocked(storageAdapter.save).mock
         .lastCall![0] as Array<{ name: string }>;
 
       expect(lastCall).toHaveLength(5);
@@ -818,21 +898,23 @@ describe("Dispatcher", () => {
     it("should apply limit when buffer exceeds maxBufferSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 12 });
       const persistedEvents = Array.from({ length: 15 }, (_, i) =>
         createEvent(`persisted${i + 1}`),
       );
 
-      storageAdapter.load = vi.fn().mockResolvedValue(persistedEvents);
-      const dispatcher = new Dispatcher(
-        createConfig({ maxBatchSize: 10, maxBufferSize: 12 }),
+      vi.mocked(storageAdapter.load).mockResolvedValue(persistedEvents);
+
+      const dispatcher = createDispatcher({
+        config,
         httpAdapter,
         storageAdapter,
-      );
+      });
 
       await dispatcher.restore();
       await dispatcher.enqueue(createEvent("new1"));
 
-      const lastCall = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
+      const lastCall = vi.mocked(storageAdapter.save).mock
         .lastCall![0] as Array<{ name: string }>;
 
       expect(lastCall).toHaveLength(12);
@@ -845,26 +927,20 @@ describe("Dispatcher", () => {
     it("should throw when maxBufferSize < maxBatchSize", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 100, maxBufferSize: 50 });
 
       expect(() => {
-        new Dispatcher(
-          createConfig({ maxBatchSize: 100, maxBufferSize: 50 }),
-          httpAdapter,
-          storageAdapter,
-        );
+        createDispatcher({ config, httpAdapter, storageAdapter });
       }).toThrow("Invalid configuration: maxBufferSize");
     });
 
     it("should not throw when maxBufferSize >= maxBatchSize", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 10 });
 
       expect(() => {
-        new Dispatcher(
-          createConfig({ maxBatchSize: 10, maxBufferSize: 10 }),
-          httpAdapter,
-          storageAdapter,
-        );
+        createDispatcher({ config, httpAdapter, storageAdapter });
       }).not.toThrow();
     });
   });

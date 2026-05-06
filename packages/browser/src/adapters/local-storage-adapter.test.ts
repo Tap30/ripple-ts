@@ -93,11 +93,13 @@ describe("LocalStorageAdapter", () => {
         "ripple_events",
         JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
+
       vi.useRealTimers();
     });
 
     it("should use custom key when provided", async () => {
       vi.setSystemTime(1000);
+
       const customAdapter = new LocalStorageAdapter({ key: "custom_events" });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(null);
@@ -108,11 +110,13 @@ describe("LocalStorageAdapter", () => {
         "custom_events",
         JSON.stringify({ events: mockEvents, savedAt: 1000 }),
       );
+
       vi.useRealTimers();
     });
 
     it("should handle StorageQuotaExceededError by dropping oldest half", async () => {
       vi.setSystemTime(1000);
+
       const events = Array.from({ length: 10 }, (_, i) => ({
         name: `event_${i}`,
         payload: {},
@@ -136,7 +140,9 @@ describe("LocalStorageAdapter", () => {
       await expect(adapter.save(events)).rejects.toThrow(
         "Storage quota exceeded: dropped 5 oldest events, saved 5",
       );
+
       expect(mockLocalStorage.setItem).toHaveBeenCalledTimes(2);
+
       // Second call should have only last 5 events
       const secondCall = vi.mocked(mockLocalStorage.setItem).mock.calls[1];
 
@@ -151,6 +157,7 @@ describe("LocalStorageAdapter", () => {
 
       expect(savedData.events).toHaveLength(5);
       expect(savedData.events[0]?.name).toBe("event_5");
+
       vi.useRealTimers();
     });
 
@@ -196,6 +203,7 @@ describe("LocalStorageAdapter", () => {
 
       expect(result).toEqual([]);
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("ripple_events");
+
       vi.useRealTimers();
     });
 
@@ -209,6 +217,7 @@ describe("LocalStorageAdapter", () => {
       const result = await ttlAdapter.load();
 
       expect(result).toEqual(mockEvents);
+
       vi.useRealTimers();
     });
 
