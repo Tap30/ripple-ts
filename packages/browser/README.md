@@ -578,8 +578,8 @@ import {
 } from "@tapsioss/ripple-browser";
 
 class TrackedRippleClient extends RippleClient {
-  private traceId: string | null = null;
-  private flowId: string | null = null;
+  #traceId: string | null = null;
+  #flowId: string | null = null;
 
   constructor(config: BrowserClientConfig) {
     super(config);
@@ -587,12 +587,12 @@ class TrackedRippleClient extends RippleClient {
 
   // Set trace ID for distributed tracing
   public setTraceId(traceId: string): void {
-    this.traceId = traceId;
+    this.#traceId = traceId;
   }
 
   // Set flow ID for user journey tracking
   public setFlowId(flowId: string): void {
-    this.flowId = flowId;
+    this.#flowId = flowId;
   }
 
   // Override track to automatically inject trace/flow IDs
@@ -603,8 +603,8 @@ class TrackedRippleClient extends RippleClient {
   ): Promise<void> {
     const enhancedMetadata = {
       ...metadata,
-      ...(this.traceId && { traceId: this.traceId }),
-      ...(this.flowId && { flowId: this.flowId }),
+      ...(this.#traceId && { traceId: this.#traceId }),
+      ...(this.#flowId && { flowId: this.#flowId }),
     };
 
     return super.track(name, payload, enhancedMetadata);
@@ -638,7 +638,11 @@ import {
 } from "@tapsioss/ripple-browser";
 
 class SchemaTransformAdapter implements HttpAdapter {
-  constructor(private baseAdapter: HttpAdapter) {}
+  #baseAdapter: HttpAdapter;
+
+  constructor(baseAdapter: HttpAdapter) {
+    this.#baseAdapter = baseAdapter;
+  }
 
   public async send(
     endpoint: string,
@@ -662,7 +666,7 @@ class SchemaTransformAdapter implements HttpAdapter {
       },
     }));
 
-    return this.baseAdapter.send(
+    return this.#baseAdapter.send(
       endpoint,
       transformedEvents as unknown as Event,
       headers,

@@ -1076,41 +1076,54 @@ describe("IndexedDBAdapter", () => {
         }),
       );
 
+      const openRequest = {} as IDBOpenDBRequest;
+      const getRequest1 = {} as IDBRequest<unknown>;
+      const putRequest1 = {} as IDBRequest<IDBValidKey>;
+      const getRequest2 = {} as IDBRequest<unknown>;
+      const putRequest2 = {} as IDBRequest<IDBValidKey>;
+
+      // Return different get/put requests for first and second atomicReadWrite calls
+      let callCount = 0;
+
+      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
+      vi.mocked(mockObjectStore.get).mockImplementation(() => {
+        callCount++;
+        return callCount === 1 ? getRequest1 : getRequest2;
+      });
+      vi.mocked(mockObjectStore.put).mockImplementation(() => {
+        return callCount === 1 ? putRequest1 : putRequest2;
+      });
+
+      const savePromise = adapter.save(largeMockEvents);
+
+      Object.defineProperty(openRequest, "result", { value: mockDB });
+      openRequest.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
+      // First atomicReadWrite: get succeeds, put fails with quota error
+      Object.defineProperty(getRequest1, "result", { value: undefined });
+      getRequest1.onsuccess?.(new Event("success"));
+
+      await Promise.resolve();
+
       const quotaError = new StorageQuotaExceededError(0, 0);
 
-      const atomicSpy = vi
-        .spyOn(
-          adapter as unknown as {
-            _atomicReadWrite: (
-              db: IDBDatabase,
-              transform: (data: unknown) => unknown,
-            ) => Promise<void>;
-          },
-          "_atomicReadWrite",
-        )
-        .mockImplementationOnce((_db, transform) => {
-          transform(null);
-          return Promise.reject(quotaError);
-        })
-        .mockImplementationOnce((_db, transform) => {
-          transform(null);
-          return Promise.resolve();
-        });
+      Object.defineProperty(putRequest1, "error", { value: quotaError });
+      putRequest1.onerror?.(new Event("error"));
 
-      const openSpy = vi
-        .spyOn(
-          adapter as unknown as { _openDB: () => Promise<IDBDatabase> },
-          "_openDB",
-        )
-        .mockResolvedValue({} as IDBDatabase);
+      await Promise.resolve();
 
-      await expect(adapter.save(largeMockEvents)).rejects.toThrow(
-        "Storage quota exceeded",
-      );
+      // Second atomicReadWrite (retry with half events): get succeeds, put succeeds
+      Object.defineProperty(getRequest2, "result", { value: undefined });
+      getRequest2.onsuccess?.(new Event("success"));
 
-      expect(atomicSpy).toHaveBeenCalledTimes(2);
-      openSpy.mockRestore();
-      atomicSpy.mockRestore();
+      await Promise.resolve();
+
+      putRequest2.onsuccess?.(new Event("success"));
+      mockTransaction.oncomplete?.(new Event("complete"));
+
+      await expect(savePromise).rejects.toThrow("Storage quota exceeded");
     });
   });
 

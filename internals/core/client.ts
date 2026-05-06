@@ -69,11 +69,11 @@ export abstract class Client<
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
 
-  private readonly _initMutex = new Mutex();
+  readonly #initMutex = new Mutex();
 
-  private _sessionId: string | null = null;
-  private _initialized = false;
-  private _disposed = false;
+  #sessionId: string | null = null;
+  #initialized = false;
+  #disposed = false;
 
   /**
    * Create a new Client instance.
@@ -154,7 +154,7 @@ export abstract class Client<
     payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
-    if (this._disposed) {
+    if (this.#disposed) {
       this._logger.warn("Cannot track event: Client has been disposed");
 
       return Promise.resolve();
@@ -167,7 +167,7 @@ export abstract class Client<
       metadata: this._metadataManager.merge(metadata),
       payload: payload ?? null,
       issuedAt: Date.now(),
-      sessionId: this._sessionId,
+      sessionId: this.#sessionId,
       platform: this._getPlatform(),
     };
 
@@ -204,7 +204,7 @@ export abstract class Client<
    * @returns Current session ID or null if not set
    */
   public getSessionId(): string | null {
-    return this._sessionId;
+    return this.#sessionId;
   }
 
   // TODO: remove this function. make the field protected instead.
@@ -215,7 +215,7 @@ export abstract class Client<
    * @param sessionId The session ID to set
    */
   protected _setSessionId(sessionId: string): void {
-    this._sessionId = sessionId;
+    this.#sessionId = sessionId;
   }
 
   /**
@@ -230,19 +230,19 @@ export abstract class Client<
    * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    if (this._initialized) return await Promise.resolve();
+    if (this.#initialized) return await Promise.resolve();
 
-    if (this._disposed) {
-      this._disposed = false;
-      this._initMutex.reset();
+    if (this.#disposed) {
+      this.#disposed = false;
+      this.#initMutex.reset();
     }
 
-    await this._initMutex.runAtomic(async () => {
-      if (this._initialized) return await Promise.resolve();
+    await this.#initMutex.runAtomic(async () => {
+      if (this.#initialized) return await Promise.resolve();
 
       await this._dispatcher.restore();
 
-      this._initialized = true;
+      this.#initialized = true;
     });
   }
 
@@ -253,9 +253,9 @@ export abstract class Client<
   public dispose(): void {
     this._dispatcher.dispose();
     this._metadataManager.clear();
-    this._initMutex.release();
-    this._disposed = true;
-    this._sessionId = null;
-    this._initialized = false;
+    this.#initMutex.release();
+    this.#disposed = true;
+    this.#sessionId = null;
+    this.#initialized = false;
   }
 }

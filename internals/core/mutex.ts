@@ -15,16 +15,16 @@ export class MutexDisposedError extends Error {
  * can access a shared resource at a time.
  */
 export class Mutex {
-  private _isLocked: boolean = false;
-  private _disposed: boolean = false;
+  #isLocked: boolean = false;
+  #disposed: boolean = false;
 
-  private _taskQueue: Array<() => void> = [];
+  #taskQueue: Array<() => void> = [];
 
   /**
    * Indicates whether the mutex is currently locked.
    */
   public get isLocked(): boolean {
-    return this._isLocked;
+    return this.#isLocked;
   }
 
   /**
@@ -34,19 +34,19 @@ export class Mutex {
    * function to the queue. The promise will only resolve when `_releaseLock`
    * is called and it's this task's turn to run.
    */
-  private _acquireLock(): Promise<void> {
-    if (this._disposed) {
+  #acquireLock(): Promise<void> {
+    if (this.#disposed) {
       return Promise.reject(new MutexDisposedError());
     }
 
-    if (!this._isLocked) {
-      this._isLocked = true;
+    if (!this.#isLocked) {
+      this.#isLocked = true;
 
       return Promise.resolve();
     }
 
     return new Promise<void>(resolve => {
-      this._taskQueue.push(resolve);
+      this.#taskQueue.push(resolve);
     });
   }
 
@@ -58,13 +58,13 @@ export class Mutex {
    * If the queue is empty, it simply unlocks the mutex, making it available
    * for the next incoming task.
    */
-  private _releaseLock(): void {
-    if (this._taskQueue.length > 0) {
-      const resolve = this._taskQueue.shift();
+  #releaseLock(): void {
+    if (this.#taskQueue.length > 0) {
+      const resolve = this.#taskQueue.shift();
 
       resolve?.();
     } else {
-      this._isLocked = false;
+      this.#isLocked = false;
     }
   }
 
@@ -79,12 +79,12 @@ export class Mutex {
    */
   public async runAtomic<T>(task: () => Promise<T> | T): Promise<T> {
     try {
-      await this._acquireLock();
+      await this.#acquireLock();
       const result = await task();
 
       return result;
     } finally {
-      this._releaseLock();
+      this.#releaseLock();
     }
   }
 
@@ -93,18 +93,18 @@ export class Mutex {
    * Used for cleanup during disposal.
    */
   public release(): void {
-    this._disposed = true;
-    this._isLocked = false;
-    this._taskQueue.forEach(resolve => resolve());
-    this._taskQueue = [];
+    this.#disposed = true;
+    this.#isLocked = false;
+    this.#taskQueue.forEach(resolve => resolve());
+    this.#taskQueue = [];
   }
 
   /**
    * Reset the mutex to its initial state, allowing it to be reused after disposal.
    */
   public reset(): void {
-    this._disposed = false;
-    this._isLocked = false;
-    this._taskQueue = [];
+    this.#disposed = false;
+    this.#isLocked = false;
+    this.#taskQueue = [];
   }
 }

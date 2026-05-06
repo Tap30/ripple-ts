@@ -4,7 +4,6 @@ import type {
   HttpResponse,
 } from "@internals/core";
 
-// TODO: consider idle callback and improve main thread workload
 /**
  * HTTP adapter implementation using the Fetch API.
  * Uses keepalive flag to ensure requests complete even during page navigation.

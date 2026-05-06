@@ -12,9 +12,9 @@ import {
 } from "@tapsioss/ripple-node";
 
 class HybridLogger implements LoggerAdapter {
-  private readonly _filePath: string;
-  private readonly _level: LogLevel;
-  private readonly _levelOrder = [
+  readonly #filePath: string;
+  readonly #level: LogLevel;
+  readonly #levelOrder = [
     LogLevel.DEBUG,
     LogLevel.INFO,
     LogLevel.WARN,
@@ -23,51 +23,51 @@ class HybridLogger implements LoggerAdapter {
   ] as const;
 
   constructor(filePath: string, level: LogLevel = LogLevel.INFO) {
-    this._filePath = filePath;
-    this._level = level;
+    this.#filePath = filePath;
+    this.#level = level;
 
-    writeFileSync(this._filePath, "");
+    writeFileSync(this.#filePath, "");
   }
 
-  private _shouldLog(messageLevel: LogLevel): boolean {
-    if (this._level === LogLevel.NONE) return false;
+  #shouldLog(messageLevel: LogLevel): boolean {
+    if (this.#level === LogLevel.NONE) return false;
 
     return (
-      this._levelOrder.indexOf(messageLevel) >=
-      this._levelOrder.indexOf(this._level)
+      this.#levelOrder.indexOf(messageLevel) >=
+      this.#levelOrder.indexOf(this.#level)
     );
   }
 
-  private _log(
+  #log(
     level: LogLevel,
     consoleMethod: "debug" | "info" | "warn" | "error",
     message: string,
     args: unknown[],
   ): void {
-    if (!this._shouldLog(level)) return;
+    if (!this.#shouldLog(level)) return;
 
     const timestamp = new Date().toISOString();
     const argsStr = args.length > 0 ? ` ${JSON.stringify(args)}` : "";
     const line = `[${timestamp}] [${level.toUpperCase()}] ${message}${argsStr}\n`;
 
-    appendFileSync(this._filePath, line);
+    appendFileSync(this.#filePath, line);
     console[consoleMethod](`[Ripple] ${message}`, ...args);
   }
 
   public debug(message: string, ...args: unknown[]): void {
-    this._log(LogLevel.DEBUG, "debug", message, args);
+    this.#log(LogLevel.DEBUG, "debug", message, args);
   }
 
   public info(message: string, ...args: unknown[]): void {
-    this._log(LogLevel.INFO, "info", message, args);
+    this.#log(LogLevel.INFO, "info", message, args);
   }
 
   public warn(message: string, ...args: unknown[]): void {
-    this._log(LogLevel.WARN, "warn", message, args);
+    this.#log(LogLevel.WARN, "warn", message, args);
   }
 
   public error(message: string, ...args: unknown[]): void {
-    this._log(LogLevel.ERROR, "error", message, args);
+    this.#log(LogLevel.ERROR, "error", message, args);
   }
 }
 
