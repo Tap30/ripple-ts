@@ -1,5 +1,91 @@
 # @tapsioss/ripple-browser
 
+## 1.1.0
+### Minor Changes
+
+
+
+- [#32](https://github.com/Tap30/ripple-ts/pull/32) [`6572d26`](https://github.com/Tap30/ripple-ts/commit/6572d262d920e47cfa580344b676b0b4aa04813d) Thanks [@mimshins](https://github.com/mimshins)! - **Replace multiple `HttpAdapter.send` parameters with a context object.**
+  
+  This refactor simplifies the `HttpAdapter` interface by consolidating multiple parameters
+  into a single context object named `HttpAdapterContext`.
+  
+  **Before:**
+  
+  ```ts
+  send(
+    endpoint: string,
+    events: Event[],
+    headers: Record<string, string>,
+    apiKeyHeader: string,
+  ): Promise<HttpResponse>;
+  ```
+  
+  **After:**
+  
+  ```ts
+  // After
+  send(context: HttpAdapterContext): Promise<HttpResponse>;
+  ```
+
+
+- [#32](https://github.com/Tap30/ripple-ts/pull/32) [`6572d26`](https://github.com/Tap30/ripple-ts/commit/6572d262d920e47cfa580344b676b0b4aa04813d) Thanks [@mimshins](https://github.com/mimshins)! - **Fixes & Improvements in IndexedDBAdapter:**
+  
+  - **Improved Transaction Error Handling:** Added explicit fallback error messages (`"Transaction failed"`, `"Transaction aborted"`) for edge cases where the browser's IndexedDB `transaction.error` or `request.error` is `null` or `undefined` during `onerror` and `onabort` events.
+  - **Robust Quota Exceeded Logic:** Ensured `StorageQuotaExceededError` is correctly propagated and handled within the retry logic when the browser storage limit is reached.
+  - **Lifecycle Event Resilience:** Improved cleanup and connection resets during native database lifecycle events (`onclose`, `onabort`, `onversionchange`, `onblocked`).
+
+### Patch Changes
+
+
+
+- [#32](https://github.com/Tap30/ripple-ts/pull/32) [`6572d26`](https://github.com/Tap30/ripple-ts/commit/6572d262d920e47cfa580344b676b0b4aa04813d) Thanks [@mimshins](https://github.com/mimshins)! - **Enhance browser compatibility by updating error handling syntax.**
+  
+  This change refactors `catch {}` blocks to `catch (_) {}` to ensure broader compatibility, specifically for legacy iOS browsers that do not support optional catch binding (a feature introduced in ES2019).
+  
+  **Why this change?**
+  
+  While modern JavaScript environments support optional catch binding (e.g., `try { ... } catch { ... }`), our codebase targets ES2017. Legacy iOS browsers running older versions of Safari/WebKit do not recognize the `catch {}` syntax, leading to syntax errors and breaking application functionality on those devices.
+  
+  By explicitly including the unused error parameter `_`, we ensure that the code remains valid ES2017, preventing syntax errors in environments that do not support the newer `catch` syntax. This maintains robust error handling across a wider range of user devices.
+  
+  **Before:**
+  
+  ```ts
+  try {
+    // ... some code that might throw
+  } catch {
+    // Ignore error
+  }
+  ```
+  
+  **After:**
+  
+  ```ts
+  try {
+    // ... some code that might throw
+  
+    // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+    // Older iOS Safari versions don't support optional catch binding.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
+  }
+  ```
+
+
+- [#32](https://github.com/Tap30/ripple-ts/pull/32) [`6572d26`](https://github.com/Tap30/ripple-ts/commit/6572d262d920e47cfa580344b676b0b4aa04813d) Thanks [@mimshins](https://github.com/mimshins)! - **Migrate private members to native ES private field syntax (`#`).**
+  
+  All private fields and methods across `internals/core` and `packages/browser` have been migrated from the conventional `_` underscore prefix to native ES `#` private syntax. This enforces true encapsulation at the JavaScript engine level rather than relying on naming convention alone.
+  
+  No public API changes.
+
+
+- [#32](https://github.com/Tap30/ripple-ts/pull/32) [`6572d26`](https://github.com/Tap30/ripple-ts/commit/6572d262d920e47cfa580344b676b0b4aa04813d) Thanks [@mimshins](https://github.com/mimshins)! - **Replace `_setSessionId()` method with a `protected _sessionId` field.**
+  
+  The protected `_setSessionId(sessionId)` method has been removed in favor of a directly accessible `protected _sessionId` field. Subclasses can now assign the session ID directly instead of going through a setter method.
+  
+  No public API changes.
+
 ## 1.0.1
 ### Patch Changes
 
