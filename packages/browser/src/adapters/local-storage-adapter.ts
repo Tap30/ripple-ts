@@ -19,8 +19,8 @@ export type LocalStorageAdapterConfig = {
  * Provides persistent storage across browser sessions with optional TTL.
  */
 export class LocalStorageAdapter implements StorageAdapter {
-  private readonly _key: string;
-  private readonly _ttl: number | null;
+  readonly #key: string;
+  readonly #ttl: number | null;
 
   /**
    * Create a new LocalStorageAdapter instance.
@@ -28,8 +28,8 @@ export class LocalStorageAdapter implements StorageAdapter {
    * @param config Configuration object
    */
   constructor(config: LocalStorageAdapterConfig = {}) {
-    this._key = config.key ?? "ripple_events";
-    this._ttl = config.ttl ?? null;
+    this.#key = config.key ?? "ripple_events";
+    this.#ttl = config.ttl ?? null;
   }
 
   /**
@@ -45,7 +45,10 @@ export class LocalStorageAdapter implements StorageAdapter {
       localStorage.removeItem(testKey);
 
       return Promise.resolve(true);
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return Promise.resolve(false);
     }
   }
@@ -65,13 +68,9 @@ export class LocalStorageAdapter implements StorageAdapter {
         savedAt: Date.now(),
       };
 
-      localStorage.setItem(this._key, JSON.stringify(data));
+      localStorage.setItem(this.#key, JSON.stringify(data));
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "QuotaExceededError" &&
-        events.length > 1
-      ) {
+      if (error instanceof StorageQuotaExceededError && events.length > 1) {
         try {
           // Drop oldest half and retry
           const reduced = events.slice(-Math.floor(events.length / 2));
@@ -80,7 +79,7 @@ export class LocalStorageAdapter implements StorageAdapter {
             savedAt: Date.now(),
           };
 
-          localStorage.setItem(this._key, JSON.stringify(reducedData));
+          localStorage.setItem(this.#key, JSON.stringify(reducedData));
 
           throw new StorageQuotaExceededError(
             reduced.length,
@@ -103,21 +102,24 @@ export class LocalStorageAdapter implements StorageAdapter {
    * @returns Promise resolving to array of events
    */
   public async load(): Promise<RippleEvent[]> {
-    const stored = localStorage.getItem(this._key);
+    const stored = localStorage.getItem(this.#key);
 
     if (!stored) return [];
 
     try {
       const data = JSON.parse(stored) as StorageData;
 
-      if (this._ttl !== null && Date.now() - data.savedAt > this._ttl) {
+      if (this.#ttl !== null && Date.now() - data.savedAt > this.#ttl) {
         await this.clear();
 
         return [];
       }
 
       return data.events;
-    } catch {
+      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+      // Older iOS Safari versions don't support optional catch binding.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return [];
     }
   }
@@ -126,7 +128,7 @@ export class LocalStorageAdapter implements StorageAdapter {
    * Clear events from localStorage.
    */
   public clear(): Promise<void> {
-    localStorage.removeItem(this._key);
+    localStorage.removeItem(this.#key);
 
     return Promise.resolve();
   }

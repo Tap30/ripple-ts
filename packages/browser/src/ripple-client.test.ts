@@ -1,6 +1,7 @@
 import {
   NoOpLoggerAdapter,
   type HttpAdapter,
+  type HttpAdapterContext,
   type StorageAdapter,
 } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -258,9 +259,9 @@ describe("RippleClient", () => {
       await client.init();
       client.setMetadata("userId", "456");
 
-      expect(async () => {
-        await client.track("page_view", { page: "/home" });
-      }).not.toThrow();
+      await expect(
+        client.track("page_view", { page: "/home" }),
+      ).resolves.not.toThrow();
 
       expect(client.getMetadata()).toEqual({ userId: "456" });
     });
@@ -275,20 +276,22 @@ describe("RippleClient", () => {
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "test_event",
-            platform: {
-              type: "web",
-              browser: { name: "chrome", version: "120.0.0" },
-              device: { name: "desktop", version: "apple" },
-              os: { name: "macos", version: "14.0.0" },
-            },
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "test_event",
+              platform: {
+                type: "web",
+                browser: { name: "chrome", version: "120.0.0" },
+                device: { name: "desktop", version: "apple" },
+                os: { name: "macos", version: "14.0.0" },
+              },
+            }),
+          ]) as Array<unknown>,
+          headers: expect.any(Object) as object,
+        } as HttpAdapterContext),
       );
     });
 
@@ -304,7 +307,7 @@ describe("RippleClient", () => {
         this.getDevice = () => ({});
         this.getOS = () => ({});
         return this;
-      } as unknown as typeof UAParser);
+      });
 
       const newClient = new RippleClient({
         ...mockConfig,
@@ -317,20 +320,22 @@ describe("RippleClient", () => {
       await newClient.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "test_event",
-            platform: {
-              type: "web",
-              browser: { name: "UNKNOWN", version: "UNKNOWN" },
-              device: { name: "desktop", version: "UNKNOWN" },
-              os: { name: "UNKNOWN", version: "UNKNOWN" },
-            },
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "test_event",
+              platform: {
+                type: "web",
+                browser: { name: "UNKNOWN", version: "UNKNOWN" },
+                device: { name: "desktop", version: "UNKNOWN" },
+                os: { name: "UNKNOWN", version: "UNKNOWN" },
+              },
+            }),
+          ]) as Array<unknown>,
+          headers: expect.any(Object) as object,
+        } as HttpAdapterContext),
       );
     });
 
@@ -350,15 +355,17 @@ describe("RippleClient", () => {
       await newClient.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "test_event",
-            platform: null,
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          headers: expect.any(Object) as object,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "test_event",
+              platform: null,
+            }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
 
       global.navigator = originalNavigator;
@@ -376,15 +383,17 @@ describe("RippleClient", () => {
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "user_action",
-            metadata: { schemaVersion: "2.0", eventType: "interaction" },
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          headers: expect.any(Object) as object,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "user_action",
+              metadata: { schemaVersion: "2.0", eventType: "interaction" },
+            }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
     });
 
@@ -398,15 +407,17 @@ describe("RippleClient", () => {
       await clientWithDefaults.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "page_view",
-            metadata: { customField: "value", version: 1 },
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          headers: expect.any(Object) as object,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "page_view",
+              metadata: { customField: "value", version: 1 },
+            }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
     });
 
@@ -416,15 +427,17 @@ describe("RippleClient", () => {
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        mockConfig.endpoint,
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "simple_event",
-            metadata: null,
-          }),
-        ]),
-        expect.any(Object),
-        expect.any(String),
+        expect.objectContaining({
+          apiKeyHeader: expect.any(String) as string,
+          headers: expect.any(Object) as object,
+          endpoint: mockConfig.endpoint,
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "simple_event",
+              metadata: null,
+            }),
+          ]) as Array<unknown>,
+        } as HttpAdapterContext),
       );
     });
   });

@@ -98,7 +98,7 @@ pnpm clean          # Clean build artifacts
 
 ### Naming Conventions
 
-- Private members: `_` prefix
+- Private members: `#` prefix (native ES private member syntax)
 - Public methods: Explicit `public` keyword
 - Use `interface` for OOP contracts, `type` for data structures
 

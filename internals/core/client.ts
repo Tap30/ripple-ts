@@ -69,11 +69,12 @@ export abstract class Client<
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
 
-  private readonly _initMutex = new Mutex();
+  protected _sessionId: string | null = null;
 
-  private _sessionId: string | null = null;
-  private _initialized = false;
-  private _disposed = false;
+  readonly #initMutex = new Mutex();
+
+  #initialized = false;
+  #disposed = false;
 
   /**
    * Create a new Client instance.
@@ -154,7 +155,7 @@ export abstract class Client<
     payload?: TEvents[K],
     metadata?: Partial<TMetadata>,
   ): Promise<void> {
-    if (this._disposed) {
+    if (this.#disposed) {
       this._logger.warn("Cannot track event: Client has been disposed");
 
       return Promise.resolve();
@@ -208,16 +209,6 @@ export abstract class Client<
   }
 
   /**
-   * Set the session ID.
-   * Default implementation for base client - runtime packages can override.
-   *
-   * @param sessionId The session ID to set
-   */
-  protected _setSessionId(sessionId: string): void {
-    this._sessionId = sessionId;
-  }
-
-  /**
    * Immediately flush all queued events.
    */
   public async flush(): Promise<void> {
@@ -229,19 +220,19 @@ export abstract class Client<
    * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    if (this._initialized) return await Promise.resolve();
+    if (this.#initialized) return await Promise.resolve();
 
-    if (this._disposed) {
-      this._disposed = false;
-      this._initMutex.reset();
+    if (this.#disposed) {
+      this.#disposed = false;
+      this.#initMutex.reset();
     }
 
-    await this._initMutex.runAtomic(async () => {
-      if (this._initialized) return await Promise.resolve();
+    await this.#initMutex.runAtomic(async () => {
+      if (this.#initialized) return await Promise.resolve();
 
       await this._dispatcher.restore();
 
-      this._initialized = true;
+      this.#initialized = true;
     });
   }
 
@@ -252,9 +243,9 @@ export abstract class Client<
   public dispose(): void {
     this._dispatcher.dispose();
     this._metadataManager.clear();
-    this._initMutex.release();
-    this._disposed = true;
+    this.#initMutex.release();
+    this.#disposed = true;
     this._sessionId = null;
-    this._initialized = false;
+    this.#initialized = false;
   }
 }

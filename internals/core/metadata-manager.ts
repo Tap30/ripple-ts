@@ -5,7 +5,7 @@
  * @template TMetadata The type definition for metadata
  */
 export class MetadataManager<TMetadata extends Record<string, unknown>> {
-  private _metadata: Partial<TMetadata> = {};
+  #metadata: Partial<TMetadata> = {};
 
   /**
    * Set a metadata value.
@@ -15,7 +15,7 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    * @param value The value to set
    */
   public set<K extends keyof TMetadata>(key: K, value: TMetadata[K]): void {
-    this._metadata[key] = value;
+    this.#metadata[key] = value;
   }
 
   /**
@@ -24,7 +24,7 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    * @returns All metadata or empty object if none set
    */
   public getAll(): Partial<TMetadata> {
-    return { ...this._metadata };
+    return { ...this.#metadata };
   }
 
   /**
@@ -33,14 +33,14 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    * @returns True if no metadata has been set
    */
   public isEmpty(): boolean {
-    return Object.keys(this._metadata).length === 0;
+    return Object.keys(this.#metadata).length === 0;
   }
 
   /**
    * Clear all metadata.
    */
   public clear(): void {
-    this._metadata = {};
+    this.#metadata = {};
   }
 
   /**
@@ -53,7 +53,7 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
     if (this.isEmpty() && !eventMetadata) return null;
 
     return {
-      ...this._metadata,
+      ...this.#metadata,
       ...eventMetadata,
     } as TMetadata;
   }

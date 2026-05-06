@@ -29,7 +29,7 @@ export class RippleClient<
   TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > extends Client<TEvents, TMetadata> {
-  private readonly _sessionManager: SessionManager;
+  readonly #sessionManager: SessionManager;
 
   /**
    * Create a new RippleClient instance.
@@ -43,7 +43,7 @@ export class RippleClient<
 
     super(finalConfig);
 
-    this._sessionManager = new SessionManager(config.sessionStoreKey);
+    this.#sessionManager = new SessionManager(config.sessionStoreKey);
   }
 
   /**
@@ -82,7 +82,7 @@ export class RippleClient<
    * Should be called before tracking events.
    */
   public override async init(): Promise<void> {
-    this._setSessionId(this._sessionManager.init());
+    this._sessionId = this.#sessionManager.init();
 
     await super.init();
   }
@@ -93,14 +93,14 @@ export class RippleClient<
    * @returns The session ID or null if not initialized
    */
   public override getSessionId(): string | null {
-    return this._sessionManager.getSessionId();
+    return this.#sessionManager.getSessionId();
   }
 
   /**
    * Dispose the client and clean up resources including session management.
    */
   public override dispose(): void {
-    this._sessionManager.clear();
+    this.#sessionManager.clear();
     super.dispose();
   }
 }

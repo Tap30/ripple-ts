@@ -1,6 +1,104 @@
-import type { Event as RippleEvent } from "@internals/core";
+import {
+  StorageQuotaExceededError,
+  type Event as RippleEvent,
+} from "@internals/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IndexedDBAdapter } from "./indexed-db-adapter.ts";
+
+const createEvent = (name = "test_event"): RippleEvent => ({
+  name,
+  payload: { key: "value" },
+  issuedAt: Date.now(),
+  metadata: {},
+  sessionId: "session-123",
+  platform: null,
+});
+
+const defProp = <T>(obj: T, key: string, value: unknown) =>
+  Object.defineProperty(obj, key, { value, configurable: true });
+
+/**
+ * Resolves an IDB open request with the given db, then flushes the microtask queue.
+ */
+const resolveOpen = async (req: IDBOpenDBRequest, db: IDBDatabase) => {
+  defProp(req, "result", db);
+
+  req.onsuccess?.(new Event("success"));
+
+  await Promise.resolve();
+};
+
+/**
+ * Resolves a get request with the given value, then flushes.
+ */
+const resolveGet = async (req: IDBRequest<unknown>, value: unknown) => {
+  defProp(req, "result", value);
+
+  req.onsuccess?.(new Event("success"));
+
+  await Promise.resolve();
+};
+
+/**
+ * Completes a put/delete request and fires transaction oncomplete.
+ */
+const completeTx = (req: IDBRequest, tx: IDBTransaction) => {
+  req.onsuccess?.(new Event("success"));
+  tx.oncomplete?.(new Event("complete"));
+};
+
+/**
+ * Rejects a request with an optional error message.
+ */
+const rejectRequest = (req: IDBRequest, message: string | null) => {
+  defProp(req, "error", message ? { message } : null);
+  req.onerror?.(new Event("error"));
+};
+
+/**
+ * Rejects a transaction with an optional error.
+ */
+const rejectTx = (
+  tx: IDBTransaction,
+  error: Error | null,
+  event: "onerror" | "onabort" = "onerror",
+) => {
+  defProp(tx, "error", error);
+  tx[event]?.(new Event(event === "onerror" ? "error" : "abort"));
+};
+
+/**
+ * Creates a mock get request and registers it as the next return value on the store.
+ */
+const mockGetReq = (store: IDBObjectStore) => {
+  const req = {} as IDBRequest<unknown>;
+
+  vi.mocked(store.get).mockReturnValue(req);
+
+  return req;
+};
+
+/**
+ * Creates a mock put request and registers it as the next return value on the store.
+ */
+const mockPutReq = (store: IDBObjectStore) => {
+  const req = {} as IDBRequest<IDBValidKey>;
+
+  vi.mocked(store.put).mockReturnValue(req);
+
+  return req;
+};
+
+/**
+ * Creates a mock delete request and registers it as the next return value on the store.
+ */
+const mockDeleteReq = (store: IDBObjectStore) => {
+  const req = {} as IDBRequest<undefined>;
+
+  vi.mocked(store.delete).mockReturnValue(req);
+
+  return req;
+};
 
 describe("IndexedDBAdapter", () => {
   let adapter: IndexedDBAdapter;
@@ -8,20 +106,12 @@ describe("IndexedDBAdapter", () => {
   let mockDB: IDBDatabase;
   let mockTransaction: IDBTransaction;
   let mockObjectStore: IDBObjectStore;
+  let openRequest: IDBOpenDBRequest;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockEvents = [
-      {
-        name: "test_event",
-        payload: { key: "value" },
-        issuedAt: Date.now(),
-        metadata: {},
-        sessionId: "session-123",
-        platform: null,
-      } satisfies RippleEvent,
-    ];
+    mockEvents = [createEvent()];
 
     mockObjectStore = {
       put: vi.fn(),
@@ -31,6 +121,9 @@ describe("IndexedDBAdapter", () => {
 
     mockTransaction = {
       objectStore: vi.fn().mockReturnValue(mockObjectStore),
+      oncomplete: null,
+      onerror: null,
+      onabort: null,
     } as unknown as IDBTransaction;
 
     mockDB = {
@@ -42,10 +135,10 @@ describe("IndexedDBAdapter", () => {
       close: vi.fn(),
     } as unknown as IDBDatabase;
 
+    openRequest = {} as IDBOpenDBRequest;
+
     Object.defineProperty(global, "indexedDB", {
-      value: {
-        open: vi.fn(),
-      },
+      value: { open: vi.fn().mockReturnValue(openRequest) },
       writable: true,
       configurable: true,
     });
@@ -58,179 +151,116 @@ describe("IndexedDBAdapter", () => {
   });
 
   describe("constructor", () => {
-    it("should create instance with default parameters", () => {
+    it("creates with defaults", () => {
       expect(adapter).toBeInstanceOf(IndexedDBAdapter);
     });
 
-    it("should create instance with custom parameters", () => {
-      const customAdapter = new IndexedDBAdapter({
-        dbName: "custom_db",
-        storeName: "custom_store",
-        key: "custom_key",
-      });
-
-      expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
-    });
-
-    it("should create instance with TTL", () => {
-      const customAdapter = new IndexedDBAdapter({ ttl: 60000 });
-
-      expect(customAdapter).toBeInstanceOf(IndexedDBAdapter);
+    it("creates with custom config", () => {
+      expect(
+        new IndexedDBAdapter({
+          dbName: "db",
+          storeName: "store",
+          key: "k",
+          ttl: 60000,
+        }),
+      ).toBeInstanceOf(IndexedDBAdapter);
     });
   });
 
   describe("isAvailable", () => {
-    it("should return true when IndexedDB is available", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const db = {
-        close: vi.fn(),
-      } as unknown as IDBDatabase;
+    it("returns true when IndexedDB opens successfully", async () => {
+      const db = { close: vi.fn() } as unknown as IDBDatabase;
+      const promise = IndexedDBAdapter.isAvailable();
 
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-
-      const availablePromise = IndexedDBAdapter.isAvailable();
-
-      Object.defineProperty(openRequest, "result", { value: db });
+      defProp(openRequest, "result", db);
       openRequest.onsuccess?.(new Event("success"));
 
-      const available = await availablePromise;
-
-      expect(available).toBe(true);
+      expect(await promise).toBe(true);
       expect(db.close).toHaveBeenCalled();
     });
 
-    it("should return false when IndexedDB is not available", async () => {
-      const originalIndexedDB = globalThis.indexedDB;
+    it("returns false when indexedDB is unavailable", async () => {
+      const original = globalThis.indexedDB;
 
-      // Remove indexedDB from globalThis
-      // @ts-expect-error - Deleting for test
+      // @ts-expect-error - intentional deletion
       delete globalThis.indexedDB;
 
-      const available = await IndexedDBAdapter.isAvailable();
+      expect(await IndexedDBAdapter.isAvailable()).toBe(false);
 
-      expect(available).toBe(false);
-
-      // Restore
       Object.defineProperty(globalThis, "indexedDB", {
-        value: originalIndexedDB,
+        value: original,
         writable: true,
         configurable: true,
       });
     });
 
-    it("should return false when IndexedDB open fails", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
+    it.each([
+      [
+        "open fails",
+        (req: IDBOpenDBRequest) => {
+          req.onerror?.(new Event("error"));
+        },
+      ],
+      [
+        "open is blocked",
+        (req: IDBOpenDBRequest) => {
+          req.onblocked?.({
+            newVersion: null,
+            oldVersion: 0,
+          } as IDBVersionChangeEvent);
+        },
+      ],
+    ])("returns false when %s", async (_, trigger) => {
+      const promise = IndexedDBAdapter.isAvailable();
 
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-
-      const availablePromise = IndexedDBAdapter.isAvailable();
-
-      openRequest.onerror?.(new Event("error"));
-
-      const available = await availablePromise;
-
-      expect(available).toBe(false);
+      trigger(openRequest);
+      expect(await promise).toBe(false);
     });
 
-    it("should return false when IndexedDB open is blocked", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-
-      const availablePromise = IndexedDBAdapter.isAvailable();
-
-      openRequest.onblocked?.({
-        newVersion: null,
-        oldVersion: 0,
-      } as IDBVersionChangeEvent);
-
-      const available = await availablePromise;
-
-      expect(available).toBe(false);
-    });
-
-    it("should return false when IndexedDB.open throws", async () => {
+    it("returns false when IndexedDB.open throws", async () => {
       vi.spyOn(indexedDB, "open").mockImplementation(() => {
         throw new Error("IndexedDB disabled");
       });
 
-      const available = await IndexedDBAdapter.isAvailable();
-
-      expect(available).toBe(false);
+      expect(await IndexedDBAdapter.isAvailable()).toBe(false);
     });
   });
 
   describe("connection lifecycle", () => {
-    it("should reset promise on database close", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-      const db = {
-        close: vi.fn(),
-        onclose: null as (() => void) | null,
-        onversionchange: null as (() => void) | null,
-        transaction: vi.fn().mockReturnValue(mockTransaction),
-      } as unknown as IDBDatabase;
-
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
+    const doSave = async () => {
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
 
       const savePromise = adapter.save(mockEvents);
 
-      Object.defineProperty(openRequest, "result", { value: db });
-      openRequest.onsuccess?.(new Event("success"));
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
 
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      putRequest.onsuccess?.(new Event("success"));
+      completeTx(putReq, mockTransaction);
 
       await savePromise;
 
-      // Trigger close
-      db.onclose?.(new Event("close"));
+      return mockDB as unknown as {
+        close: ReturnType<typeof vi.fn>;
+        onclose: ((e: Event) => void) | null;
+        onabort: ((e: Event) => void) | null;
+        onversionchange: ((e: IDBVersionChangeEvent) => void) | null;
+      };
+    };
 
-      // Verify close handler was set
+    it("resets db promise on close and abort", async () => {
+      const db = await doSave();
+
+      db.onclose?.(new Event("close"));
+      db.onabort?.(new Event("abort"));
+
       expect(db.onclose).toBeDefined();
+      expect(db.onabort).toBeDefined();
     });
 
-    it("should reset promise on version change", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-      const db = {
-        close: vi.fn(),
-        onclose: null as (() => void) | null,
-        onversionchange: null as (() => void) | null,
-        transaction: vi.fn().mockReturnValue(mockTransaction),
-      } as unknown as IDBDatabase;
+    it("closes db on version change", async () => {
+      const db = await doSave();
 
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: db });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      // Trigger version change
       db.onversionchange?.({
         newVersion: 2,
         oldVersion: 1,
@@ -239,258 +269,20 @@ describe("IndexedDBAdapter", () => {
       expect(db.close).toHaveBeenCalled();
     });
 
-    it("should handle blocked event during open", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.spyOn(indexedDB, "open").mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
+    it("rejects on blocked upgrade", async () => {
       const savePromise = adapter.save(mockEvents);
 
-      // Trigger blocked event (should not reject, just a no-op)
       openRequest.onblocked?.({
         newVersion: null,
         oldVersion: 0,
       } as IDBVersionChangeEvent);
 
-      // Then succeed
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      expect(mockObjectStore.put).toHaveBeenCalled();
-    });
-  });
-
-  describe("save", () => {
-    it("should save events to IndexedDB with timestamp", async () => {
-      vi.setSystemTime(1000);
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns no existing data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      expect(indexedDB.open).toHaveBeenCalledWith(
-        "ripple_db",
-        IndexedDBAdapter.SCHEMA_VERSION,
-      );
-      expect(mockDB.transaction).toHaveBeenCalled();
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: mockEvents, savedAt: 1000 },
-        "queue",
+      await expect(savePromise).rejects.toThrow(
+        "IndexedDB upgrade blocked by another tab",
       );
     });
 
-    it("should handle database open error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "error", {
-        value: { message: "Database error" } as DOMException,
-      });
-      openRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Database error");
-    });
-
-    it("should handle database open error without message", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "error", { value: null });
-      openRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Failed to open IndexedDB");
-    });
-
-    it("should handle save error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns no data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put fails
-      Object.defineProperty(putRequest, "error", {
-        value: { message: "Save error" } as DOMException,
-      });
-      putRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Save error");
-    });
-
-    it("should handle save error without message", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-      const getRequest = {} as IDBRequest<unknown>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      // First open for load()
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns no data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put fails
-      Object.defineProperty(putRequest, "error", { value: null });
-      putRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Failed to write data");
-    });
-
-    it("should handle get error during save", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get fails
-      Object.defineProperty(getRequest, "error", {
-        value: { message: "Get error" } as DOMException,
-      });
-      getRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Get error");
-    });
-
-    it("should handle get error without message during save", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const savePromise = adapter.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get fails without message
-      Object.defineProperty(getRequest, "error", { value: null });
-      getRequest.onerror?.(new Event("error"));
-
-      await expect(savePromise).rejects.toThrow("Failed to read data");
-    });
-
-    it("should discard expired data and save new events when TTL exceeded", async () => {
-      const adapterWithTTL = new IndexedDBAdapter({ ttl: 1000 });
-
-      vi.setSystemTime(5000);
-
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
-      const savePromise = adapterWithTTL.save(mockEvents);
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns expired data (savedAt: 1000, now: 5000, ttl: 1000)
-      Object.defineProperty(getRequest, "result", {
-        value: { events: [{ name: "old" }], savedAt: 1000 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      putRequest.onsuccess?.(new Event("success"));
-
-      await savePromise;
-
-      // Should only save new events, discarding expired ones
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: mockEvents, savedAt: 5000 },
-        "queue",
-      );
-    });
-
-    it("should create object store on upgrade", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
+    it("creates object store on upgrade if missing", async () => {
       const upgradeDB = {
         ...mockDB,
         objectStoreNames: {
@@ -498,19 +290,14 @@ describe("IndexedDBAdapter", () => {
         } as unknown as DOMStringList,
       } as IDBDatabase;
 
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
-
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
       const savePromise = adapter.save(mockEvents);
 
-      Object.defineProperty(openRequest, "result", { value: upgradeDB });
+      defProp(openRequest, "result", upgradeDB);
       const upgradeEvent = new Event("upgradeneeded");
 
-      Object.defineProperty(upgradeEvent, "target", {
-        value: openRequest,
-        writable: false,
-      });
+      defProp(upgradeEvent, "target", openRequest);
       openRequest.onupgradeneeded?.(upgradeEvent as IDBVersionChangeEvent);
 
       expect(upgradeDB.createObjectStore).toHaveBeenCalledWith("events");
@@ -519,36 +306,23 @@ describe("IndexedDBAdapter", () => {
 
       await Promise.resolve();
 
-      // Get returns no data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
+      await resolveGet(getReq, undefined);
 
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
+      completeTx(putReq, mockTransaction);
 
       await savePromise;
     });
 
-    it("should not create object store if it exists", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
+    it("skips object store creation if already exists", async () => {
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
 
       const savePromise = adapter.save(mockEvents);
 
-      Object.defineProperty(openRequest, "result", { value: mockDB });
+      defProp(openRequest, "result", mockDB);
       const upgradeEvent = new Event("upgradeneeded");
 
-      Object.defineProperty(upgradeEvent, "target", {
-        value: openRequest,
-        writable: false,
-      });
+      defProp(upgradeEvent, "target", openRequest);
       openRequest.onupgradeneeded?.(upgradeEvent as IDBVersionChangeEvent);
 
       expect(mockDB.createObjectStore).not.toHaveBeenCalled();
@@ -557,304 +331,58 @@ describe("IndexedDBAdapter", () => {
 
       await Promise.resolve();
 
-      // Get returns no data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
+      await resolveGet(getReq, undefined);
 
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
+      completeTx(putReq, mockTransaction);
 
       await savePromise;
     });
   });
 
-  describe("load", () => {
-    it("should load events from IndexedDB", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const loadPromise = adapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", {
-        value: { events: mockEvents, savedAt: Date.now() },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      const result = await loadPromise;
-
-      expect(result).toEqual(mockEvents);
-      expect(mockDB.transaction).toHaveBeenCalledWith("events", "readonly");
-      expect(mockObjectStore.get).toHaveBeenCalledWith("queue");
-    });
-
-    it("should return empty array when no data exists", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const loadPromise = adapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      const result = await loadPromise;
-
-      expect(result).toEqual([]);
-    });
-
-    it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
-
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-      const deleteRequest = {} as IDBRequest<undefined>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.delete).mockReturnValue(deleteRequest);
-      vi.setSystemTime(2000);
-
-      const loadPromise = ttlAdapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", {
-        value: { events: mockEvents, savedAt: 0 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Handle the clear() call
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      deleteRequest.onsuccess?.(new Event("success"));
-
-      const result = await loadPromise;
-
-      expect(result).toEqual([]);
-    });
-
-    it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 5000 });
-
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.setSystemTime(2000);
-
-      const loadPromise = ttlAdapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", {
-        value: { events: mockEvents, savedAt: 1000 },
-      });
-      getRequest.onsuccess?.(new Event("success"));
-
-      const result = await loadPromise;
-
-      expect(result).toEqual(mockEvents);
-    });
-
-    it("should handle database open error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-
-      const loadPromise = adapter.load();
-
-      Object.defineProperty(openRequest, "error", {
-        value: { message: "Database error" } as DOMException,
-      });
-      openRequest.onerror?.(new Event("error"));
-
-      await expect(loadPromise).rejects.toThrow("Database error");
-    });
-
-    it("should handle load error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const loadPromise = adapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "error", {
-        value: { message: "Load error" } as DOMException,
-      });
-      getRequest.onerror?.(new Event("error"));
-
-      await expect(loadPromise).rejects.toThrow("Load error");
-    });
-
-    it("should handle load error without message", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
-      const loadPromise = adapter.load();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "error", { value: null });
-      getRequest.onerror?.(new Event("error"));
-
-      await expect(loadPromise).rejects.toThrow("Failed to read data");
-    });
-  });
-
-  describe("clear", () => {
-    it("should clear events from IndexedDB", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const deleteRequest = {} as IDBRequest<undefined>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.delete).mockReturnValue(deleteRequest);
-
-      const clearPromise = adapter.clear();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      deleteRequest.onsuccess?.(new Event("success"));
-
-      await clearPromise;
-
-      expect(mockDB.transaction).toHaveBeenCalledWith("events", "readwrite");
-      expect(mockObjectStore.delete).toHaveBeenCalledWith("queue");
-    });
-
-    it("should handle database open error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-
-      const clearPromise = adapter.clear();
-
-      Object.defineProperty(openRequest, "error", {
-        value: { message: "Database error" } as DOMException,
-      });
-      openRequest.onerror?.(new Event("error"));
-
-      await expect(clearPromise).rejects.toThrow("Database error");
-    });
-
-    it("should handle clear error", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const deleteRequest = {} as IDBRequest<undefined>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.delete).mockReturnValue(deleteRequest);
-
-      const clearPromise = adapter.clear();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(deleteRequest, "error", {
-        value: { message: "Clear error" } as DOMException,
-      });
-      deleteRequest.onerror?.(new Event("error"));
-
-      await expect(clearPromise).rejects.toThrow("Clear error");
-    });
-
-    it("should handle clear error without message", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const deleteRequest = {} as IDBRequest<undefined>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.delete).mockReturnValue(deleteRequest);
-
-      const clearPromise = adapter.clear();
-
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(deleteRequest, "error", { value: null });
-      deleteRequest.onerror?.(new Event("error"));
-
-      await expect(clearPromise).rejects.toThrow("Failed to clear data");
-    });
-  });
-
-  describe("custom parameters", () => {
-    it("should use custom database name, store name, and key", async () => {
+  describe("save", () => {
+    it("saves events with timestamp", async () => {
       vi.setSystemTime(1000);
-      const customAdapter = new IndexedDBAdapter({
+
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
+
+      const savePromise = adapter.save(mockEvents);
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
+
+      completeTx(putReq, mockTransaction);
+
+      await savePromise;
+
+      expect(indexedDB.open).toHaveBeenCalledWith(
+        "ripple_db",
+        IndexedDBAdapter.SCHEMA_VERSION,
+      );
+      expect(mockObjectStore.put).toHaveBeenCalledWith(
+        { events: mockEvents, savedAt: 1000 },
+        "queue",
+      );
+    });
+
+    it("uses custom db/store/key names", async () => {
+      vi.setSystemTime(1000);
+
+      const custom = new IndexedDBAdapter({
         dbName: "custom_db",
         storeName: "custom_store",
         key: "custom_key",
       });
 
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
 
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
+      const savePromise = custom.save(mockEvents);
 
-      const savePromise = customAdapter.save(mockEvents);
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
 
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Get returns no data
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      // Put succeeds
-      putRequest.onsuccess?.(new Event("success"));
+      completeTx(putReq, mockTransaction);
 
       await savePromise;
 
@@ -862,140 +390,370 @@ describe("IndexedDBAdapter", () => {
         "custom_db",
         IndexedDBAdapter.SCHEMA_VERSION,
       );
-      expect(mockDB.transaction).toHaveBeenCalled();
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 1000 },
         "custom_key",
       );
     });
 
-    it("should handle single event quota error", async () => {
-      const adapter = new IndexedDBAdapter();
-      const singleEvent: RippleEvent[] = [
-        {
-          name: "event1",
-          payload: {},
-          metadata: {},
-          issuedAt: Date.now(),
-          sessionId: "s",
-          platform: null,
-        },
-      ];
+    it("discards expired TTL data on save", async () => {
+      vi.setSystemTime(5000);
 
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-      const putRequest = {} as IDBRequest<IDBValidKey>;
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
 
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-      vi.mocked(mockObjectStore.put).mockReturnValue(putRequest);
+      const savePromise = ttlAdapter.save(mockEvents);
 
-      const savePromise = adapter.save(singleEvent);
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, { events: [createEvent("old")], savedAt: 1000 });
 
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
+      completeTx(putReq, mockTransaction);
 
-      await Promise.resolve();
+      await savePromise;
 
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      const quotaError = new Error("QuotaExceededError");
-
-      quotaError.name = "QuotaExceededError";
-
-      const errorEvent = { target: { error: quotaError } } as unknown as Event;
-
-      putRequest.onerror?.(errorEvent);
-
-      await expect(savePromise).rejects.toThrow("Failed to write data");
+      expect(mockObjectStore.put).toHaveBeenCalledWith(
+        { events: mockEvents, savedAt: 5000 },
+        "queue",
+      );
     });
 
-    it("should handle quota exceeded with retry for multiple events", async () => {
-      const adapter = new IndexedDBAdapter();
-      const largeMockEvents: RippleEvent[] = Array.from(
-        { length: 10 },
-        (_, i) => ({
-          name: `event${i}`,
-          payload: {},
-          metadata: {},
-          issuedAt: Date.now(),
-          sessionId: "s",
-          platform: null,
-        }),
+    it("rejects on db open error (with and without message)", async () => {
+      const savePromise1 = adapter.save(mockEvents);
+
+      defProp(openRequest, "error", { message: "Database error" });
+      openRequest.onerror?.(new Event("error"));
+
+      await expect(savePromise1).rejects.toThrow("Database error");
+
+      const savePromise2 = adapter.save(mockEvents);
+
+      defProp(openRequest, "error", null);
+      openRequest.onerror?.(new Event("error"));
+
+      await expect(savePromise2).rejects.toThrow("Failed to open IndexedDB");
+    });
+
+    it("rejects on get error (with and without message)", async () => {
+      for (const [msg, expected] of [
+        ["Get error", "Get error"],
+        [null, "Failed to read data"],
+      ] as const) {
+        const getReq = mockGetReq(mockObjectStore);
+        const promise = adapter.save(mockEvents);
+
+        await resolveOpen(openRequest, mockDB);
+
+        rejectRequest(getReq, msg);
+
+        await expect(promise).rejects.toThrow(expected);
+      }
+    });
+
+    it("rejects on put error (with and without message)", async () => {
+      for (const [msg, expected] of [
+        ["Save error", "Save error"],
+        [null, "Failed to write data"],
+      ] as const) {
+        const getReq = mockGetReq(mockObjectStore);
+        const putReq = mockPutReq(mockObjectStore);
+
+        const savePromise = adapter.save(mockEvents);
+
+        await resolveOpen(openRequest, mockDB);
+        await resolveGet(getReq, undefined);
+
+        rejectRequest(putReq, msg);
+
+        await expect(savePromise).rejects.toThrow(expected);
+      }
+    });
+
+    it.each([
+      [
+        "onerror with error",
+        "onerror" as const,
+        new Error("Tx Error"),
+        "Tx Error",
+      ],
+      [
+        "onabort with error",
+        "onabort" as const,
+        new Error("Tx Abort"),
+        "Tx Abort",
+      ],
+      ["onerror without error", "onerror" as const, null, "Transaction failed"],
+      [
+        "onabort without error",
+        "onabort" as const,
+        null,
+        "Transaction aborted",
+      ],
+    ])("rejects on transaction %s", async (_, event, error, expected) => {
+      mockGetReq(mockObjectStore);
+      const savePromise = adapter.save(mockEvents);
+
+      await resolveOpen(openRequest, mockDB);
+
+      rejectTx(mockTransaction, error, event);
+
+      await expect(savePromise).rejects.toThrow(expected);
+    });
+
+    it("rejects with quota error for single event (no retry)", async () => {
+      const getReq = mockGetReq(mockObjectStore);
+      const putReq = mockPutReq(mockObjectStore);
+
+      const savePromise = adapter.save([createEvent()]);
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
+
+      defProp(putReq, "error", new StorageQuotaExceededError(0, 0));
+      putReq.onerror?.(new Event("error"));
+
+      await expect(savePromise).rejects.toThrow("Storage quota exceeded");
+    });
+
+    it("retries with half events on quota error for multiple events", async () => {
+      const largeMockEvents = Array.from({ length: 10 }, (_, i) =>
+        createEvent(`event${i}`),
       );
 
-      const quotaError = new Error("QuotaExceededError");
+      let callCount = 0;
 
-      quotaError.name = "QuotaExceededError";
+      const getReqs = [mockGetReq(mockObjectStore), {} as IDBRequest<unknown>];
+      const putReqs = [
+        mockPutReq(mockObjectStore),
+        {} as IDBRequest<IDBValidKey>,
+      ];
 
-      const atomicSpy = vi
-        .spyOn(
-          adapter as unknown as {
-            _atomicReadWrite: (
-              db: IDBDatabase,
-              transform: (data: unknown) => unknown,
-            ) => Promise<void>;
-          },
-          "_atomicReadWrite",
-        )
-        .mockImplementationOnce((_db, transform) => {
-          transform(null);
-          return Promise.reject(quotaError);
-        })
-        .mockImplementationOnce((_db, transform) => {
-          transform(null);
-          return Promise.resolve();
-        });
-
-      const openSpy = vi
-        .spyOn(
-          adapter as unknown as { _openDB: () => Promise<IDBDatabase> },
-          "_openDB",
-        )
-        .mockResolvedValue({} as IDBDatabase);
-
-      await expect(adapter.save(largeMockEvents)).rejects.toThrow(
-        "Storage quota exceeded",
+      vi.mocked(mockObjectStore.get).mockImplementation(
+        () => getReqs[callCount]!,
+      );
+      vi.mocked(mockObjectStore.put).mockImplementation(
+        () => putReqs[callCount]!,
       );
 
-      expect(atomicSpy).toHaveBeenCalledTimes(2);
-      openSpy.mockRestore();
-      atomicSpy.mockRestore();
+      const savePromise = adapter.save(largeMockEvents);
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReqs[0]!, undefined);
+
+      callCount = 1;
+
+      defProp(putReqs[0]!, "error", new StorageQuotaExceededError(0, 0));
+      putReqs[0]!.onerror?.(new Event("error"));
+
+      await Promise.resolve();
+
+      await resolveGet(getReqs[1]!, undefined);
+
+      completeTx(putReqs[1]!, mockTransaction);
+
+      await expect(savePromise).rejects.toThrow("Storage quota exceeded");
+    });
+  });
+
+  describe("load", () => {
+    it("loads events from IndexedDB", async () => {
+      const getReq = mockGetReq(mockObjectStore);
+      const loadPromise = adapter.load();
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, { events: mockEvents, savedAt: Date.now() });
+
+      expect(await loadPromise).toEqual(mockEvents);
+      expect(mockDB.transaction).toHaveBeenCalledWith("events", "readonly");
+      expect(mockObjectStore.get).toHaveBeenCalledWith("queue");
+    });
+
+    it("returns empty array when no data exists", async () => {
+      const getReq = mockGetReq(mockObjectStore);
+      const loadPromise = adapter.load();
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
+
+      expect(await loadPromise).toEqual([]);
+    });
+
+    it("returns events when TTL not expired", async () => {
+      vi.setSystemTime(2000);
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 5000 });
+      const getReq = mockGetReq(mockObjectStore);
+      const loadPromise = ttlAdapter.load();
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, { events: mockEvents, savedAt: 1000 });
+
+      expect(await loadPromise).toEqual(mockEvents);
+    });
+
+    it("clears and returns empty array when TTL expired", async () => {
+      vi.setSystemTime(2000);
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const getReq = mockGetReq(mockObjectStore);
+      const deleteReq = mockDeleteReq(mockObjectStore);
+      const loadPromise = ttlAdapter.load();
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, { events: mockEvents, savedAt: 0 });
+
+      await Promise.resolve();
+
+      await resolveOpen(openRequest, mockDB);
+
+      await Promise.resolve();
+
+      completeTx(deleteReq, mockTransaction);
+
+      await expect(loadPromise).resolves.toEqual([]);
+    });
+
+    it("logs error and returns empty array when TTL clear fails", async () => {
+      vi.setSystemTime(2000);
+
+      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const getReq = mockGetReq(mockObjectStore);
+
+      vi.spyOn(ttlAdapter, "clear").mockRejectedValueOnce(
+        new Error("Clear failed"),
+      );
+
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      const loadPromise = ttlAdapter.load();
+
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, { events: mockEvents, savedAt: 0 });
+
+      await expect(loadPromise).resolves.toEqual([]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to clear expired TTL data:",
+        expect.any(Error),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects on db open error", async () => {
+      const loadPromise = adapter.load();
+
+      defProp(openRequest, "error", { message: "Database error" });
+      openRequest.onerror?.(new Event("error"));
+
+      await expect(loadPromise).rejects.toThrow("Database error");
+    });
+
+    it("rejects on get error (with and without message)", async () => {
+      for (const [msg, expected] of [
+        ["Load error", "Load error"],
+        [null, "Failed to read data"],
+      ] as const) {
+        const getReq = mockGetReq(mockObjectStore);
+        const loadPromise = adapter.load();
+
+        await resolveOpen(openRequest, mockDB);
+
+        rejectRequest(getReq, msg);
+
+        await expect(loadPromise).rejects.toThrow(expected);
+      }
+    });
+  });
+
+  describe("clear", () => {
+    it("clears events from IndexedDB", async () => {
+      const deleteReq = mockDeleteReq(mockObjectStore);
+      const loadPromise = adapter.clear();
+
+      await resolveOpen(openRequest, mockDB);
+
+      completeTx(deleteReq, mockTransaction);
+
+      await loadPromise;
+
+      expect(mockDB.transaction).toHaveBeenCalledWith("events", "readwrite");
+      expect(mockObjectStore.delete).toHaveBeenCalledWith("queue");
+    });
+
+    it("rejects on db open error", async () => {
+      const loadPromise = adapter.clear();
+
+      defProp(openRequest, "error", { message: "Database error" });
+      openRequest.onerror?.(new Event("error"));
+
+      await expect(loadPromise).rejects.toThrow("Database error");
+    });
+
+    it("rejects on delete error (with and without message)", async () => {
+      for (const [msg, expected] of [
+        ["Clear error", "Clear error"],
+        [null, "Failed to clear data"],
+      ] as const) {
+        const deleteReq = mockDeleteReq(mockObjectStore);
+        const loadPromise = adapter.clear();
+
+        await resolveOpen(openRequest, mockDB);
+
+        rejectRequest(deleteReq, msg);
+
+        await expect(loadPromise).rejects.toThrow(expected);
+      }
+    });
+
+    it.each([
+      [
+        "onerror with error",
+        "onerror" as const,
+        new Error("Clear Tx Error"),
+        "Clear Tx Error",
+      ],
+      [
+        "onabort with error",
+        "onabort" as const,
+        new Error("Clear Tx Abort"),
+        "Clear Tx Abort",
+      ],
+      ["onerror without error", "onerror" as const, null, "Transaction failed"],
+      [
+        "onabort without error",
+        "onabort" as const,
+        null,
+        "Transaction aborted",
+      ],
+    ])("rejects on transaction %s", async (_, event, error, expected) => {
+      mockDeleteReq(mockObjectStore);
+
+      const loadPromise = adapter.clear();
+
+      await resolveOpen(openRequest, mockDB);
+
+      rejectTx(mockTransaction, error, event);
+
+      await expect(loadPromise).rejects.toThrow(expected);
     });
   });
 
   describe("close", () => {
-    it("should close database connection", async () => {
-      const openRequest = {} as IDBOpenDBRequest;
-      const getRequest = {} as IDBRequest<unknown>;
-
-      vi.mocked(indexedDB.open).mockReturnValue(openRequest);
-      vi.mocked(mockObjectStore.get).mockReturnValue(getRequest);
-
+    it("closes the database connection", async () => {
+      const getReq = mockGetReq(mockObjectStore);
       const loadPromise = adapter.load();
 
-      Object.defineProperty(openRequest, "result", { value: mockDB });
-      openRequest.onsuccess?.(new Event("success"));
-
-      await Promise.resolve();
-
-      Object.defineProperty(getRequest, "result", { value: undefined });
-      getRequest.onsuccess?.(new Event("success"));
-
+      await resolveOpen(openRequest, mockDB);
+      await resolveGet(getReq, undefined);
       await loadPromise;
 
       await adapter.close();
-
       expect(mockDB.close).toHaveBeenCalled();
     });
 
-    it("should handle close when no connection exists", async () => {
-      const newAdapter = new IndexedDBAdapter();
-
-      await expect(newAdapter.close()).resolves.toBeUndefined();
+    it("resolves without error when no connection exists", async () => {
+      await expect(new IndexedDBAdapter().close()).resolves.toBeUndefined();
     });
   });
 });

@@ -4,8 +4,8 @@ import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
  * Default console logger implementation.
  */
 export class ConsoleLoggerAdapter implements LoggerAdapter {
-  private readonly _level: LogLevel;
-  private readonly _levelOrder = [
+  readonly #level: LogLevel;
+  readonly #levelOrder = [
     LogLevel.DEBUG,
     LogLevel.INFO,
     LogLevel.WARN,
@@ -13,42 +13,42 @@ export class ConsoleLoggerAdapter implements LoggerAdapter {
     LogLevel.NONE,
   ] as const;
 
-  public constructor(level: LogLevel = LogLevel.WARN) {
-    this._level = level;
+  constructor(level: LogLevel = LogLevel.WARN) {
+    this.#level = level;
   }
 
-  private _shouldLog(messageLevel: LogLevel): boolean {
-    if (this._level === LogLevel.NONE) return false;
+  #shouldLog(messageLevel: LogLevel): boolean {
+    if (this.#level === LogLevel.NONE) return false;
 
     return (
-      this._levelOrder.indexOf(messageLevel) >=
-      this._levelOrder.indexOf(this._level)
+      this.#levelOrder.indexOf(messageLevel) >=
+      this.#levelOrder.indexOf(this.#level)
     );
   }
 
   public debug(message: string, ...args: unknown[]): void {
-    if (!this._shouldLog(LogLevel.DEBUG)) return;
+    if (!this.#shouldLog(LogLevel.DEBUG)) return;
 
     // eslint-disable-next-line no-console
     console.debug(`[Ripple] ${message}`, ...args);
   }
 
   public info(message: string, ...args: unknown[]): void {
-    if (!this._shouldLog(LogLevel.INFO)) return;
+    if (!this.#shouldLog(LogLevel.INFO)) return;
 
     // eslint-disable-next-line no-console
     console.info(`[Ripple] ${message}`, ...args);
   }
 
   public warn(message: string, ...args: unknown[]): void {
-    if (!this._shouldLog(LogLevel.WARN)) return;
+    if (!this.#shouldLog(LogLevel.WARN)) return;
 
     // eslint-disable-next-line no-console
     console.warn(`[Ripple] ${message}`, ...args);
   }
 
   public error(message: string, ...args: unknown[]): void {
-    if (!this._shouldLog(LogLevel.ERROR)) return;
+    if (!this.#shouldLog(LogLevel.ERROR)) return;
 
     // eslint-disable-next-line no-console
     console.error(`[Ripple] ${message}`, ...args);

@@ -389,8 +389,8 @@ const client2 = new RippleClient({
 import { RippleClient, type NodeClientConfig } from "@tapsioss/ripple-node";
 
 class TrackedRippleClient extends RippleClient {
-  private requestId: string | null = null;
-  private correlationId: string | null = null;
+  #requestId: string | null = null;
+  #correlationId: string | null = null;
 
   constructor(config: NodeClientConfig) {
     super(config);
@@ -398,12 +398,12 @@ class TrackedRippleClient extends RippleClient {
 
   // Set request ID for request tracing
   public setRequestId(requestId: string): void {
-    this.requestId = requestId;
+    this.#requestId = requestId;
   }
 
   // Set correlation ID for cross-service tracking
   public setCorrelationId(correlationId: string): void {
-    this.correlationId = correlationId;
+    this.#correlationId = correlationId;
   }
 
   // Override track to automatically inject IDs
@@ -414,8 +414,8 @@ class TrackedRippleClient extends RippleClient {
   ): Promise<void> {
     const enhancedMetadata = {
       ...metadata,
-      ...(this.requestId && { requestId: this.requestId }),
-      ...(this.correlationId && { correlationId: this.correlationId }),
+      ...(this.#requestId && { requestId: this.#requestId }),
+      ...(this.#correlationId && { correlationId: this.#correlationId }),
       serviceVersion: process.env.SERVICE_VERSION,
     };
 
@@ -461,7 +461,11 @@ import {
 } from "@tapsioss/ripple-node";
 
 class SchemaTransformAdapter implements HttpAdapter {
-  constructor(private baseAdapter: HttpAdapter) {}
+  #baseAdapter: HttpAdapter;
+
+  constructor(baseAdapter: HttpAdapter) {
+    this.#baseAdapter = baseAdapter;
+  }
 
   public async send(
     endpoint: string,
@@ -489,7 +493,7 @@ class SchemaTransformAdapter implements HttpAdapter {
       labels: event.metadata,
     }));
 
-    return this.baseAdapter.send(
+    return this.#baseAdapter.send(
       endpoint,
       transformedEvents as any,
       headers,

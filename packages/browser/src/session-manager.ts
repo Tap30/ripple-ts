@@ -3,8 +3,8 @@
  * Session lifecycle matches browser sessionStorage (cleared on tab/window close).
  */
 export class SessionManager {
-  private readonly _storageKey: string;
-  private _sessionId: string | null = null;
+  readonly #storageKey: string;
+  #sessionId: string | null = null;
 
   /**
    * Create a new SessionManager instance.
@@ -12,7 +12,7 @@ export class SessionManager {
    * @param storageKey The sessionStorage key to use (default: "ripple_session_id")
    */
   constructor(storageKey: string = "ripple_session_id") {
-    this._storageKey = storageKey;
+    this.#storageKey = storageKey;
   }
 
   /**
@@ -20,7 +20,7 @@ export class SessionManager {
    *
    * @returns A unique session identifier
    */
-  private _generateSessionId(): string {
+  #generateSessionId(): string {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join(
       "",
@@ -35,16 +35,16 @@ export class SessionManager {
    * @returns The current session ID
    */
   public init(): string {
-    const existing = sessionStorage.getItem(this._storageKey);
+    const existing = sessionStorage.getItem(this.#storageKey);
 
     if (existing) {
-      this._sessionId = existing;
+      this.#sessionId = existing;
     } else {
-      this._sessionId = this._generateSessionId();
-      sessionStorage.setItem(this._storageKey, this._sessionId);
+      this.#sessionId = this.#generateSessionId();
+      sessionStorage.setItem(this.#storageKey, this.#sessionId);
     }
 
-    return this._sessionId;
+    return this.#sessionId;
   }
 
   /**
@@ -53,15 +53,15 @@ export class SessionManager {
    * @returns The session ID or null if not initialized
    */
   public getSessionId(): string | null {
-    return this._sessionId;
+    return this.#sessionId;
   }
 
   /**
    * Clear the current session.
    */
   public clear(): void {
-    this._sessionId = null;
+    this.#sessionId = null;
 
-    sessionStorage.removeItem(this._storageKey);
+    sessionStorage.removeItem(this.#storageKey);
   }
 }

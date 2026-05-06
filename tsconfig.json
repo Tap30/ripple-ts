@@ -4,7 +4,7 @@
     "module": "node20",
     "moduleResolution": "nodenext",
     "skipLibCheck": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2020", "DOM"],
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
@@ -32,6 +32,8 @@
     "noUncheckedIndexedAccess": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedSideEffectImports": true,
+
+    "types": ["node"],
 
     "paths": {
       // Browser package

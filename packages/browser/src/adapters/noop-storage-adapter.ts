@@ -12,8 +12,5 @@ export class NoOpStorageAdapter implements StorageAdapter {
   }
 
   public async clear(): Promise<void> {}
-
-  public close(): Promise<void> {
-    return Promise.resolve();
-  }
+  public async close(): Promise<void> {}
 }
