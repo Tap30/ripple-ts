@@ -36,7 +36,7 @@ class TestClient extends Client<TestEvents, TestMetadata> {
   }
 
   public testSetSessionId(sessionId: string): void {
-    this._setSessionId(sessionId);
+    this._sessionId = sessionId;
   }
 }
 
@@ -657,18 +657,18 @@ describe("Client", () => {
       expect(storageAdapter.save).toHaveBeenCalledTimes(1);
     });
 
-    it("should allow subclasses to override _setSessionId", () => {
-      class TestClient extends Client<Record<string, EventPayload>> {
+    it("should allow subclasses to set _sessionId directly", () => {
+      class SubClient extends Client<Record<string, EventPayload>> {
         protected _getPlatform(): Platform | null {
           return null;
         }
 
         public testSetSessionId(sessionId: string): void {
-          this._setSessionId(sessionId);
+          this._sessionId = sessionId;
         }
       }
 
-      const client = new TestClient({
+      const client = new SubClient({
         apiKey: "test-key",
         endpoint: "https://api.example.com",
         httpAdapter: createMockHttpAdapter(),

@@ -69,9 +69,10 @@ export abstract class Client<
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
 
+  protected _sessionId: string | null = null;
+
   readonly #initMutex = new Mutex();
 
-  #sessionId: string | null = null;
   #initialized = false;
   #disposed = false;
 
@@ -167,7 +168,7 @@ export abstract class Client<
       metadata: this._metadataManager.merge(metadata),
       payload: payload ?? null,
       issuedAt: Date.now(),
-      sessionId: this.#sessionId,
+      sessionId: this._sessionId,
       platform: this._getPlatform(),
     };
 
@@ -204,18 +205,7 @@ export abstract class Client<
    * @returns Current session ID or null if not set
    */
   public getSessionId(): string | null {
-    return this.#sessionId;
-  }
-
-  // TODO: remove this function. make the field protected instead.
-  /**
-   * Set the session ID.
-   * Default implementation for base client - runtime packages can override.
-   *
-   * @param sessionId The session ID to set
-   */
-  protected _setSessionId(sessionId: string): void {
-    this.#sessionId = sessionId;
+    return this._sessionId;
   }
 
   /**
@@ -255,7 +245,7 @@ export abstract class Client<
     this._metadataManager.clear();
     this.#initMutex.release();
     this.#disposed = true;
-    this.#sessionId = null;
+    this._sessionId = null;
     this.#initialized = false;
   }
 }

@@ -82,7 +82,7 @@ export class RippleClient<
    * Should be called before tracking events.
    */
   public override async init(): Promise<void> {
-    this._setSessionId(this.#sessionManager.init());
+    this._sessionId = this.#sessionManager.init();
 
     await super.init();
   }
