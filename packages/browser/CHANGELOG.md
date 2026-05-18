@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 1.2.1
+### Patch Changes
+
+
+
+- [`f061cce`](https://github.com/Tap30/ripple-ts/commit/f061ccea8688b6c5d01460da2fbcacf1aa91c8d0) Thanks [@mimshins](https://github.com/mimshins)! - Export event sampler types.
+
 ## 1.2.0
 ### Minor Changes
 
