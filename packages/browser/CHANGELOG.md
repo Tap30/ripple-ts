@@ -1,5 +1,21 @@
 # @tapsioss/ripple-browser
 
+## 1.2.0
+### Minor Changes
+
+
+
+- [#34](https://github.com/Tap30/ripple-ts/pull/34) [`c612db8`](https://github.com/Tap30/ripple-ts/commit/c612db8bbeab9918def6f4aad99b4c269efdd60d) Thanks [@mimshins](https://github.com/mimshins)! - Add `eventSampler` config option to allow filtering events before they are enqueued.
+  
+  The sampler is a synchronous function that receives the fully-constructed event and returns `true` to keep it or `false` to drop it. When omitted, all events are enqueued (default behavior unchanged).
+  
+  ```ts
+  const client = new RippleClient({
+    // sample 50% of events
+    eventSampler: (event) => Math.random() < 0.5,
+  });
+  ```
+
 ## 1.1.0
 ### Minor Changes
 
