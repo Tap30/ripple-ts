@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
-import { Client, type ClientConfig } from "./client.ts";
+import { Client, type ClientConfig, type EventSampler } from "./client.ts";
 import type { Event, EventPayload, Platform } from "./types.ts";
 
 type TestMetadata = {
@@ -183,6 +183,18 @@ describe("Client", () => {
           storageAdapter: createMockStorageAdapter(),
         });
       }).toThrow("`maxBufferSize` must be a positive number.");
+    });
+
+    it("should throw error if eventSampler is not a function", () => {
+      expect(() => {
+        createTestClient({
+          config: {
+            eventSampler: "not-a-function" as unknown as EventSampler,
+          },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        });
+      }).toThrow("`eventSampler` must be a function.");
     });
   });
 
@@ -440,6 +452,68 @@ describe("Client", () => {
 
       expect(savedEvents[0]?.issuedAt).toBeGreaterThanOrEqual(beforeTime);
       expect(savedEvents[0]?.issuedAt).toBeLessThanOrEqual(afterTime);
+    });
+
+    it("should enqueue event when sampler returns true", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        config: { eventSampler: () => true },
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      expect(storageAdapter.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("should drop event when sampler returns false", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        config: { eventSampler: () => false },
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      expect(storageAdapter.save).not.toHaveBeenCalled();
+    });
+
+    it("should pass the constructed event to the sampler", async () => {
+      const sampler = vi.fn().mockReturnValue(true);
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        config: { eventSampler: sampler },
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event", { key: "value" });
+
+      expect(sampler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "test_event",
+          payload: { key: "value" },
+        }),
+      );
+    });
+
+    it("should enqueue all events when no sampler is provided", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("event1");
+      await client.track("event2");
+
+      expect(storageAdapter.save).toHaveBeenCalledTimes(2);
     });
   });
 
