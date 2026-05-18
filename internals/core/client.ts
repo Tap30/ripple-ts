@@ -8,31 +8,38 @@ import { Mutex } from "./mutex.ts";
 import type { Event, EventPayload, Platform } from "./types.ts";
 
 /**
+ * Function to sample events before they are enqueued.
+ */
+export type EventSampler<
+  TMetadata extends Record<string, unknown> = Record<string, unknown>,
+> = (event: Event<TMetadata>) => boolean;
+
+/**
  * Configuration for the Ripple client.
  */
 export type ClientConfig = {
   /**
-   * API key for authentication
+   * API key for authentication.
    */
   apiKey: string;
   /**
-   * API endpoint URL
+   * API endpoint URL.
    */
   endpoint: string;
   /**
-   * Header name for API key (default: `"X-API-Key"`)
+   * Header name for API key (default: `"X-API-Key"`).
    */
   apiKeyHeader?: string;
   /**
-   * Interval in milliseconds between automatic flushes (default: `5000`)
+   * Interval in milliseconds between automatic flushes (default: `5000`).
    */
   flushInterval?: number;
   /**
-   * Maximum number of events before auto-flush (default: `10`)
+   * Maximum number of events before auto-flush (default: `10`).
    */
   maxBatchSize?: number;
   /**
-   * Maximum retry attempts for failed requests (default: `3`)
+   * Maximum retry attempts for failed requests (default: `3`).
    */
   maxRetries?: number;
   /**
@@ -41,17 +48,22 @@ export type ClientConfig = {
    */
   maxBufferSize?: number;
   /**
-   * HTTP adapter for sending events
+   * HTTP adapter for sending events.
    */
   httpAdapter: HttpAdapter;
   /**
-   * Storage adapter for persisting events
+   * Storage adapter for persisting events.
    */
   storageAdapter: StorageAdapter;
   /**
-   * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level)
+   * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level).
    */
   loggerAdapter?: LoggerAdapter;
+  /**
+   * Optional function to sample events before they are enqueued.
+   * Return `true` to keep the event, `false` to drop it.
+   */
+  eventSampler?: EventSampler;
 };
 
 /**
@@ -68,6 +80,7 @@ export abstract class Client<
   protected readonly _metadataManager: MetadataManager<TMetadata>;
   protected readonly _dispatcher: Dispatcher<TMetadata>;
   protected readonly _logger: LoggerAdapter;
+  protected readonly _sampler: EventSampler;
 
   protected _sessionId: string | null = null;
 
@@ -112,6 +125,14 @@ export abstract class Client<
       throw new Error("`maxBufferSize` must be a positive number.");
     }
 
+    if (
+      config.eventSampler !== undefined &&
+      typeof config.eventSampler !== "function"
+    ) {
+      throw new Error("`eventSampler` must be a function.");
+    }
+
+    this._sampler = config.eventSampler ?? (() => true);
     this._logger =
       config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
@@ -172,7 +193,9 @@ export abstract class Client<
       platform: this._getPlatform(),
     };
 
-    await this._dispatcher.enqueue(event);
+    if (!this._sampler(event)) return;
+
+    return this._dispatcher.enqueue(event);
   }
 
   /**
