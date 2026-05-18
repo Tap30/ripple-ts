@@ -12,6 +12,7 @@ export {
   type ClientConfig,
   type Event,
   type EventPayload,
+  type EventSampler,
   type HttpAdapter,
   type HttpAdapterContext,
   type HttpResponse,
