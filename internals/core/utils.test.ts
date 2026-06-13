@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  calculateBackoff,
+  delay,
+  DelayAbortedError,
+  IdGenerator,
+} from "./utils.ts";
 
 describe("utils", () => {
   describe("calculateBackoff", () => {
@@ -107,6 +112,71 @@ describe("utils", () => {
       setTimeout(() => controller.abort(), 10);
 
       await expect(promise).rejects.toThrow(DelayAbortedError);
+    });
+  });
+
+  describe("IdGenerator", () => {
+    // Standard UUID v4 regex
+    const UUID_V4_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    afterEach(() => {
+      // Clean up any global stubs or mocks after each test
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it("should generate a string in valid UUID v4 format", () => {
+      const id = IdGenerator.generate();
+
+      expect(id).toMatch(UUID_V4_REGEX);
+    });
+
+    it("should generate unique UUIDs", () => {
+      const id1 = IdGenerator.generate();
+      const id2 = IdGenerator.generate();
+
+      expect(id1).not.toBe(id2);
+    });
+
+    it("should use native crypto.randomUUID if available", () => {
+      const mockUUID = "12345678-1234-4321-a123-123456789012";
+      const mockCrypto = {
+        randomUUID: vi.fn().mockReturnValue(mockUUID),
+      };
+
+      // Stub the global crypto object
+      vi.stubGlobal("crypto", mockCrypto);
+
+      const id = IdGenerator.generate();
+
+      expect(mockCrypto.randomUUID).toHaveBeenCalledOnce();
+      expect(id).toBe(mockUUID);
+    });
+
+    it("should use fallback Math.random when global crypto is undefined", () => {
+      // Remove crypto entirely
+      vi.stubGlobal("crypto", undefined);
+
+      const mathRandomSpy = vi.spyOn(Math, "random");
+
+      const id = IdGenerator.generate();
+
+      // 31 x's and y's in the template string means Math.random should be called 31 times
+      expect(mathRandomSpy).toHaveBeenCalledTimes(31);
+      expect(id).toMatch(UUID_V4_REGEX);
+    });
+
+    it("should use fallback Math.random when crypto.randomUUID is undefined", () => {
+      // Crypto exists, but randomUUID does not (e.g., older browsers/Node versions)
+      vi.stubGlobal("crypto", {});
+
+      const mathRandomSpy = vi.spyOn(Math, "random");
+
+      const id = IdGenerator.generate();
+
+      expect(mathRandomSpy).toHaveBeenCalled();
+      expect(id).toMatch(UUID_V4_REGEX);
     });
   });
 });

@@ -46,3 +46,28 @@ export const delay = (ms: number, signal?: AbortSignal): Promise<void> => {
     });
   });
 };
+
+/**
+ * Utility class for generating unique identifiers.
+ */
+export class IdGenerator {
+  /**
+   * Generates a universally unique identifier (UUID v4).
+   *
+   * @returns A string representing the UUID.
+   */
+  public static generate(): string {
+    // Use the native Web Crypto API if available
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+
+    // Fallback pseudo-random generator
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+
+      return v.toString(16);
+    });
+  }
+}
