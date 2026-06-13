@@ -364,7 +364,7 @@ export type Event<TMetadata = Record<string, unknown>> = {
   /**
    * Environment/App-specific data attached to all events (e.g., app version, build number).
    */
-  metadata: TMetadata | null;
+  metadata: Partial<TMetadata> | null;
   /**
    * Platform context.
    */
@@ -458,3 +458,29 @@ export type Campaign = {
  * Application state enum.
  */
 export type AppState = "opened" | "closed" | "foreground" | "background";
+
+export type UserTraits = {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  username?: string;
+  age?: number;
+  email?: string;
+  phone?: string;
+  gender?: "male" | "female" | "other";
+  /**
+   * UNIX timestamp in milliseconds.
+   */
+  birthday?: number;
+  /**
+   * UNIX timestamp in milliseconds.
+   */
+  createdAt?: number;
+  address?: {
+    city?: string;
+    country?: string;
+    state?: string;
+    street?: string;
+    timezone?: string;
+  };
+};

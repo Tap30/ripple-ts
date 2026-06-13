@@ -12,12 +12,13 @@ import type {
   Primitive,
   Product,
   Sort,
+  UserTraits,
 } from "./types.ts";
 
 /**
  * Payload for identify event.
  */
-export type IdentifyPayload = {
+export type UserIdentifiedPayload = {
   /**
    * The known database ID of the user.
    */
@@ -25,37 +26,13 @@ export type IdentifyPayload = {
   /**
    * User profile attributes.
    */
-  traits: {
-    firstName?: string;
-    lastName?: string;
-    fullName?: string;
-    username?: string;
-    age?: number;
-    email?: string;
-    phone?: string;
-    gender?: "male" | "female" | "other";
-    /**
-     * UNIX timestamp in milliseconds.
-     */
-    birthday?: number;
-    /**
-     * UNIX timestamp in milliseconds.
-     */
-    createdAt?: number;
-    address?: {
-      city?: string;
-      country?: string;
-      state?: string;
-      street?: string;
-      timezone?: string;
-    };
-  };
+  traits: UserTraits;
 };
 
 /**
  * Payload for web screen/page view events.
  */
-export type WebScreenPayload = {
+export type WebScreenedPayload = {
   /**
    * The page title.
    */
@@ -90,7 +67,7 @@ export type WebScreenPayload = {
 /**
  * Payload for mobile screen view events.
  */
-export type MobileScreenPayload = {
+export type MobileScreenedPayload = {
   /**
    * Name of the screen (e.g., "Home", "Product Detail").
    */
@@ -112,6 +89,26 @@ export type MobileScreenPayload = {
 export type AppStateChangedPayload = {
   newState: AppState;
   previousState?: AppState;
+};
+
+/**
+ * Payload for click event.
+ */
+export type ClickedPayload = {
+  elementId: string;
+  elementType?: string;
+  elementTitle?: string;
+  customProperties?: Record<string, Primitive>;
+};
+
+/**
+ * Payload for view event.
+ */
+export type ViewedPayload = {
+  elementId: string;
+  elementType?: string;
+  elementTitle?: string;
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
@@ -419,8 +416,8 @@ export type PaymentRefundedPayload = {
  */
 export type PredefinedEvents = {
   // Identity & Screen
-  identify: IdentifyPayload;
-  screen: WebScreenPayload | MobileScreenPayload;
+  identify: UserIdentifiedPayload;
+  screen: WebScreenedPayload | MobileScreenedPayload;
   app_state_changed: AppStateChangedPayload;
 
   // Product Discovery
