@@ -309,6 +309,22 @@ export type OrderFulfillmentStatusUpdatedPayload = {
 };
 
 /**
+ * Payload for order reviewed event.
+ */
+export type OrderReviewedPayload = {
+  order: Order;
+  /** Unique identifier for the submitted review. */
+  reviewId: string;
+  /** The numerical rating given by the user (e.g., 1 to 5). */
+  rating: number;
+  /** The title or summary of the review. */
+  title?: string;
+  /** The full text body of the review. */
+  body?: string;
+  customProperties?: Record<string, Primitive>;
+};
+
+/**
  * Payload for products searched event.
  */
 export type ProductsSearchedPayload = {
@@ -415,38 +431,31 @@ export type PaymentRefundedPayload = {
  * Provides type-safe event tracking with autocomplete support.
  */
 export type PredefinedEvents = {
-  // Identity & Screen
-  identify: UserIdentifiedPayload;
-  screen: WebScreenedPayload | MobileScreenedPayload;
+  user_identified: UserIdentifiedPayload;
   app_state_changed: AppStateChangedPayload;
+  clicked: ClickedPayload;
+  viewed: ViewedPayload;
 
-  // Product Discovery
   product_clicked: ProductClickedPayload;
   product_viewed: ProductViewedPayload;
   product_shared: ProductSharedPayload;
   products_searched: ProductsSearchedPayload;
   product_list_viewed: ProductListViewedPayload;
   product_list_filtered: ProductListFilteredPayload;
+  product_reviewed: ProductReviewedPayload;
 
-  // Wishlist
   product_added_to_wishlist: ProductWishlistPayload;
   product_removed_from_wishlist: ProductWishlistPayload;
 
-  // Cart
   product_added_to_cart: CartModificationPayload;
   product_removed_from_cart: CartModificationPayload;
   cart_viewed: CartViewedPayload;
   cart_emptied: CartEmptiedPayload;
 
-  // Product Reviews
-  product_reviewed: ProductReviewedPayload;
-
-  // Checkout
   checkout_started: CheckoutStartedPayload;
   checkout_step_viewed: CheckoutStepPayload;
   checkout_step_completed: CheckoutStepPayload;
 
-  // Orders
   order_completed: OrderCompletedPayload;
   order_failed: OrderFailedPayload;
   order_cancelled: OrderCancelledPayload;
@@ -456,18 +465,16 @@ export type PredefinedEvents = {
   order_product_fulfilled: OrderProductFulfilledPayload;
   order_product_returned: OrderProductReturnedPayload;
   order_fulfillment_status_updated: OrderFulfillmentStatusUpdatedPayload;
+  order_reviewed: OrderReviewedPayload;
 
-  // Coupons
   coupon_entered: CouponEnteredRemovedPayload;
   coupon_removed: CouponEnteredRemovedPayload;
   coupon_denied: CouponDeniedPayload;
   coupon_redeemed: CouponRedeemedPayload;
 
-  // Promotions
   promotion_viewed: PromotionPayload;
   promotion_clicked: PromotionPayload;
 
-  // Payments
   payment_authorized: PaymentAuthorizedPayload;
   payment_captured: PaymentCapturedPayload;
   payment_failed: PaymentFailedPayload;

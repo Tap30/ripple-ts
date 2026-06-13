@@ -1,11 +1,24 @@
+import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
 import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { type StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
+import type {
+  ClickedPayload,
+  PredefinedEvents,
+  ViewedPayload,
+} from "./event-specs.ts";
 import { ConsoleLoggerAdapter } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import { Mutex } from "./mutex.ts";
-import type { Event, EventPayload, Platform } from "./types.ts";
+import type {
+  Event,
+  EventPayload,
+  Platform,
+  SdkInfo,
+  UserTraits,
+} from "./types.ts";
+import { IdGenerator } from "./utils.ts";
 
 /**
  * Function to sample events before they are enqueued.
@@ -67,14 +80,23 @@ export type ClientConfig = {
 };
 
 /**
+ * Merges predefined CDP events with user-defined custom events.
+ */
+export type AllEvents<TCustomEvents extends Record<string, EventPayload>> =
+  PredefinedEvents & TCustomEvents;
+
+/**
  * Abstract base class for Ripple SDK clients.
  * Provides core event tracking functionality with type-safe metadata management.
  *
- * @template TEvents The type definition mapping event names to their payloads
+ * @template TCustomEvents Custom event definitions merged with predefined CDP events
  * @template TMetadata The type definition for metadata
  */
 export abstract class Client<
-  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
+  TCustomEvents extends Record<string, EventPayload> = Record<
+    string,
+    EventPayload
+  >,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
   protected readonly _metadataManager: MetadataManager<TMetadata>;
@@ -82,7 +104,8 @@ export abstract class Client<
   protected readonly _logger: LoggerAdapter;
   protected readonly _sampler: EventSampler;
 
-  protected _sessionId: string | null = null;
+  protected _anonymousId: string;
+  protected _userId: string | null = null;
 
   readonly #initMutex = new Mutex();
 
@@ -132,6 +155,8 @@ export abstract class Client<
       throw new Error("`eventSampler` must be a function.");
     }
 
+    this._anonymousId = this._generateAnonymousId();
+
     this._sampler = config.eventSampler ?? (() => true);
     this._logger =
       config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
@@ -155,6 +180,10 @@ export abstract class Client<
     );
   }
 
+  protected _generateAnonymousId(): string {
+    return IdGenerator.generate();
+  }
+
   /**
    * Get platform information for the current runtime.
    * Must be implemented by runtime-specific clients.
@@ -164,32 +193,94 @@ export abstract class Client<
   protected abstract _getPlatform(): Platform | null;
 
   /**
+   * Identify a user and associate traits with their profile.
+   *
+   * @param userId The authenticated user's unique identifier
+   * @param traits User profile attributes (e.g., name, email)
+   * @param schemaVersion Event schema version
+   */
+  public async identify(
+    userId: string,
+    traits: UserTraits,
+    schemaVersion?: string,
+  ): Promise<void> {
+    return this.track(
+      "user_identified",
+      { userId, traits } as AllEvents<TCustomEvents>["user_identified"],
+      schemaVersion,
+    );
+  }
+
+  /**
+   * Track a click interaction on a UI element.
+   *
+   * @param payload Click event data including element identifier
+   * @param schemaVersion Event schema version
+   */
+  public async click(
+    payload: ClickedPayload,
+    schemaVersion?: string,
+  ): Promise<void> {
+    return this.track(
+      "clicked",
+      payload as AllEvents<TCustomEvents>["clicked"],
+      schemaVersion,
+    );
+  }
+
+  /**
+   * Track a view impression of a UI element.
+   *
+   * @param payload View event data including element identifier
+   * @param schemaVersion Event schema version
+   */
+  public async view(
+    payload: ViewedPayload,
+    schemaVersion?: string,
+  ): Promise<void> {
+    return this.track(
+      "viewed",
+      payload as AllEvents<TCustomEvents>["viewed"],
+      schemaVersion,
+    );
+  }
+
+  /**
    * Track an event.
    * Automatically initializes the client if not already initialized.
    *
    * @param name Event name/identifier
    * @param payload Event data payload
-   * @param metadata Event-specific metadata
+   * @param schemaVersion Event schema version
    */
-  public async track<K extends keyof TEvents>(
+  public async track<K extends keyof AllEvents<TCustomEvents>>(
     name: K,
-    payload?: TEvents[K],
-    metadata?: Partial<TMetadata>,
+    payload?: AllEvents<TCustomEvents>[K],
+    schemaVersion?: string,
   ): Promise<void> {
     if (this.#disposed) {
       this._logger.warn("Cannot track event: Client has been disposed");
 
-      return Promise.resolve();
+      return;
     }
 
     await this.init();
 
+    const sdkInfo: SdkInfo = {
+      name: SDK_NAME,
+      version: SDK_VERSION,
+    };
+
     const event: Event<TMetadata> = {
+      eventId: IdGenerator.generate(),
+      schemaVersion: schemaVersion ?? null,
+      sdk: sdkInfo,
+      anonymousId: this._anonymousId,
+      userId: this._userId,
       name: name as string,
-      metadata: this._metadataManager.merge(metadata),
+      metadata: this.getMetadata(),
       payload: payload ?? null,
       issuedAt: Date.now(),
-      sessionId: this._sessionId,
       platform: this._getPlatform(),
     };
 
@@ -223,12 +314,21 @@ export abstract class Client<
   }
 
   /**
-   * Get the current session ID.
+   * Get the anonymous ID.
    *
-   * @returns Current session ID or null if not set
+   * @returns Anonymous ID
    */
-  public getSessionId(): string | null {
-    return this._sessionId;
+  public getAnonymousId(): string {
+    return this._anonymousId;
+  }
+
+  /**
+   * Get the user ID.
+   *
+   * @returns User ID or null if not set
+   */
+  public getUserId(): string | null {
+    return this._userId;
   }
 
   /**
@@ -267,8 +367,9 @@ export abstract class Client<
     this._dispatcher.dispose();
     this._metadataManager.clear();
     this.#initMutex.release();
+    this._userId = null;
     this.#disposed = true;
-    this._sessionId = null;
+    this._anonymousId = "";
     this.#initialized = false;
   }
 }
