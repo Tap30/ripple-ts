@@ -6,30 +6,33 @@ import {
   type WebPlatform,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
-import { SessionManager } from "./session-manager.ts";
+import { IdentityManager } from "./identity-manager.ts";
 
 /**
  * Browser-specific client configuration
  */
 export type BrowserClientConfig = ClientConfig & {
   /**
-   * Custom session storage key (default: "ripple_session_id")
+   * Custom session storage key for anonymous ID persistence (default: "ripple_anonymous_id")
    */
   sessionStoreKey?: string;
 };
 
 /**
  * Ripple SDK client for browser environments.
- * Automatically tracks user sessions tied to browser session lifecycle.
+ * Automatically persists anonymous ID via sessionStorage.
  *
- * @template TEvents The type definition mapping event names to their payloads
+ * @template TCustomEvents Custom event definitions merged with predefined CDP events
  * @template TMetadata The type definition for metadata
  */
 export class RippleClient<
-  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
+  TCustomEvents extends Record<string, EventPayload> = Record<
+    string,
+    EventPayload
+  >,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
-> extends Client<TEvents, TMetadata> {
-  readonly #sessionManager: SessionManager;
+> extends Client<TCustomEvents, TMetadata> {
+  readonly #identityManager: IdentityManager;
 
   /**
    * Create a new RippleClient instance.
@@ -37,13 +40,8 @@ export class RippleClient<
    * @param config Client configuration including required adapters
    */
   constructor(config: BrowserClientConfig) {
-    const finalConfig: ClientConfig = {
-      ...config,
-    };
-
-    super(finalConfig);
-
-    this.#sessionManager = new SessionManager(config.sessionStoreKey);
+    super(config);
+    this.#identityManager = new IdentityManager(config.sessionStoreKey);
   }
 
   /**
@@ -78,29 +76,18 @@ export class RippleClient<
   }
 
   /**
-   * Initialize the client, restore persisted events, and start session tracking.
-   * Should be called before tracking events.
+   * Initialize the client, restore persisted events, and restore anonymous ID.
    */
   public override async init(): Promise<void> {
-    this._sessionId = this.#sessionManager.init();
-
+    this._anonymousId = this.#identityManager.init();
     await super.init();
-  }
-
-  /**
-   * Get the current session ID.
-   *
-   * @returns The session ID or null if not initialized
-   */
-  public override getSessionId(): string | null {
-    return this.#sessionManager.getSessionId();
   }
 
   /**
    * Dispose the client and clean up resources including session management.
    */
   public override dispose(): void {
-    this.#sessionManager.clear();
+    this.#identityManager.clear();
     super.dispose();
   }
 }

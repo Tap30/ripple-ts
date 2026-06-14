@@ -9,6 +9,8 @@ export {
   LogLevel,
   NoOpLoggerAdapter,
   StorageQuotaExceededError,
+  type AllEvents,
+  type BatchOptions,
   type ClientConfig,
   type Event,
   type EventPayload,
@@ -20,6 +22,7 @@ export {
   type NativePlatform,
   type Platform,
   type PlatformInfo,
+  type RetryOptions,
   type StorageAdapter,
   type WebPlatform,
 } from "@internals/core";

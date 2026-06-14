@@ -6,6 +6,8 @@ export {
   ConsoleLoggerAdapter,
   LogLevel,
   NoOpLoggerAdapter,
+  type AllEvents,
+  type BatchOptions,
   type ClientConfig,
   type Event,
   type EventPayload,
@@ -16,6 +18,7 @@ export {
   type LoggerAdapter,
   type Platform,
   type PlatformInfo,
+  type RetryOptions,
   type ServerPlatform,
   type StorageAdapter,
 } from "@internals/core";

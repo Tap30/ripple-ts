@@ -18,21 +18,19 @@ for browsers.
 ## Features
 
 - 🚀 **High Performance**: Efficient buffer management with O(1) operations
-- 📦 **Automatic Batching**: Configurable batch size and flush intervals
-- 🔄 **Dynamic Rebatching**: Optimizes throughput when buffer grows during
-  offline/retry scenarios
-- 🔄 **Retry Logic**: Exponential backoff with jitter
-- 🔐 **Session Tracking**: Automatic session ID generation and management
+- 📦 **Automatic Batching**: Configurable batch size, payload size, and flush
+  intervals
+- 🔄 **Dynamic Rebatching**: Optimizes throughput with stop-on-failure ordering
+  guarantees
+- 🔄 **Retry Logic**: Configurable exponential backoff with jitter
+- 🆔 **Anonymous ID**: Persistent anonymous identity via sessionStorage
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
-- 💾 **Multiple Storage Options**: localStorage, sessionStorage, IndexedDB,
-  Cookies
+- 💾 **Multiple Storage Options**: localStorage, IndexedDB
 - 🔌 **Pluggable Adapters**: Custom HTTP, storage, and logger implementations
-- 📘 **Type-Safe**: Full TypeScript support with generics
+- 📘 **Type-Safe**: Full TypeScript support with predefined CDP events + custom
+  events
 - 🌐 **Offline Support**: Events persist across page reloads
-- ✅ **No Event Loss**: Events are preserved even during concurrent operations
-- 📋 **Event Ordering**: FIFO order maintained across all scenarios
-- 🚀 **Keepalive Support**: Reliable event delivery using fetch with `keepalive`
-  flag
+- ✅ **No Event Loss**: Events preserved with FIFO ordering across all scenarios
 
 ## Installation
 
@@ -40,19 +38,10 @@ for browsers.
 npm install @tapsioss/ripple-browser ua-parser-js
 ```
 
-```sh
-pnpm add @tapsioss/ripple-browser ua-parser-js
-```
-
-```sh
-yarn add @tapsioss/ripple-browser ua-parser-js
-```
-
 ### Peer Dependencies
 
 This package requires `ua-parser-js` (v2.x) as a peer dependency for automatic
-platform detection (browser, device, and OS information). Make sure to install
-it alongside the SDK.
+platform detection.
 
 ## Quick Start
 
@@ -63,14 +52,17 @@ import {
   IndexedDBAdapter,
 } from "@tapsioss/ripple-browser";
 
-// Define your event types for type safety
-type AppEvents = {
-  "page.view": { page: string; referrer?: string };
-  "user.login": { method: "google" | "email" };
-  "purchase.completed": { orderId: string; amount: number };
+// Define custom event types (predefined CDP events are always available)
+type CustomEvents = {
+  "feature.enabled": { featureName: string };
 };
 
-const client = new RippleClient<AppEvents>({
+type AppMetadata = {
+  appVersion: string;
+  environment: "prod" | "dev";
+};
+
+const client = new RippleClient<CustomEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   httpAdapter: new FetchHttpAdapter(),
@@ -78,391 +70,141 @@ const client = new RippleClient<AppEvents>({
 });
 
 await client.init();
-// Type-safe event tracking
-await client.track("page.view", { page: "/home", referrer: "google" });
-```
 
-## Usage
+// Set global metadata
+client.setMetadata("appVersion", "2.0.0");
+client.setMetadata("environment", "prod");
 
-### Basic Tracking
-
-```ts
-import {
-  RippleClient,
-  FetchHttpAdapter,
-  IndexedDBAdapter,
-} from "@tapsioss/ripple-browser";
-
-const client = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  flushInterval: 5000, // Auto-flush every 5 seconds
-  maxBatchSize: 10, // Auto-flush after 10 events
-  maxRetries: 3, // Retry failed requests 3 times
-  sessionStoreKey: "my_app_session", // Custom session storage key
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new IndexedDBAdapter(),
+// Track predefined events (autocomplete available!)
+await client.track("product_viewed", {
+  product: { productId: "123", price: { amount: 29.99, currency: "USD" } },
 });
 
-// Initialize and restore persisted events
-await client.init();
+// Track custom events with schema version
+await client.track("feature.enabled", { featureName: "dark-mode" }, "1.0.0");
 
-// Session ID is automatically generated and tracked
-console.log("Session ID:", client.getSessionId());
+// Identity
+await client.identify("user-123", { email: "user@example.com" });
 
-// Track events (session ID is automatically attached)
-// Note: Events tracked before init() are queued and sent after initialization
-await client.track("button_click", { button: "signup" });
-await client.track("form_submit", { form: "contact" });
-
-// Track without payload (just signal that something happened)
-await client.track("page_loaded");
-
-// Get current metadata
-const currentMetadata = client.getMetadata();
-
-// Manually flush events
+// Flush and cleanup
 await client.flush();
-
-// Clean up when done (e.g., SPA route change, component unmount)
 client.dispose();
 ```
 
-### Type-Safe Metadata
+## Configuration
 
 ```ts
-import { RippleClient } from "@tapsioss/ripple-browser";
-
-type Events = {
-  "user.signup": { email: string; plan: "free" | "premium" };
-  "product.viewed": { productId: string; category: string };
-  "cart.abandoned": { items: number; totalValue: number };
-};
-
-type Metadata = {
-  schemaVersion: string;
-  eventType: "user_action" | "system_event" | "conversion";
-  source: string;
-  experimentId?: string;
-  userId: string;
-  appVersion: string;
-};
-
-// Create typed client with both generics
-const client = new RippleClient<Events, Metadata>({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-});
-
-// Metadata to automatically attach to all events
-client.setMetadata("userId", "user-123");
-client.setMetadata("appVersion", "1.0.0");
-
-await client.init();
-
-// Track with typed events and metadata
-await client.track(
-  "user.signup",
-  { email: "user@example.com", plan: "premium" },
-  {
-    schemaVersion: "2.0.0",
-    eventType: "conversion",
-    source: "checkout_page",
-    experimentId: "signup-v2",
-  },
-);
-
-await client.track("product.viewed", {
-  productId: "prod-123",
-  category: "electronics",
-});
-```
-
-> [!NOTE]
->
-> Platform information (browser, device, OS) is automatically detected and
-> attached to all events.
-
-### Custom Storage Adapters
-
-```ts
-import {
-  RippleClient,
-  IndexedDBAdapter,
-  LocalStorageAdapter,
-} from "@tapsioss/ripple-browser";
-
-// Use IndexedDB for large event queues
 const client = new RippleClient({
+  // Required
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
+  httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new IndexedDBAdapter(),
-});
 
-// Or use localStorage for persistent tracking
-const persistentClient = new RippleClient({
-  ...config,
-  storageAdapter: new LocalStorageAdapter(),
-});
-```
+  // Batching (all optional)
+  batchOptions: {
+    interval: 10000, // Auto-flush interval in ms (default: 10000)
+    size: 10, // Max events per batch (default: 10)
+    maxPayloadSize: 65536, // Max batch payload in bytes (default: 64KB)
+  },
 
-### Multiple Client Instances
+  // Retry (all optional)
+  retryOptions: {
+    maxAttempts: 3, // Max retry attempts (default: 3)
+    minDelay: 1000, // Base delay in ms (default: 1000)
+    maxDelay: 360000, // Max delay cap in ms (default: 360000)
+    backoffFactor: 2, // Exponential multiplier (default: 2)
+  },
 
-When using multiple Ripple instances in the same application, configure unique
-storage keys to prevent conflicts:
-
-```ts
-import {
-  RippleClient,
-  IndexedDBAdapter,
-  LocalStorageAdapter,
-} from "@tapsioss/ripple-browser";
-
-// Analytics client
-const analyticsClient = new RippleClient({
-  apiKey: "analytics-key",
-  endpoint: "https://analytics.example.com/events",
-  sessionStoreKey: "analytics_session",
-  storageAdapter: new IndexedDBAdapter({ dbName: "analytics_db" }),
-});
-
-// Marketing client
-const marketingClient = new RippleClient({
-  apiKey: "marketing-key",
-  endpoint: "https://marketing.example.com/events",
-  sessionStoreKey: "marketing_session",
-  storageAdapter: new LocalStorageAdapter({ key: "marketing_events" }),
-});
-
-// Both clients can operate independently without conflicts
-await analyticsClient.init();
-await marketingClient.init();
-```
-
-### Custom HTTP Adapter
-
-```ts
-import {
-  RippleClient,
-  type HttpAdapter,
-  type HttpResponse,
-  type Event,
-} from "@tapsioss/ripple-browser";
-
-class AxiosHttpAdapter implements HttpAdapter {
-  public async send(
-    endpoint: string,
-    events: Event[],
-    headers: Record<string, string>,
-    apiKeyHeader: string,
-  ): Promise<HttpResponse> {
-    const response = await axios.post(endpoint, { events }, { headers });
-    return {
-      status: response.status,
-      data: response.data,
-    };
-  }
-}
-
-const client = new RippleClient({
-  ...config,
-  httpAdapter: new AxiosHttpAdapter(),
+  // Other options
+  apiKeyHeader: "X-API-Key", // Header name (default: "X-API-Key")
+  maxBufferSize: 1000, // Max persisted events (default: unlimited)
+  sessionStoreKey: "ripple_anonymous_id", // sessionStorage key (default)
+  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.WARN),
+  eventSampler: event => Math.random() < 0.5, // Sample 50% of events
 });
 ```
+
+## API Reference
+
+### `new RippleClient<TCustomEvents, TMetadata>(config)`
+
+Creates a new client. `TCustomEvents` defines your custom events — predefined
+CDP events are always merged automatically.
+
+### `init(): Promise<void>`
+
+Initializes the client, restores persisted events, and persists anonymous ID.
+
+### `track<K>(name, payload?, schemaVersion?): Promise<void>`
+
+Tracks an event. Accepts predefined event names and custom event names with full
+type safety.
+
+### `identify(userId, traits, schemaVersion?): Promise<void>`
+
+Identifies a user. Sends a `user_identified` event.
+
+### `click(payload, schemaVersion?): Promise<void>`
+
+Tracks a `clicked` event.
+
+### `view(payload, schemaVersion?): Promise<void>`
+
+Tracks a `viewed` event.
+
+### `setMetadata<K>(key, value): void`
+
+Sets global metadata attached to all subsequent events.
+
+### `getMetadata(): Partial<TMetadata>`
+
+Returns current metadata.
+
+### `getAnonymousId(): string`
+
+Returns the anonymous ID (persisted in sessionStorage).
+
+### `getUserId(): string | null`
+
+Returns the authenticated user ID if set via `identify()`.
+
+### `flush(): Promise<void>`
+
+Immediately flushes all queued events.
+
+### `dispose(): void`
+
+Cleans up resources, cancels timers, clears session.
 
 ## Storage Adapters
 
-| Adapter                 | Capacity   | Persistence | Performance | TTL Support | Buffer Limit Support | Use Case                                        |
-| ----------------------- | ---------- | ----------- | ----------- | ----------- | -------------------- | ----------------------------------------------- |
-| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Good        | ✅ Yes      | ✅ Yes               | Small to medium event queues                    |
-| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Excellent   | ✅ Yes      | ✅ Yes               | Large event queues                              |
-| **NoOpStorageAdapter**  | Unlimited  | -           | -           | -           | -                    | When persistence is not needed or not supported |
+| Adapter                 | Capacity   | Persistence | Use Case                     |
+| ----------------------- | ---------- | ----------- | ---------------------------- |
+| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Large event queues (default) |
+| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Small to medium queues       |
+| **NoOpStorageAdapter**  | N/A        | None        | When persistence not needed  |
 
 ### Storage Availability Detection
 
-All storage adapters provide a static `isAvailable()` method to check if the
-storage mechanism is accessible before creating an instance. This is useful for:
-
-- Detecting private/incognito browsing mode restrictions
-- Handling disabled storage APIs (user settings, browser policies)
-- Gracefully degrading when storage is unavailable
-
 ```ts
 import {
-  LocalStorageAdapter,
   IndexedDBAdapter,
+  LocalStorageAdapter,
   NoOpStorageAdapter,
 } from "@tapsioss/ripple-browser";
 
-// Example: Graceful degradation strategy
-async function createStorageAdapter(): StorageAdapter {
-  if (await IndexedDBAdapter.isAvailable()) {
-    return new IndexedDBAdapter();
-  }
-
-  if (await LocalStorageAdapter.isAvailable()) {
-    return new LocalStorageAdapter();
-  }
-
+async function createStorageAdapter() {
+  if (await IndexedDBAdapter.isAvailable()) return new IndexedDBAdapter();
+  if (await LocalStorageAdapter.isAvailable()) return new LocalStorageAdapter();
   return new NoOpStorageAdapter();
 }
-
-const client = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  maxBufferSize: 1000, // Limit in-memory buffer
-  storageAdapter: await createStorageAdapter(),
-});
-```
-
-**Common scenarios where storage may be unavailable:**
-
-- Safari private browsing (throws on `localStorage.setItem`)
-- Firefox private browsing (limited IndexedDB quota)
-- User disabled cookies or storage in browser settings
-- Browser extensions blocking storage APIs
-- Incognito/private mode in various browsers
-
-### TTL (Time-to-Live) Support
-
-LocalStorageAdapter and IndexedDBAdapter support optional TTL to automatically
-expire stored events:
-
-```ts
-import {
-  LocalStorageAdapter,
-  IndexedDBAdapter,
-} from "@tapsioss/ripple-browser";
-
-// Events expire after 1 hour (3600000ms)
-const localStorage = new LocalStorageAdapter({ ttl: 3600000 });
-const indexedDB = new IndexedDBAdapter({ ttl: 3600000 });
-```
-
-### Buffer Size Limit
-
-The client supports an optional `maxBufferSize` parameter to limit the in-memory
-event buffer. When the limit is reached, oldest events are evicted using a FIFO
-(First-In-First-Out) policy:
-
-```ts
-import { RippleClient, LocalStorageAdapter } from "@tapsioss/ripple-browser";
-
-// Limit buffer to 1000 events (oldest events are dropped when exceeded)
-const client = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  maxBufferSize: 1000,
-  storageAdapter: new LocalStorageAdapter(),
-});
-
-// Combine TTL and buffer limit
-const clientWithLimits = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  maxBufferSize: 5000,
-  storageAdapter: new IndexedDBAdapter({ ttl: 3600000 }),
-});
-```
-
-This feature is particularly useful for:
-
-- Preventing unbounded memory growth in long-running applications
-- Limiting event accumulation during extended offline periods
-- Controlling how many events are re-queued after network failures
-
-#### Understanding `maxBatchSize` vs `maxBufferSize`
-
-These two parameters serve different purposes and work together:
-
-**`maxBatchSize` (default: 10)** - Controls **when** events are sent
-
-- Triggers immediate flush when buffer reaches this size
-- Determines how many events are sent in a single HTTP request
-- Affects network efficiency and latency
-
-**`maxBufferSize` (default: unlimited)** - Controls **how many** events are kept
-
-- Limits total events in memory/storage
-- Drops oldest events when exceeded (FIFO)
-- Prevents unbounded memory growth
-
-> [!IMPORTANT]
->
-> `maxBufferSize` should always be **greater than or equal to** `maxBatchSize`.
-> If `maxBufferSize` is smaller, the batch size will never be reached and events
-> will be dropped unnecessarily.
-
-```ts
-// ✅ Good: Buffer is 10x batch size
-const client = new RippleClient({
-  maxBatchSize: 10,
-  maxBufferSize: 100,
-  // ...
-});
-
-// ✅ Good: Large buffer for extended offline periods
-const client = new RippleClient({
-  maxBatchSize: 20,
-  maxBufferSize: 1000,
-  // ...
-});
-
-// ❌ Bad: Buffer smaller than batch (batch will never be reached)
-const client = new RippleClient({
-  maxBatchSize: 100,
-  maxBufferSize: 50, // Events dropped before batch is full!
-  // ...
-});
-```
-
-**Behavior in different scenarios**:
-
-- **Normal operation** (`maxBatchSize: 10, maxBufferSize: 100`): Events flush
-  every 10 events, buffer rarely fills
-- **Offline mode**: Buffer accumulates up to 100 events, then starts dropping
-  oldest
-- **Misconfigured** (`maxBatchSize: 100, maxBufferSize: 50`): Batch never
-  reached, events only sent via time-based flush
-
-## Logger Adapters
-
-| Adapter                  | Output  | Configurable | Use Case                    |
-| ------------------------ | ------- | ------------ | --------------------------- |
-| **ConsoleLoggerAdapter** | Console | Yes          | Development and debugging   |
-| **NoOpLoggerAdapter**    | None    | No           | Production (silent logging) |
-
-### Log Levels
-
-- `DEBUG`: Detailed debugging information
-- `INFO`: General information messages
-- `WARN`: Warning messages (default level)
-- `ERROR`: Error messages
-- `NONE`: No logging output
-
-```ts
-import { ConsoleLoggerAdapter, LogLevel } from "@tapsioss/ripple-browser";
-
-const client = new RippleClient({
-  // ... other config
-  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
-});
 ```
 
 ## Platform Detection
 
-The SDK automatically detects and attaches platform information to all events
-using [ua-parser-js](https://github.com/faisalman/ua-parser-js). This includes:
-
-- **Browser**: Name and version (e.g., Chrome 120.0, Firefox 121.0)
-- **Device**: Type and vendor (e.g., Desktop, Mobile, Tablet)
-- **OS**: Name and version (e.g., Windows 11, macOS 14.0, iOS 17.0)
-
-Platform data is automatically included in every event and requires no
-configuration. The `ua-parser-js` library is a peer dependency and must be
-installed alongside the SDK.
-
-**Example platform data:**
+The SDK automatically detects browser, device, and OS information using
+`ua-parser-js` and attaches it to every event:
 
 ```ts
 {
@@ -473,299 +215,39 @@ installed alongside the SDK.
 }
 ```
 
-## Concurrency Guarantees
-
-The SDK is designed to handle concurrent operations safely:
-
-- **Thread-Safe Flush**: Multiple concurrent `flush()` calls are automatically
-  serialized using mutex locks
-- **Event Ordering**: FIFO order is maintained even during retry failures and
-  concurrent operations
-- **No Event Loss**: Events tracked during flush operations are safely queued
-  and sent in the next batch
-- **Automatic Cleanup**: Mutex locks are automatically released even if errors
-  occur, preventing deadlocks
-
-You can safely call `track()` and `flush()` from multiple parts of your
-application without worrying about race conditions.
-
 ## Error Handling
 
-The SDK handles HTTP errors differently based on their type:
+- **2xx**: Events cleared from storage
+- **4xx**: Events dropped (client errors won't self-resolve)
+- **5xx / Network errors**: Retried with exponential backoff, then requeued with
+  ordering preserved
 
-- **2xx Success**: Events are cleared from storage
-- **4xx Client Errors**: Events are dropped (not retried or persisted) since
-  client errors won't resolve without code changes
-- **5xx Server Errors**: Retried with exponential backoff up to `maxRetries`,
-  then re-queued and persisted for later retry
-- **Network Errors**: Same behavior as 5xx errors
-
-## Multi-Instance Considerations
-
-When running multiple Ripple client instances in the same application, consider
-these important factors to avoid conflicts and ensure proper operation:
-
-### Storage Isolation
-
-Each client instance should use separate storage to prevent data conflicts:
+## Custom HTTP Adapter
 
 ```ts
-// ❌ Bad: Both instances will conflict
-const client1 = new RippleClient({ apiKey: "key1", endpoint: "url1" });
-const client2 = new RippleClient({ apiKey: "key2", endpoint: "url2" });
-
-// ✅ Good: Isolated storage
-const client1 = new RippleClient({
-  apiKey: "key1",
-  endpoint: "url1",
-  sessionStoreKey: "app1_session",
-  storageAdapter: new IndexedDBAdapter({
-    dbName: "app1_db",
-    storeName: "events",
-    key: "queue",
-  }),
-});
-
-const client2 = new RippleClient({
-  apiKey: "key2",
-  endpoint: "url2",
-  sessionStoreKey: "app2_session",
-  storageAdapter: new LocalStorageAdapter({ key: "app2_events" }),
-});
-```
-
-### Resource Management
-
-- Each instance has its own flush timer and buffer
-- Always call `dispose()` when instances are no longer needed
-- Consider memory usage with many concurrent instances
-
-```ts
-// Proper cleanup
-const cleanup = () => {
-  client1.dispose();
-  client2.dispose();
-};
-
-// In React/SPA
-useEffect(() => cleanup, []);
-```
-
-### Session Management
-
-Configure unique session storage keys to maintain separate user sessions:
-
-```ts
-const userClient = new RippleClient({
-  sessionStoreKey: "user_analytics_session",
-  // ...
-});
-
-const adminClient = new RippleClient({
-  sessionStoreKey: "admin_analytics_session",
-  // ...
-});
-```
-
-## Extending Functionality
-
-### Extending the Client Class
-
-```ts
-import {
-  RippleClient,
-  type BrowserClientConfig,
+import type {
+  HttpAdapter,
+  HttpAdapterContext,
+  HttpResponse,
 } from "@tapsioss/ripple-browser";
 
-class TrackedRippleClient extends RippleClient {
-  #traceId: string | null = null;
-  #flowId: string | null = null;
-
-  constructor(config: BrowserClientConfig) {
-    super(config);
-  }
-
-  // Set trace ID for distributed tracing
-  public setTraceId(traceId: string): void {
-    this.#traceId = traceId;
-  }
-
-  // Set flow ID for user journey tracking
-  public setFlowId(flowId: string): void {
-    this.#flowId = flowId;
-  }
-
-  // Override track to automatically inject trace/flow IDs
-  public override async track(
-    name: string,
-    payload?: any,
-    metadata?: any,
-  ): Promise<void> {
-    const enhancedMetadata = {
-      ...metadata,
-      ...(this.#traceId && { traceId: this.#traceId }),
-      ...(this.#flowId && { flowId: this.#flowId }),
-    };
-
-    return super.track(name, payload, enhancedMetadata);
-  }
-
-  // Convenience method for A/B testing
-  public trackExperiment(experimentId: string, variant: string, event: string) {
-    return this.track(event, { experimentId, variant });
+class CustomHttpAdapter implements HttpAdapter {
+  async send(context: HttpAdapterContext): Promise<HttpResponse> {
+    const response = await fetch(context.endpoint, {
+      method: "POST",
+      headers: context.headers,
+      body: JSON.stringify({ events: context.events }),
+    });
+    return { status: response.status };
   }
 }
-
-const client = new TrackedRippleClient(config);
-await client.init();
-
-// Set trace context
-client.setTraceId("trace-abc-123");
-client.setFlowId("checkout-flow");
-
-// All events now include traceId and flowId
-await client.track("button_click", { button: "purchase" });
-await client.trackExperiment("checkout-v2", "variant-a", "conversion");
 ```
 
-### Schema Transformation via HTTP Adapter
+## Migration from v1
 
-```ts
-import {
-  type HttpAdapter,
-  type HttpResponse,
-  type Event,
-} from "@tapsioss/ripple-browser";
-
-class SchemaTransformAdapter implements HttpAdapter {
-  #baseAdapter: HttpAdapter;
-
-  constructor(baseAdapter: HttpAdapter) {
-    this.#baseAdapter = baseAdapter;
-  }
-
-  public async send(
-    endpoint: string,
-    events: Event[],
-    headers: Record<string, string>,
-    apiKeyHeader: string,
-  ): Promise<HttpResponse> {
-    // Transform to match your analytics platform schema
-    const transformedEvents = events.map(event => ({
-      event_name: event.name,
-      properties: event.payload,
-      user_properties: {
-        session_id: event.sessionId,
-        trace_id: event.metadata?.traceId,
-        flow_id: event.metadata?.flowId,
-      },
-      context: {
-        browser: event.platform?.browser?.name,
-        os: event.platform?.os?.name,
-        timestamp: event.timestamp,
-      },
-    }));
-
-    return this.#baseAdapter.send(
-      endpoint,
-      transformedEvents as unknown as Event,
-      headers,
-      apiKeyHeader,
-    );
-  }
-}
-
-const client = new RippleClient({
-  apiKey: "your-api-key",
-  endpoint: "https://api.example.com/events",
-  httpAdapter: new SchemaTransformAdapter(new FetchHttpAdapter()),
-  storageAdapter: new IndexedDBAdapter(),
-});
-```
-
-## Configuration
-
-The RippleClient uses `BrowserClientConfig` for configuration:
-
-```ts
-type BrowserClientConfig = {
-  apiKey: string; // Required: API authentication key
-  endpoint: string; // Required: API endpoint URL
-  apiKeyHeader?: string; // Optional: Header name for API key (default: "X-API-Key")
-  flushInterval?: number; // Optional: Auto-flush interval in ms (default: 5000)
-  maxBatchSize?: number; // Optional: Max events per batch (default: 10)
-  maxRetries?: number; // Optional: Max retry attempts (default: 3)
-  sessionStoreKey?: string; // Optional: Custom session storage key (default: "ripple_session_id")
-  httpAdapter: HttpAdapter; // Required: HTTP adapter for sending events
-  storageAdapter: StorageAdapter; // Required: Storage adapter for persisting events
-  loggerAdapter?: LoggerAdapter; // Optional: Logger adapter (default: ConsoleLoggerAdapter with WARN level)
-};
-```
-
-## API Reference
-
-### `RippleClient`
-
-#### `constructor(config: BrowserClientConfig)`
-
-Creates a new RippleClient instance.
-
-**Parameters:**
-
-- `config: BrowserClientConfig` - Client configuration with optional adapters
-
-#### `async init(): Promise<void>`
-
-Initializes the client and restores persisted events. Events tracked before
-initialization are automatically queued and processed after `init()` completes.
-
-#### `async track(name: string, payload?: EventPayload, metadata?: TMetadata): Promise<void>`
-
-Tracks an event with optional payload data and typed metadata. Metadata includes
-schemaVersion for event versioning. Platform information (browser, device, OS)
-is automatically detected and attached.
-
-**Throws**: Error if `init()` has not been called.
-
-#### `setMetadata<K>(key: K, value: TMetadata[K]): void`
-
-Sets a global metadata value that will be attached to all subsequent events.
-
-#### `async flush(): Promise<void>`
-
-Immediately flushes all queued events to the server.
-
-#### `getSessionId(): string | null`
-
-Gets the current session ID. Returns null if the client has not been
-initialized.
-
-#### `dispose(): void`
-
-Disposes the client and cleans up resources. Detaches event listeners and
-cancels scheduled flushes. Call this when you're done using the client to
-prevent memory leaks.
-
-## Ripple Guides and Best Practices
-
-- [Security Best Practices](https://github.com/Tap30/ripple/blob/main/guides/SECURITY.md)
-- [Disaster Recovery](https://github.com/Tap30/ripple/blob/main/guides/DISASTER_RECOVERY.md)
-- [Performance Tuning](https://github.com/Tap30/ripple/blob/main/guides/PERFORMANCE_TUNING.md)
-
-## Design and API Contract
-
-Read the
-[Design and API Contract Documentation](https://github.com/Tap30/ripple/blob/main/DESIGN_AND_CONTRACTS.md)
-to learn about the framework-agnostic API contract for SDKs.
-
-## Contributing
-
-Read the
-[contributing guide](https://github.com/Tap30/ripple-ts/blob/main/CONTRIBUTING.md)
-to learn about our development process, how to propose bug fixes and
-improvements, and how to build and test your changes.
+See the [Migration Guide](../../MIGRATION.md) for detailed instructions on
+upgrading from v1 to v2.
 
 ## License
 
-This project is licensed under the terms of the
-[MIT license](https://github.com/Tap30/ripple-ts/blob/main/packages/browser/LICENSE).
+[MIT](./LICENSE)
