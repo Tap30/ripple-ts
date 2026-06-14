@@ -6,6 +6,7 @@ import {
 } from "./adapters/storage-adapter.ts";
 import { Buffer } from "./buffer.ts";
 import { Mutex } from "./mutex.ts";
+import type { TelemetryHooks } from "./telemetry.ts";
 import type { Event } from "./types.ts";
 import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
 
@@ -88,6 +89,10 @@ export type DispatcherConfig = {
    * `null` means no expiry.
    */
   eventTTL: number | null;
+  /**
+   * Telemetry hooks for monitoring.
+   */
+  hooks: TelemetryHooks;
 };
 
 /**
@@ -153,6 +158,7 @@ export class Dispatcher<
     }
 
     this.#buffer.enqueue(event);
+    this.#config.hooks.onEnqueue?.({ bufferSize: this.#buffer.size() });
 
     try {
       const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
@@ -196,10 +202,23 @@ export class Dispatcher<
       this.#buffer.clear();
 
       const events = this.#filterExpired(allEvents);
+      const droppedCount = allEvents.length - events.length;
+
+      if (droppedCount > 0) {
+        this.#config.hooks.onDrop?.({
+          eventCount: droppedCount,
+          reason: "expired",
+        });
+      }
 
       if (events.length === 0) return;
 
       const batches = this.#createBatches(events);
+
+      this.#config.hooks.onFlush?.({
+        eventCount: events.length,
+        batchCount: batches.length,
+      });
 
       for (let i = 0; i < batches.length; i++) {
         const success = await this.#sendWithRetry(batches[i]!);
@@ -330,6 +349,10 @@ export class Dispatcher<
   ): Promise<boolean> {
     if (response.status >= 200 && response.status < 300) {
       await this.#clearStorage("Failed to clear storage after successful send");
+      this.#config.hooks.onSendSuccess?.({
+        batchSize: events.length,
+        status: response.status,
+      });
 
       return true;
     } else if (response.status >= 400 && response.status < 500) {
@@ -339,6 +362,10 @@ export class Dispatcher<
       });
 
       await this.#clearStorage("Failed to clear storage after 4xx error");
+      this.#config.hooks.onDrop?.({
+        eventCount: events.length,
+        reason: "client_error",
+      });
 
       return true;
     } else if (response.status >= 500) {
@@ -379,15 +406,19 @@ export class Dispatcher<
       });
 
       try {
-        await delay(
-          calculateBackoff(
-            attempt,
-            this.#config.retryOptions.minDelay,
-            this.#config.retryOptions.maxDelay,
-            this.#config.retryOptions.backoffFactor,
-          ),
-          this.#retryAbortController.signal,
+        const backoffDelay = calculateBackoff(
+          attempt,
+          this.#config.retryOptions.minDelay,
+          this.#config.retryOptions.maxDelay,
+          this.#config.retryOptions.backoffFactor,
         );
+
+        this.#config.hooks.onRetry?.({
+          attempt: attempt + 1,
+          delay: backoffDelay,
+        });
+
+        await delay(backoffDelay, this.#retryAbortController.signal);
 
         return await this.#sendWithRetry(events, attempt + 1);
       } catch (err) {
@@ -402,6 +433,12 @@ export class Dispatcher<
         status,
         maxRetries: this.#config.retryOptions.maxAttempts,
         eventsCount: events.length,
+      });
+
+      this.#config.hooks.onSendFailure?.({
+        batchSize: events.length,
+        error: `5xx: ${status}`,
+        attempt,
       });
 
       return false;
@@ -434,15 +471,19 @@ export class Dispatcher<
       });
 
       try {
-        await delay(
-          calculateBackoff(
-            attempt,
-            this.#config.retryOptions.minDelay,
-            this.#config.retryOptions.maxDelay,
-            this.#config.retryOptions.backoffFactor,
-          ),
-          this.#retryAbortController.signal,
+        const backoffDelay = calculateBackoff(
+          attempt,
+          this.#config.retryOptions.minDelay,
+          this.#config.retryOptions.maxDelay,
+          this.#config.retryOptions.backoffFactor,
         );
+
+        this.#config.hooks.onRetry?.({
+          attempt: attempt + 1,
+          delay: backoffDelay,
+        });
+
+        await delay(backoffDelay, this.#retryAbortController.signal);
 
         return await this.#sendWithRetry(events, attempt + 1);
       } catch (delayErr) {
@@ -458,6 +499,12 @@ export class Dispatcher<
         eventsCount: events.length,
         /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
+      });
+
+      this.#config.hooks.onSendFailure?.({
+        batchSize: events.length,
+        error: err instanceof Error ? err.message : String(err),
+        attempt,
       });
 
       return false;

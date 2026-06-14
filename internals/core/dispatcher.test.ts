@@ -48,6 +48,7 @@ const createConfig = (
   },
   maxBufferSize: Number.MAX_SAFE_INTEGER,
   eventTTL: null,
+  hooks: {},
   logger: new NoOpLogger(),
   ...overrides,
 });

@@ -16,6 +16,11 @@ import { HttpClient } from "./http-client.ts";
 import { ConsoleLogger } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import { Mutex } from "./mutex.ts";
+import {
+  createTelemetryHooks,
+  type TelemetryHooks,
+  type TelemetryOptions,
+} from "./telemetry.ts";
 import type {
   Event,
   EventPayload,
@@ -85,6 +90,15 @@ export type ClientConfig = {
    * Return `true` to keep the event, `false` to drop it.
    */
   eventSampler?: EventSampler;
+  /**
+   * Telemetry hooks for production monitoring (fire-and-forget).
+   */
+  hooks?: TelemetryHooks;
+  /**
+   * Automatic telemetry reporting configuration.
+   * When enabled, the SDK sends internal metrics to the specified endpoint.
+   */
+  telemetryOptions?: TelemetryOptions;
 };
 
 /**
@@ -112,6 +126,8 @@ export abstract class Client<
   protected readonly _storage: StorageAdapter;
   protected readonly _logger: LoggerAdapter;
   protected readonly _sampler: EventSampler;
+
+  readonly #hooks: TelemetryHooks;
 
   protected _anonymousId: string;
   protected _userId: string | null = null;
@@ -208,6 +224,12 @@ export abstract class Client<
     this._anonymousId = this._generateAnonymousId();
 
     this._sampler = config.eventSampler ?? (() => true);
+    this.#hooks = createTelemetryHooks(
+      config.hooks ?? {},
+      config.telemetryOptions ?? null,
+      config.apiKey,
+      config.apiKeyHeader ?? "X-API-Key",
+    );
     this._logger = config.loggerAdapter ?? new ConsoleLogger(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
 
@@ -228,6 +250,7 @@ export abstract class Client<
       },
       maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
       eventTTL: config.eventTTL ?? null,
+      hooks: this.#hooks,
       logger: this._logger,
     };
 
@@ -341,7 +364,11 @@ export abstract class Client<
       platform: this._getPlatform(),
     };
 
-    if (!this._sampler(event)) return;
+    if (!this._sampler(event)) {
+      this.#hooks.onDrop?.({ eventCount: 1, reason: "sampled" });
+
+      return;
+    }
 
     return this._dispatcher.enqueue(event);
   }
