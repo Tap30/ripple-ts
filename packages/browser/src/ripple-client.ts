@@ -189,6 +189,20 @@ export class RippleClient<
     return undefined;
   }
 
+  /**
+   * Track an app opened state change.
+   */
+  public openApp(): void {
+    this.#trackAppStateChange("opened");
+  }
+
+  /**
+   * Track an app closed state change.
+   */
+  public closeApp(): void {
+    this.#trackAppStateChange("closed");
+  }
+
   #trackAppStateChange(newState: AppState): void {
     const previousState = this.#appState;
 

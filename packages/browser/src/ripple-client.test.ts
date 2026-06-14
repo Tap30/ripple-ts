@@ -493,5 +493,49 @@ describe("RippleClient", () => {
         expect.any(Function),
       );
     });
+
+    it("should track opened state via openApp()", async () => {
+      await client.init();
+      client.openApp();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "opened", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should track closed state via closeApp()", async () => {
+      await client.init();
+      client.closeApp();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "closed", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
   });
 });

@@ -155,6 +155,14 @@ Tracks a `screened` page view event. Auto-captures title, URL, pathname,
 referrer, search, keywords (from meta tag), and UTM campaign params. Provided
 fields override auto-captured values.
 
+### `openApp(): void`
+
+Manually tracks `app_state_changed` with `newState: "opened"`.
+
+### `closeApp(): void`
+
+Manually tracks `app_state_changed` with `newState: "closed"`.
+
 ### `setMetadata<K>(key, value): void`
 
 Sets global metadata attached to all subsequent events.

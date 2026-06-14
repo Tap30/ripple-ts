@@ -2,18 +2,21 @@
 "@tapsioss/ripple-browser": minor
 ---
 
-Automatic `app_state_changed` tracking on visibility change.
+Automatic `app_state_changed` tracking and manual `openApp()`/`closeApp()` methods.
 
 #### New Features
 
-The browser client now automatically tracks `app_state_changed` events when
-the page visibility changes (`foreground` ↔ `background`). No configuration
-needed — events are sent automatically after `init()`.
+##### Auto-tracking visibility changes
+
+The browser client automatically tracks `app_state_changed` events when page
+visibility changes (`foreground` ↔ `background`). Starts after `init()`,
+cleaned up on `dispose()`.
+
+##### `openApp()` and `closeApp()`
+
+Manual methods to explicitly signal app lifecycle state:
 
 ```ts
-// Automatically tracked:
-// { newState: "background", previousState: "foreground" }
-// { newState: "foreground", previousState: "background" }
+client.openApp();  // { newState: "opened", previousState: ... }
+client.closeApp(); // { newState: "closed", previousState: ... }
 ```
-
-The listener is cleaned up on `dispose()`.
