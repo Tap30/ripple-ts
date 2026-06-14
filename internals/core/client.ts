@@ -105,6 +105,7 @@ export abstract class Client<
 > {
   protected readonly _metadataManager: MetadataManager<TMetadata>;
   protected readonly _dispatcher: Dispatcher<TMetadata>;
+  protected readonly _storage: StorageAdapter;
   protected readonly _logger: LoggerAdapter;
   protected readonly _sampler: EventSampler;
 
@@ -225,8 +226,10 @@ export abstract class Client<
       loggerAdapter: this._logger,
     };
 
+    this._storage = config.storageAdapter;
     this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
+      /* v8 ignore next -- @preserve */
       config.httpAdapter ?? new HttpClient(),
       config.storageAdapter,
     );
@@ -405,6 +408,7 @@ export abstract class Client<
     await this.#initMutex.runAtomic(async () => {
       if (this.#initialized) return await Promise.resolve();
 
+      await this._storage.init();
       await this._dispatcher.restore();
 
       this.#initialized = true;

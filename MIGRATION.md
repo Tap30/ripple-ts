@@ -139,3 +139,29 @@ The adapter now receives a context object instead of positional arguments:
 -send(endpoint: string, events: Event[], headers: Record<string, string>, apiKeyHeader: string): Promise<HttpResponse>
 +send(context: HttpAdapterContext): Promise<HttpResponse>
 ```
+
+## Storage
+
+### `StorageAdapter` interface requires `init()` method
+
+Custom storage adapters must now implement `init(): Promise<void>`.
+
+### Browser storage classes consolidated
+
+`IndexedDBAdapter` and `LocalStorageAdapter` are no longer exported. Use
+`WebStorage` which auto-detects the best available backend:
+
+```diff
+-import { IndexedDBAdapter } from "@tapsioss/ripple-browser";
+-const storage = new IndexedDBAdapter({ ttl: 3600000 });
++import { WebStorage } from "@tapsioss/ripple-browser";
++const storage = new WebStorage({ ttl: 3600000 });
+```
+
+### Storage class renames
+
+| v1                      | v2            |
+| ----------------------- | ------------- |
+| `IndexedDBAdapter`      | (internal)    |
+| `LocalStorageAdapter`   | (internal)    |
+| `NoOpStorageAdapter`    | `NoOpStorage` |

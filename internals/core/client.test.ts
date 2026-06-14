@@ -38,6 +38,7 @@ const createMockHttpAdapter = (): HttpAdapter => ({
 });
 
 const createMockStorageAdapter = (): StorageAdapter => ({
+  init: vi.fn().mockResolvedValue(undefined),
   save: vi.fn().mockResolvedValue(undefined),
   load: vi.fn().mockResolvedValue([]),
   clear: vi.fn().mockResolvedValue(undefined),

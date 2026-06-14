@@ -1,7 +1,6 @@
-export * from "./adapters/indexed-db-adapter.ts";
-export * from "./adapters/local-storage-adapter.ts";
-export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
+export * from "./storages/noop-storage.ts";
+export * from "./storages/web-storage.ts";
 
 export {
   ConsoleLogger,

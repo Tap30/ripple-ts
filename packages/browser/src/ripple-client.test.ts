@@ -54,6 +54,7 @@ const mockHttpAdapter: HttpAdapter = {
 };
 
 const mockStorageAdapter: StorageAdapter = {
+  init: vi.fn().mockResolvedValue(undefined),
   save: vi.fn().mockResolvedValue(undefined),
   load: vi.fn().mockResolvedValue([]),
   clear: vi.fn().mockResolvedValue(undefined),

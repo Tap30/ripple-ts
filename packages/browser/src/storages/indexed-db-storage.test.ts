@@ -3,14 +3,21 @@ import {
   type Event as RippleEvent,
 } from "@internals/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IndexedDBAdapter } from "./indexed-db-adapter.ts";
+import { IndexedDBStorage } from "./indexed-db-storage.ts";
 
 const createEvent = (name = "test_event"): RippleEvent => ({
   name,
+  anonymousId: "anon-user-123",
+  eventId: "event-id",
+  userId: "user-123",
+  sdk: {
+    name: "sdk",
+    version: "x.y.z",
+  },
   payload: { key: "value" },
   issuedAt: Date.now(),
   metadata: {},
-  sessionId: "session-123",
+  schemaVersion: null,
   platform: null,
 });
 
@@ -100,8 +107,8 @@ const mockDeleteReq = (store: IDBObjectStore) => {
   return req;
 };
 
-describe("IndexedDBAdapter", () => {
-  let adapter: IndexedDBAdapter;
+describe("IndexedDBStorage", () => {
+  let adapter: IndexedDBStorage;
   let mockEvents: RippleEvent[];
   let mockDB: IDBDatabase;
   let mockTransaction: IDBTransaction;
@@ -143,7 +150,7 @@ describe("IndexedDBAdapter", () => {
       configurable: true,
     });
 
-    adapter = new IndexedDBAdapter();
+    adapter = new IndexedDBStorage();
   });
 
   afterEach(() => {
@@ -152,25 +159,29 @@ describe("IndexedDBAdapter", () => {
 
   describe("constructor", () => {
     it("creates with defaults", () => {
-      expect(adapter).toBeInstanceOf(IndexedDBAdapter);
+      expect(adapter).toBeInstanceOf(IndexedDBStorage);
+    });
+
+    it("should init without error", async () => {
+      await expect(adapter.init()).resolves.toBeUndefined();
     });
 
     it("creates with custom config", () => {
       expect(
-        new IndexedDBAdapter({
+        new IndexedDBStorage({
           dbName: "db",
           storeName: "store",
           key: "k",
           ttl: 60000,
         }),
-      ).toBeInstanceOf(IndexedDBAdapter);
+      ).toBeInstanceOf(IndexedDBStorage);
     });
   });
 
   describe("isAvailable", () => {
     it("returns true when IndexedDB opens successfully", async () => {
       const db = { close: vi.fn() } as unknown as IDBDatabase;
-      const promise = IndexedDBAdapter.isAvailable();
+      const promise = IndexedDBStorage.isAvailable();
 
       defProp(openRequest, "result", db);
       openRequest.onsuccess?.(new Event("success"));
@@ -185,7 +196,7 @@ describe("IndexedDBAdapter", () => {
       // @ts-expect-error - intentional deletion
       delete globalThis.indexedDB;
 
-      expect(await IndexedDBAdapter.isAvailable()).toBe(false);
+      expect(await IndexedDBStorage.isAvailable()).toBe(false);
 
       Object.defineProperty(globalThis, "indexedDB", {
         value: original,
@@ -211,7 +222,7 @@ describe("IndexedDBAdapter", () => {
         },
       ],
     ])("returns false when %s", async (_, trigger) => {
-      const promise = IndexedDBAdapter.isAvailable();
+      const promise = IndexedDBStorage.isAvailable();
 
       trigger(openRequest);
       expect(await promise).toBe(false);
@@ -222,7 +233,7 @@ describe("IndexedDBAdapter", () => {
         throw new Error("IndexedDB disabled");
       });
 
-      expect(await IndexedDBAdapter.isAvailable()).toBe(false);
+      expect(await IndexedDBStorage.isAvailable()).toBe(false);
     });
   });
 
@@ -357,7 +368,7 @@ describe("IndexedDBAdapter", () => {
 
       expect(indexedDB.open).toHaveBeenCalledWith(
         "ripple_db",
-        IndexedDBAdapter.SCHEMA_VERSION,
+        IndexedDBStorage.SCHEMA_VERSION,
       );
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 1000 },
@@ -368,7 +379,7 @@ describe("IndexedDBAdapter", () => {
     it("uses custom db/store/key names", async () => {
       vi.setSystemTime(1000);
 
-      const custom = new IndexedDBAdapter({
+      const custom = new IndexedDBStorage({
         dbName: "custom_db",
         storeName: "custom_store",
         key: "custom_key",
@@ -388,7 +399,7 @@ describe("IndexedDBAdapter", () => {
 
       expect(indexedDB.open).toHaveBeenCalledWith(
         "custom_db",
-        IndexedDBAdapter.SCHEMA_VERSION,
+        IndexedDBStorage.SCHEMA_VERSION,
       );
       expect(mockObjectStore.put).toHaveBeenCalledWith(
         { events: mockEvents, savedAt: 1000 },
@@ -399,7 +410,7 @@ describe("IndexedDBAdapter", () => {
     it("discards expired TTL data on save", async () => {
       vi.setSystemTime(5000);
 
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
       const getReq = mockGetReq(mockObjectStore);
       const putReq = mockPutReq(mockObjectStore);
 
@@ -580,7 +591,7 @@ describe("IndexedDBAdapter", () => {
 
     it("returns events when TTL not expired", async () => {
       vi.setSystemTime(2000);
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 5000 });
+      const ttlAdapter = new IndexedDBStorage({ ttl: 5000 });
       const getReq = mockGetReq(mockObjectStore);
       const loadPromise = ttlAdapter.load();
 
@@ -592,7 +603,7 @@ describe("IndexedDBAdapter", () => {
 
     it("clears and returns empty array when TTL expired", async () => {
       vi.setSystemTime(2000);
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
       const getReq = mockGetReq(mockObjectStore);
       const deleteReq = mockDeleteReq(mockObjectStore);
       const loadPromise = ttlAdapter.load();
@@ -614,7 +625,7 @@ describe("IndexedDBAdapter", () => {
     it("logs error and returns empty array when TTL clear fails", async () => {
       vi.setSystemTime(2000);
 
-      const ttlAdapter = new IndexedDBAdapter({ ttl: 1000 });
+      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
       const getReq = mockGetReq(mockObjectStore);
 
       vi.spyOn(ttlAdapter, "clear").mockRejectedValueOnce(
@@ -753,7 +764,7 @@ describe("IndexedDBAdapter", () => {
     });
 
     it("resolves without error when no connection exists", async () => {
-      await expect(new IndexedDBAdapter().close()).resolves.toBeUndefined();
+      await expect(new IndexedDBStorage().close()).resolves.toBeUndefined();
     });
   });
 });

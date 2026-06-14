@@ -9,7 +9,7 @@ type StorageData = {
   savedAt: number;
 };
 
-export type LocalStorageAdapterConfig = {
+export type LocalStorageConfig = {
   key?: string;
   ttl?: number;
 };
@@ -18,19 +18,21 @@ export type LocalStorageAdapterConfig = {
  * Storage adapter implementation using localStorage.
  * Provides persistent storage across browser sessions with optional TTL.
  */
-export class LocalStorageAdapter implements StorageAdapter {
+export class LocalStorage implements StorageAdapter {
   readonly #key: string;
   readonly #ttl: number | null;
 
   /**
-   * Create a new LocalStorageAdapter instance.
+   * Create a new LocalStorage instance.
    *
    * @param config Configuration object
    */
-  constructor(config: LocalStorageAdapterConfig = {}) {
+  constructor(config: LocalStorageConfig = {}) {
     this.#key = config.key ?? "ripple_events";
     this.#ttl = config.ttl ?? null;
   }
+
+  public async init(): Promise<void> {}
 
   /**
    * Check if localStorage is available.

@@ -25,7 +25,7 @@ for browsers.
 - 🔄 **Retry Logic**: Configurable exponential backoff with jitter
 - 🆔 **Anonymous ID**: Persistent anonymous identity via sessionStorage
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
-- 💾 **Multiple Storage Options**: localStorage, IndexedDB
+- 💾 **Auto-Detecting Storage**: IndexedDB, localStorage, with automatic fallback
 - 🔌 **Pluggable Adapters**: Custom HTTP, storage, and logger implementations
 - 📘 **Type-Safe**: Full TypeScript support with predefined CDP events + custom
   events
@@ -46,7 +46,7 @@ platform detection.
 ## Quick Start
 
 ```ts
-import { RippleClient, IndexedDBAdapter } from "@tapsioss/ripple-browser";
+import { RippleClient, WebStorage } from "@tapsioss/ripple-browser";
 
 // Define custom event types (predefined CDP events are always available)
 type CustomEvents = {
@@ -61,7 +61,7 @@ type AppMetadata = {
 const client = new RippleClient<CustomEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  storageAdapter: new IndexedDBAdapter(),
+  storageAdapter: new WebStorage(),
 });
 
 await client.init();
@@ -93,7 +93,7 @@ const client = new RippleClient({
   // Required
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  storageAdapter: new IndexedDBAdapter(),
+  storageAdapter: new WebStorage(),
 
   // Batching (all optional)
   batchOptions: {
@@ -171,28 +171,32 @@ Immediately flushes all queued events.
 
 Cleans up resources, cancels timers, clears session.
 
-## Storage Adapters
+## Storage
 
-| Adapter                 | Capacity   | Persistence | Use Case                     |
-| ----------------------- | ---------- | ----------- | ---------------------------- |
-| **IndexedDBAdapter**    | ~50MB-1GB+ | Permanent   | Large event queues (default) |
-| **LocalStorageAdapter** | ~5-10MB    | Permanent   | Small to medium queues       |
-| **NoOpStorageAdapter**  | N/A        | None        | When persistence not needed  |
-
-### Storage Availability Detection
+| Adapter          | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| **WebStorage**   | Auto-detects best backend (IndexedDB → localStorage → NoOp) |
+| **NoOpStorage**  | Discards all events (when persistence not needed)         |
 
 ```ts
-import {
-  IndexedDBAdapter,
-  LocalStorageAdapter,
-  NoOpStorageAdapter,
-} from "@tapsioss/ripple-browser";
+import { RippleClient, WebStorage } from "@tapsioss/ripple-browser";
 
-async function createStorageAdapter() {
-  if (await IndexedDBAdapter.isAvailable()) return new IndexedDBAdapter();
-  if (await LocalStorageAdapter.isAvailable()) return new LocalStorageAdapter();
-  return new NoOpStorageAdapter();
-}
+// Auto-detect best available storage
+const client = new RippleClient({
+  storageAdapter: new WebStorage(),
+  // ...
+});
+
+// Or with preferences
+const client2 = new RippleClient({
+  storageAdapter: new WebStorage({
+    prefer: "localstorage", // or "indexeddb" (default)
+    ttl: 3600000,           // Optional: expire events after 1 hour
+    dbName: "my_app_db",    // Optional: custom IndexedDB name
+    key: "my_events",       // Optional: custom storage key
+  }),
+  // ...
+});
 ```
 
 ## Platform Detection

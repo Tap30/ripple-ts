@@ -10,9 +10,9 @@ type StorageData = {
 };
 
 /**
- * Configuration options for the IndexedDBAdapter.
+ * Configuration options for the IndexedDBStorage.
  */
-export type IndexedDBAdapterConfig = {
+export type IndexedDBStorageConfig = {
   /**
    * The name of the IndexedDB database (default: "ripple_db").
    */
@@ -40,7 +40,7 @@ export type IndexedDBAdapterConfig = {
  * Storage adapter implementation using IndexedDB.
  * Provides large-capacity persistent storage with better performance for large datasets.
  */
-export class IndexedDBAdapter implements StorageAdapter {
+export class IndexedDBStorage implements StorageAdapter {
   readonly #dbName: string;
   readonly #storeName: string;
   readonly #key: string;
@@ -51,16 +51,18 @@ export class IndexedDBAdapter implements StorageAdapter {
   #dbPromise: Promise<IDBDatabase> | null = null;
 
   /**
-   * Create a new IndexedDBAdapter instance.
+   * Create a new IndexedDBStorage instance.
    *
    * @param config Configuration object
    */
-  constructor(config: IndexedDBAdapterConfig = {}) {
+  constructor(config: IndexedDBStorageConfig = {}) {
     this.#dbName = config.dbName ?? "ripple_db";
     this.#storeName = config.storeName ?? "events";
     this.#key = config.key ?? "queue";
     this.#ttl = config.ttl ?? null;
   }
+
+  public async init(): Promise<void> {}
 
   /**
    * Check if IndexedDB is available.
@@ -113,7 +115,7 @@ export class IndexedDBAdapter implements StorageAdapter {
       this.#dbPromise = new Promise((resolve, reject) => {
         const request = indexedDB.open(
           this.#dbName,
-          IndexedDBAdapter.SCHEMA_VERSION,
+          IndexedDBStorage.SCHEMA_VERSION,
         );
 
         request.onblocked = () => {

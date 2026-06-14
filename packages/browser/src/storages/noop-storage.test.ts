@@ -1,10 +1,15 @@
 import type { Event as RippleEvent } from "@internals/core";
 import { describe, expect, it } from "vitest";
-import { NoOpStorageAdapter } from "./noop-storage-adapter.ts";
+import { NoOpStorage } from "./noop-storage.ts";
 
-describe("NoOpStorageAdapter", () => {
+describe("NoOpStorage", () => {
+  it("should init without error", async () => {
+    const adapter = new NoOpStorage();
+    await expect(adapter.init()).resolves.toBeUndefined();
+  });
+
   it("should save without error", async () => {
-    const adapter = new NoOpStorageAdapter();
+    const adapter = new NoOpStorage();
 
     await expect(
       adapter.save([
@@ -21,19 +26,19 @@ describe("NoOpStorageAdapter", () => {
   });
 
   it("should load empty array", async () => {
-    const adapter = new NoOpStorageAdapter();
+    const adapter = new NoOpStorage();
 
     expect(await adapter.load()).toEqual([]);
   });
 
   it("should clear without error", async () => {
-    const adapter = new NoOpStorageAdapter();
+    const adapter = new NoOpStorage();
 
     await expect(adapter.clear()).resolves.toBeUndefined();
   });
 
   it("should close without error", async () => {
-    const adapter = new NoOpStorageAdapter();
+    const adapter = new NoOpStorage();
 
     await expect(adapter.close()).resolves.toBeUndefined();
   });

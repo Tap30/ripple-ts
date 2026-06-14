@@ -3,10 +3,10 @@ import {
   type Event as RippleEvent,
 } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LocalStorageAdapter } from "./local-storage-adapter.ts";
+import { LocalStorage } from "./local-storage.ts";
 
-describe("LocalStorageAdapter", () => {
-  let adapter: LocalStorageAdapter;
+describe("LocalStorage", () => {
+  let adapter: LocalStorage;
   let mockLocalStorage: Storage;
   let mockEvents: RippleEvent[];
 
@@ -25,7 +25,7 @@ describe("LocalStorageAdapter", () => {
       writable: true,
     });
 
-    adapter = new LocalStorageAdapter();
+    adapter = new LocalStorage();
 
     mockEvents = [
       {
@@ -41,25 +41,29 @@ describe("LocalStorageAdapter", () => {
 
   describe("constructor", () => {
     it("should create instance with default key", () => {
-      expect(adapter).toBeInstanceOf(LocalStorageAdapter);
+      expect(adapter).toBeInstanceOf(LocalStorage);
+    });
+
+    it("should init without error", async () => {
+      await expect(adapter.init()).resolves.toBeUndefined();
     });
 
     it("should create instance with custom key", () => {
-      const customAdapter = new LocalStorageAdapter({ key: "custom_key" });
+      const customAdapter = new LocalStorage({ key: "custom_key" });
 
-      expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
+      expect(customAdapter).toBeInstanceOf(LocalStorage);
     });
 
     it("should create instance with TTL", () => {
-      const customAdapter = new LocalStorageAdapter({ ttl: 60000 });
+      const customAdapter = new LocalStorage({ ttl: 60000 });
 
-      expect(customAdapter).toBeInstanceOf(LocalStorageAdapter);
+      expect(customAdapter).toBeInstanceOf(LocalStorage);
     });
   });
 
   describe("isAvailable", () => {
     it("should return true when localStorage is available", async () => {
-      const available = await LocalStorageAdapter.isAvailable();
+      const available = await LocalStorage.isAvailable();
 
       expect(available).toBe(true);
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -76,7 +80,7 @@ describe("LocalStorageAdapter", () => {
         throw new StorageQuotaExceededError(0, 0);
       });
 
-      const available = await LocalStorageAdapter.isAvailable();
+      const available = await LocalStorage.isAvailable();
 
       expect(available).toBe(false);
     });
@@ -100,7 +104,7 @@ describe("LocalStorageAdapter", () => {
     it("should use custom key when provided", async () => {
       vi.setSystemTime(1000);
 
-      const customAdapter = new LocalStorageAdapter({ key: "custom_events" });
+      const customAdapter = new LocalStorage({ key: "custom_events" });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(null);
 
@@ -193,7 +197,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new LocalStorageAdapter({ ttl: 1000 });
+      const ttlAdapter = new LocalStorage({ ttl: 1000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
@@ -208,7 +212,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new LocalStorageAdapter({ ttl: 5000 });
+      const ttlAdapter = new LocalStorage({ ttl: 5000 });
       const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
 
       vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
@@ -238,7 +242,7 @@ describe("LocalStorageAdapter", () => {
     });
 
     it("should use custom key when provided", async () => {
-      const customAdapter = new LocalStorageAdapter({ key: "custom_events" });
+      const customAdapter = new LocalStorage({ key: "custom_events" });
 
       await customAdapter.clear();
 

@@ -1,5 +1,5 @@
-export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
+export * from "./storages/noop-storage.ts";
 
 export {
   ConsoleLogger,
