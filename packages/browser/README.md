@@ -46,11 +46,7 @@ platform detection.
 ## Quick Start
 
 ```ts
-import {
-  RippleClient,
-  FetchHttpAdapter,
-  IndexedDBAdapter,
-} from "@tapsioss/ripple-browser";
+import { RippleClient, IndexedDBAdapter } from "@tapsioss/ripple-browser";
 
 // Define custom event types (predefined CDP events are always available)
 type CustomEvents = {
@@ -65,7 +61,6 @@ type AppMetadata = {
 const client = new RippleClient<CustomEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new IndexedDBAdapter(),
 });
 
@@ -98,7 +93,6 @@ const client = new RippleClient({
   // Required
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new IndexedDBAdapter(),
 
   // Batching (all optional)

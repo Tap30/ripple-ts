@@ -97,3 +97,45 @@ await client.view({ elementId: "hero-banner" });
 
 These are shorthand for `client.track("user_identified", ...)`,
 `client.track("clicked", ...)`, and `client.track("viewed", ...)`.
+
+## Adapters
+
+### `httpAdapter` is now optional
+
+The built-in `HttpClient` (isomorphic fetch-based) is used by default. You no
+longer need to pass an HTTP adapter unless you need custom behavior.
+
+```diff
+ const client = new RippleClient({
+   apiKey: "your-api-key",
+   endpoint: "https://api.example.com/events",
+-  httpAdapter: new FetchHttpAdapter(),
+   storageAdapter: new IndexedDBAdapter(),
+ });
+```
+
+### `FetchHttpAdapter` removed from packages
+
+The package-specific `FetchHttpAdapter` exports have been removed. Use the
+built-in `HttpClient` from core (auto-applied) or import it explicitly:
+
+```diff
+-import { FetchHttpAdapter } from "@tapsioss/ripple-browser";
++import { HttpClient } from "@tapsioss/ripple-browser";
+```
+
+### Logger class renames
+
+| v1                     | v2              |
+| ---------------------- | --------------- |
+| `ConsoleLoggerAdapter` | `ConsoleLogger` |
+| `NoOpLoggerAdapter`    | `NoOpLogger`    |
+
+### `HttpAdapter.send()` signature changed
+
+The adapter now receives a context object instead of positional arguments:
+
+```diff
+-send(endpoint: string, events: Event[], headers: Record<string, string>, apiKeyHeader: string): Promise<HttpResponse>
++send(context: HttpAdapterContext): Promise<HttpResponse>
+```

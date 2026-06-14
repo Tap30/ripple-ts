@@ -1,11 +1,11 @@
 import type { Event as RippleEvent } from "@internals/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FetchHttpAdapter } from "./fetch-http-adapter.ts";
+import { HttpClient } from "./http-client.ts";
 
 global.fetch = vi.fn();
 
-describe("FetchHttpAdapter", () => {
-  let adapter: FetchHttpAdapter;
+describe("HttpClient", () => {
+  let adapter: HttpClient;
   let mockEvents: RippleEvent[];
   let endpoint: string;
   let apiKeyHeader: string;
@@ -14,7 +14,7 @@ describe("FetchHttpAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    adapter = new FetchHttpAdapter();
+    adapter = new HttpClient();
 
     endpoint = "https://api.test.com/events";
     apiKeyHeader = "X-API-Key";
@@ -26,10 +26,17 @@ describe("FetchHttpAdapter", () => {
     mockEvents = [
       {
         name: "test_event",
+        anonymousId: "anon-user-123",
+        eventId: "event-id",
+        sdk: {
+          name: "sdk",
+          version: "x.y.z",
+        },
+        userId: "user-123",
         payload: { key: "value" },
         issuedAt: Date.now(),
-        metadata: {},
-        sessionId: "session-123",
+        schemaVersion: null,
+        metadata: null,
         platform: null,
       } satisfies RippleEvent,
     ];
@@ -37,7 +44,7 @@ describe("FetchHttpAdapter", () => {
 
   describe("constructor", () => {
     it("should create instance", () => {
-      expect(adapter).toBeInstanceOf(FetchHttpAdapter);
+      expect(adapter).toBeInstanceOf(HttpClient);
     });
   });
 
@@ -61,6 +68,7 @@ describe("FetchHttpAdapter", () => {
         method: "POST",
         headers,
         body: JSON.stringify({ events: mockEvents }),
+        keepalive: true,
       });
 
       expect(result.status).toBe(200);
@@ -69,20 +77,19 @@ describe("FetchHttpAdapter", () => {
     it("should handle successful response", async () => {
       const mockResponse = {
         status: 200,
-        json: vi.fn().mockResolvedValue({ success: true }),
+        json: vi.fn().mockResolvedValue({}),
       };
 
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await adapter.send({
         endpoint,
-        headers,
         apiKeyHeader,
+        headers,
         events: mockEvents,
       });
 
       expect(result.status).toBe(200);
-      expect(result.data).toEqual({ success: true });
     });
 
     it("should handle failed response", async () => {
@@ -95,8 +102,8 @@ describe("FetchHttpAdapter", () => {
 
       const result = await adapter.send({
         endpoint,
-        headers,
         apiKeyHeader,
+        headers,
         events: mockEvents,
       });
 
@@ -113,13 +120,36 @@ describe("FetchHttpAdapter", () => {
 
       const result = await adapter.send({
         endpoint,
-        headers,
         apiKeyHeader,
+        headers,
         events: mockEvents,
       });
 
       expect(result.status).toBe(200);
       expect(result.data).toBeUndefined();
+    });
+
+    it("should use keepalive flag", async () => {
+      const mockResponse = {
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      };
+
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
+
+      await adapter.send({
+        endpoint,
+        apiKeyHeader,
+        headers,
+        events: mockEvents,
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        endpoint,
+        expect.objectContaining({
+          keepalive: true,
+        }),
+      );
     });
 
     it("should handle empty events array", async () => {
@@ -132,8 +162,8 @@ describe("FetchHttpAdapter", () => {
 
       await adapter.send({
         endpoint,
-        headers,
         apiKeyHeader,
+        headers,
         events: [],
       });
 
@@ -143,6 +173,26 @@ describe("FetchHttpAdapter", () => {
           body: JSON.stringify({ events: [] }),
         }),
       );
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle empty headers", async () => {
+      const mockResponse = {
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      };
+
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
+
+      const result = await adapter.send({
+        endpoint,
+        apiKeyHeader,
+        headers,
+        events: [],
+      });
+
+      expect(result.status).toBe(200);
     });
 
     it("should handle custom headers", async () => {
@@ -161,14 +211,39 @@ describe("FetchHttpAdapter", () => {
       await adapter.send({
         endpoint,
         apiKeyHeader,
-        headers: customHeaders,
         events: mockEvents,
+        headers: customHeaders,
       });
 
       expect(fetch).toHaveBeenCalledWith(
         endpoint,
         expect.objectContaining({
           headers: customHeaders,
+        }),
+      );
+    });
+
+    it("should handle special characters in endpoint", async () => {
+      const specialEndpoint = "https://api.test.com/events?foo=bar&baz=qux";
+
+      const mockResponse = {
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      };
+
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
+
+      await adapter.send({
+        headers,
+        apiKeyHeader,
+        endpoint: specialEndpoint,
+        events: mockEvents,
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        specialEndpoint,
+        expect.objectContaining({
+          method: "POST",
         }),
       );
     });

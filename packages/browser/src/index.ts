@@ -1,13 +1,13 @@
-export * from "./adapters/fetch-http-adapter.ts";
 export * from "./adapters/indexed-db-adapter.ts";
 export * from "./adapters/local-storage-adapter.ts";
 export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
 
 export {
-  ConsoleLoggerAdapter,
+  ConsoleLogger,
+  HttpClient,
   LogLevel,
-  NoOpLoggerAdapter,
+  NoOpLogger,
   StorageQuotaExceededError,
   type AllEvents,
   type BatchOptions,

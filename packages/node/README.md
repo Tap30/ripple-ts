@@ -43,11 +43,7 @@ npm install @tapsioss/ripple-node
 ## Quick Start
 
 ```ts
-import {
-  RippleClient,
-  FetchHttpAdapter,
-  NoOpStorageAdapter,
-} from "@tapsioss/ripple-node";
+import { RippleClient, NoOpStorageAdapter } from "@tapsioss/ripple-node";
 
 // Define custom events (predefined CDP events always available)
 type CustomEvents = {
@@ -62,7 +58,6 @@ type AppMetadata = {
 const client = new RippleClient<CustomEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new NoOpStorageAdapter(),
 });
 
@@ -106,7 +101,6 @@ const client = new RippleClient({
   // Required
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
-  httpAdapter: new FetchHttpAdapter(),
   storageAdapter: new NoOpStorageAdapter(),
 
   // Batching (all optional)

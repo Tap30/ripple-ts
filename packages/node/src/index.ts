@@ -1,11 +1,11 @@
-export * from "./adapters/fetch-http-adapter.ts";
 export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
 
 export {
-  ConsoleLoggerAdapter,
+  ConsoleLogger,
+  HttpClient,
   LogLevel,
-  NoOpLoggerAdapter,
+  NoOpLogger,
   type AllEvents,
   type BatchOptions,
   type ClientConfig,

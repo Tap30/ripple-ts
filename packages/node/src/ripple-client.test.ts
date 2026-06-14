@@ -1,5 +1,5 @@
 import {
-  NoOpLoggerAdapter,
+  NoOpLogger,
   type HttpAdapter,
   type HttpAdapterContext,
   type StorageAdapter,
@@ -34,7 +34,7 @@ const mockConfig: NodeClientConfig = {
   endpoint: "https://api.test.com/events",
   httpAdapter: mockHttpAdapter,
   storageAdapter: mockStorageAdapter,
-  loggerAdapter: new NoOpLoggerAdapter(),
+  loggerAdapter: new NoOpLogger(),
 };
 
 describe("RippleClient", () => {

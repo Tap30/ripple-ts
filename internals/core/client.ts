@@ -13,7 +13,8 @@ import type {
   PredefinedEvents,
   ViewedPayload,
 } from "./event-specs.ts";
-import { ConsoleLoggerAdapter } from "./logger.ts";
+import { HttpClient } from "./http-client.ts";
+import { ConsoleLogger } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import { Mutex } from "./mutex.ts";
 import type {
@@ -64,15 +65,15 @@ export type ClientConfig = {
    */
   maxBufferSize?: number;
   /**
-   * HTTP adapter for sending events.
+   * HTTP adapter for sending events (default: built-in `HttpClient`).
    */
-  httpAdapter: HttpAdapter;
+  httpAdapter?: HttpAdapter;
   /**
    * Storage adapter for persisting events.
    */
   storageAdapter: StorageAdapter;
   /**
-   * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level).
+   * Logger adapter for SDK internal logging (default: `ConsoleLogger` with `WARN` level).
    */
   loggerAdapter?: LoggerAdapter;
   /**
@@ -121,10 +122,8 @@ export abstract class Client<
    * @param config Client configuration including adapters
    */
   constructor(config: ClientConfig) {
-    if (!config.httpAdapter || !config.storageAdapter) {
-      throw new Error(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
-      );
+    if (!config.storageAdapter) {
+      throw new Error("`storageAdapter` must be provided in `config`.");
     }
 
     if (!config.apiKey) {
@@ -204,8 +203,7 @@ export abstract class Client<
     this._anonymousId = this._generateAnonymousId();
 
     this._sampler = config.eventSampler ?? (() => true);
-    this._logger =
-      config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
+    this._logger = config.loggerAdapter ?? new ConsoleLogger(LogLevel.WARN);
     this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {
@@ -229,7 +227,7 @@ export abstract class Client<
 
     this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
-      config.httpAdapter,
+      config.httpAdapter ?? new HttpClient(),
       config.storageAdapter,
     );
   }

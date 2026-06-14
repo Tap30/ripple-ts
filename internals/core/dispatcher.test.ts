@@ -8,7 +8,7 @@ import {
   type StorageAdapter,
 } from "./adapters/storage-adapter.ts";
 import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
-import { NoOpLoggerAdapter } from "./logger.ts";
+import { NoOpLogger } from "./logger.ts";
 import type { Event } from "./types.ts";
 
 type TestMetadata = {
@@ -46,7 +46,7 @@ const createConfig = (
     backoffFactor: 2,
   },
   maxBufferSize: Number.MAX_SAFE_INTEGER,
-  loggerAdapter: new NoOpLoggerAdapter(),
+  loggerAdapter: new NoOpLogger(),
   ...overrides,
 });
 
@@ -150,7 +150,7 @@ describe("Dispatcher", () => {
     });
 
     it("should not enqueue after disposal", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const warnSpy = vi.spyOn(logger, "warn");
 
       const httpAdapter = createMockHttpAdapter();
@@ -269,7 +269,7 @@ describe("Dispatcher", () => {
     it("should not retry on 4xx client error and drop events", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const warnSpy = vi.spyOn(logger, "warn");
 
       vi.mocked(httpAdapter.send).mockResolvedValue({
@@ -298,7 +298,7 @@ describe("Dispatcher", () => {
     it("should drop events on unexpected status codes (3xx)", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const warnSpy = vi.spyOn(logger, "warn");
 
       vi.mocked(httpAdapter.send).mockResolvedValue({
@@ -401,7 +401,7 @@ describe("Dispatcher", () => {
     it("should re-queue events after max retries on network error", async () => {
       const httpAdapter = createMockHttpAdapter();
 
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       vi.mocked(httpAdapter.send).mockRejectedValue(new Error("Network error"));
@@ -516,7 +516,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when restore fails", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -540,7 +540,7 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in restore errors", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -717,7 +717,7 @@ describe("Dispatcher", () => {
 
   describe("storage error handling", () => {
     it("should log error when save fails during enqueue", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -741,7 +741,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log warning when StorageQuotaExceededError during enqueue", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const warnSpy = vi.spyOn(logger, "warn");
 
       const httpAdapter = createMockHttpAdapter();
@@ -766,7 +766,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when clear fails after successful send", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -793,7 +793,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when clear fails after 4xx error", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -821,7 +821,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log error when save fails after max retries", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -857,7 +857,7 @@ describe("Dispatcher", () => {
     });
 
     it("should log warning when StorageQuotaExceededError during requeue", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const warnSpy = vi.spyOn(logger, "warn");
 
       const httpAdapter = createMockHttpAdapter();
@@ -895,7 +895,7 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in storage errors", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();
@@ -919,7 +919,7 @@ describe("Dispatcher", () => {
     });
 
     it("should handle non-Error objects in clear errors", async () => {
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
       const httpAdapter = createMockHttpAdapter();

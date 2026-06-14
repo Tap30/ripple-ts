@@ -66,17 +66,6 @@ describe("Client", () => {
   });
 
   describe("constructor", () => {
-    it("should throw error if httpAdapter is missing", () => {
-      expect(() => {
-        createTestClient({
-          httpAdapter: undefined as unknown as HttpAdapter,
-          storageAdapter: createMockStorageAdapter(),
-        });
-      }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
-      );
-    });
-
     it("should throw error if storageAdapter is missing", () => {
       expect(() => {
         createTestClient({
@@ -84,7 +73,7 @@ describe("Client", () => {
           httpAdapter: createMockHttpAdapter(),
         });
       }).toThrow(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
+        "`storageAdapter` must be provided in `config`.",
       );
     });
 

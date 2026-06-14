@@ -153,6 +153,16 @@ preserve jitter effectiveness at the cap.
 - Default storage key: `"ripple_anonymous_id"`
 - `ua-parser-js` moved from `peerDependencies` to `dependencies`
 
+### Adapter Consolidation
+
+- Isomorphic `HttpClient` in `internals/core/http-client.ts` replaces
+  per-package `FetchHttpAdapter`
+- `httpAdapter` optional in `ClientConfig` — defaults to `HttpClient`
+- Only `storageAdapter` remains required
+- Logger renames: `ConsoleLoggerAdapter` → `ConsoleLogger`, `NoOpLoggerAdapter`
+  → `NoOpLogger`
+- Package-specific `FetchHttpAdapter` files removed
+
 ## References
 
 - Client config: `internals/core/client.ts`
