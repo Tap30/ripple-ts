@@ -155,6 +155,10 @@ Tracks a `clicked` event.
 
 Tracks a `viewed` event.
 
+### `screen(payload, schemaVersion?): Promise<void>`
+
+Tracks a `screened` page view event. Requires `WebScreenedPayload`.
+
 ### `setMetadata<K>(key, value): void`
 
 Sets global metadata attached to all subsequent events.

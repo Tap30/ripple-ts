@@ -1,6 +1,7 @@
 import {
   Client,
   type AllEvents,
+  type AppState,
   type Campaign,
   type ClientConfig,
   type EventPayload,
@@ -39,6 +40,15 @@ export class RippleClient<
 > extends Client<TCustomEvents, TMetadata> {
   readonly #identityManager: IdentityManager;
 
+  #appState: AppState = "foreground";
+
+  #onVisibilityChange = (): void => {
+    /* v8 ignore next -- @preserve */
+    const newState: AppState = document.hidden ? "background" : "foreground";
+
+    this.#trackAppStateChange(newState);
+  };
+
   /**
    * Create a new RippleClient instance.
    *
@@ -49,6 +59,11 @@ export class RippleClient<
     this.#identityManager = new IdentityManager(config.sessionStoreKey);
   }
 
+  /**
+   * Get SDK information for browser environment.
+   *
+   * @returns Web SDK information
+   */
   protected override _getSdkInfo(): SdkInfo {
     return {
       name: SDK_NAME,
@@ -92,7 +107,12 @@ export class RippleClient<
    */
   public override async init(): Promise<void> {
     this._anonymousId = this.#identityManager.init();
+
     await super.init();
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.#onVisibilityChange);
+    }
   }
 
   /**
@@ -169,6 +189,17 @@ export class RippleClient<
     return undefined;
   }
 
+  #trackAppStateChange(newState: AppState): void {
+    const previousState = this.#appState;
+
+    this.#appState = newState;
+
+    void this.track("app_state_changed", {
+      newState,
+      previousState,
+    } as AllEvents<TCustomEvents>["app_state_changed"]);
+  }
+
   /**
    * Extract keywords from the page's meta keywords tag.
    */
@@ -212,6 +243,14 @@ export class RippleClient<
    * Dispose the client and clean up resources including session management.
    */
   public override dispose(): void {
+    /* v8 ignore next -- @preserve */
+    if (typeof document !== "undefined") {
+      document.removeEventListener(
+        "visibilitychange",
+        this.#onVisibilityChange,
+      );
+    }
+
     this.#identityManager.clear();
     super.dispose();
   }

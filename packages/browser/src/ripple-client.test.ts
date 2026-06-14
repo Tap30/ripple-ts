@@ -309,6 +309,8 @@ describe("RippleClient", () => {
           title: "Test Page",
           referrer: "https://google.com",
           querySelector: () => ({ content: "seo, keywords" }),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
         },
         writable: true,
         configurable: true,
@@ -377,7 +379,13 @@ describe("RippleClient", () => {
 
     it("should allow overriding auto-captured values", async () => {
       Object.defineProperty(global, "document", {
-        value: { title: "Auto Title", referrer: "", querySelector: () => null },
+        value: {
+          title: "Auto Title",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
         writable: true,
         configurable: true,
       });
@@ -407,6 +415,82 @@ describe("RippleClient", () => {
             }),
           ]) as Array<unknown>,
         } as Partial<HttpAdapterContext>),
+      );
+    });
+  });
+
+  describe("app state tracking", () => {
+    it("should track app_state_changed on visibilitychange", async () => {
+      let visibilityHandler: (() => void) | null = null;
+
+      Object.defineProperty(global, "document", {
+        value: {
+          hidden: false,
+          title: "",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: (_: string, handler: () => void) => {
+            visibilityHandler = handler;
+          },
+          removeEventListener: vi.fn(),
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      const testClient = new RippleClient<TestEvents, TestMetadata>(mockConfig);
+
+      await testClient.init();
+
+      // Simulate going to background
+      Object.defineProperty(global.document, "hidden", {
+        configurable: true,
+        get: () => true,
+      });
+
+      visibilityHandler!();
+
+      // Allow the fire-and-forget track to complete
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await testClient.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "background", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should remove listener on dispose", async () => {
+      const removeListener = vi.fn();
+
+      Object.defineProperty(global, "document", {
+        value: {
+          hidden: false,
+          title: "",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: vi.fn(),
+          removeEventListener: removeListener,
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      client.dispose();
+
+      expect(removeListener).toHaveBeenCalledWith(
+        "visibilitychange",
+        expect.any(Function),
       );
     });
   });

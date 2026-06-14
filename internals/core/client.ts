@@ -263,10 +263,22 @@ export abstract class Client<
     );
   }
 
+  /**
+   * Generate a unique anonymous ID for this client instance.
+   * Can be overridden by subclasses to provide custom ID generation or persistence.
+   *
+   * @returns A unique anonymous identifier string
+   */
   protected _generateAnonymousId(): string {
     return IdGenerator.generate();
   }
 
+  /**
+   * Get SDK information for the current runtime.
+   * Must be implemented by runtime-specific clients.
+   *
+   * @returns SDK information
+   */
   protected abstract _getSdkInfo(): SdkInfo;
 
   /**

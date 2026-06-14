@@ -177,3 +177,35 @@ const client = new RippleClient({
   // ...
 });
 ```
+
+## New: `screen()` Method
+
+```ts
+// Browser — auto-captures page info
+await client.screen();
+await client.screen({ title: "Custom" }); // override specific fields
+
+// Node — requires full payload
+await client.screen({ title: "Dashboard", url: "/dashboard" });
+```
+
+## New: Automatic App State Tracking (Browser)
+
+The browser SDK now automatically sends `app_state_changed` events when page
+visibility changes. No configuration needed — starts after `init()`.
+
+## New: Telemetry Hooks
+
+```ts
+const client = new RippleClient({
+  hooks: {
+    onFlush: info => console.log(`Flushed ${info.eventCount} events`),
+    onSendFailure: info => alerts.notify(info.error),
+    onDrop: info => console.warn(`Dropped: ${info.reason}`),
+  },
+  telemetryOptions: {
+    disabled: false,
+    endpoint: "https://telemetry.example.com/sdk",
+  },
+});
+```

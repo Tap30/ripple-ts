@@ -37,6 +37,11 @@ export class RippleClient<
     super(config);
   }
 
+  /**
+   * Get SDK information for node environment.
+   *
+   * @returns Node SDK information
+   */
   protected override _getSdkInfo(): SdkInfo {
     return {
       name: SDK_NAME,

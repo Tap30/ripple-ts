@@ -149,6 +149,12 @@ Tracks a `clicked` event.
 
 Tracks a `viewed` event.
 
+### `screen(payload?, schemaVersion?): Promise<void>`
+
+Tracks a `screened` page view event. Auto-captures title, URL, pathname,
+referrer, search, keywords (from meta tag), and UTM campaign params. Provided
+fields override auto-captured values.
+
 ### `setMetadata<K>(key, value): void`
 
 Sets global metadata attached to all subsequent events.
@@ -213,6 +219,22 @@ The SDK automatically detects browser, device, and OS information using
   os: { name: "macos", version: "14.0" }
 }
 ```
+
+## Auto-Capture
+
+### App State Tracking
+
+The SDK automatically tracks `app_state_changed` events when page visibility
+changes (`foreground` ↔ `background`). No configuration needed.
+
+### Screen/Page View
+
+`screen()` auto-captures from the browser environment:
+
+- Page title, URL, pathname, referrer, search params
+- SEO keywords from `<meta name="keywords">`
+- UTM campaign parameters (`utm_source`, `utm_medium`, `utm_campaign`,
+  `utm_term`, `utm_content`)
 
 ## Error Handling
 
