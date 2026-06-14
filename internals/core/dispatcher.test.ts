@@ -47,7 +47,8 @@ const createConfig = (
     backoffFactor: 2,
   },
   maxBufferSize: Number.MAX_SAFE_INTEGER,
-  loggerAdapter: new NoOpLogger(),
+  eventTTL: null,
+  logger: new NoOpLogger(),
   ...overrides,
 });
 
@@ -156,7 +157,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -243,6 +244,53 @@ describe("Dispatcher", () => {
 
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
     });
+
+    it("should filter out expired events by eventTTL", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10000);
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ eventTTL: 5000 });
+      const dispatcher = createDispatcher({
+        config,
+        httpAdapter,
+        storageAdapter,
+      });
+
+      await dispatcher.enqueue({ ...createEvent("old"), issuedAt: 3000 });
+      await dispatcher.enqueue({ ...createEvent("new"), issuedAt: 8000 });
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [expect.objectContaining({ name: "new", issuedAt: 8000 })],
+        }),
+      );
+
+      vi.useRealTimers();
+    });
+
+    it("should not send if all events are expired", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10000);
+
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({ eventTTL: 1000 });
+      const dispatcher = createDispatcher({
+        config,
+        httpAdapter,
+        storageAdapter,
+      });
+
+      await dispatcher.enqueue({ ...createEvent("old"), issuedAt: 1000 });
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
   });
 
   describe("retry logic", () => {
@@ -278,7 +326,7 @@ describe("Dispatcher", () => {
       });
 
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -307,7 +355,7 @@ describe("Dispatcher", () => {
       });
 
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -415,7 +463,7 @@ describe("Dispatcher", () => {
           maxDelay: 360000,
           backoffFactor: 2,
         },
-        loggerAdapter: logger,
+        logger,
       });
 
       const dispatcher = createDispatcher({
@@ -522,7 +570,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.load).mockRejectedValue(new Error("Load error"));
 
@@ -546,7 +594,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.load).mockRejectedValue("string error");
 
@@ -723,7 +771,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.save).mockRejectedValue(new Error("Save error"));
 
@@ -747,7 +795,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.save).mockRejectedValue(
         new StorageQuotaExceededError(5, 2),
@@ -772,7 +820,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.clear).mockRejectedValue(
         new Error("Clear error"),
@@ -799,7 +847,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({ status: 400 });
       vi.mocked(storageAdapter.clear).mockRejectedValue(
@@ -834,7 +882,7 @@ describe("Dispatcher", () => {
           maxDelay: 360000,
           backoffFactor: 2,
         },
-        loggerAdapter: logger,
+        logger,
       });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
@@ -870,7 +918,7 @@ describe("Dispatcher", () => {
           maxDelay: 360000,
           backoffFactor: 2,
         },
-        loggerAdapter: logger,
+        logger,
       });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({
@@ -901,7 +949,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.save).mockRejectedValue("string error");
 
@@ -925,7 +973,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ loggerAdapter: logger });
+      const config = createConfig({ logger });
 
       vi.mocked(storageAdapter.clear).mockRejectedValue("string error");
 

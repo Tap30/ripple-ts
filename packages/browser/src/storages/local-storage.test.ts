@@ -30,10 +30,17 @@ describe("LocalStorage", () => {
     mockEvents = [
       {
         name: "test_event",
+        anonymousId: "anon-user-123",
+        eventId: "event-id",
+        userId: "user-123",
+        sdk: {
+          name: "sdk",
+          version: "x.y.z",
+        },
         payload: { key: "value" },
         issuedAt: Date.now(),
         metadata: {},
-        sessionId: "session-123",
+        schemaVersion: null,
         platform: null,
       } satisfies RippleEvent,
     ];
@@ -50,12 +57,6 @@ describe("LocalStorage", () => {
 
     it("should create instance with custom key", () => {
       const customAdapter = new LocalStorage({ key: "custom_key" });
-
-      expect(customAdapter).toBeInstanceOf(LocalStorage);
-    });
-
-    it("should create instance with TTL", () => {
-      const customAdapter = new LocalStorage({ ttl: 60000 });
 
       expect(customAdapter).toBeInstanceOf(LocalStorage);
     });
@@ -121,14 +122,22 @@ describe("LocalStorage", () => {
     it("should handle StorageQuotaExceededError by dropping oldest half", async () => {
       vi.setSystemTime(1000);
 
-      const events = Array.from({ length: 10 }, (_, i) => ({
-        name: `event_${i}`,
-        payload: {},
-        issuedAt: i,
-        metadata: {},
-        sessionId: `session-${i}`,
-        platform: null,
-      })) as RippleEvent[];
+      const events = Array.from(
+        { length: 10 },
+        (_, i) =>
+          ({
+            name: `event_${i}`,
+            issuedAt: i,
+            anonymousId: "anon-user-123",
+            eventId: "event-id",
+            userId: "user-123",
+            payload: null,
+            metadata: null,
+            platform: null,
+            schemaVersion: null,
+            sdk: { name: "", version: "" },
+          }) satisfies RippleEvent,
+      ) as RippleEvent[];
 
       let callCount = 0;
 
@@ -196,35 +205,6 @@ describe("LocalStorage", () => {
       expect(result).toEqual([]);
     });
 
-    it("should return empty array and clear when TTL expired", async () => {
-      const ttlAdapter = new LocalStorage({ ttl: 1000 });
-      const data = JSON.stringify({ events: mockEvents, savedAt: 0 });
-
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
-      vi.setSystemTime(2000);
-
-      const result = await ttlAdapter.load();
-
-      expect(result).toEqual([]);
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("ripple_events");
-
-      vi.useRealTimers();
-    });
-
-    it("should return events when TTL not expired", async () => {
-      const ttlAdapter = new LocalStorage({ ttl: 5000 });
-      const data = JSON.stringify({ events: mockEvents, savedAt: 1000 });
-
-      vi.mocked(mockLocalStorage.getItem).mockReturnValue(data);
-      vi.setSystemTime(2000);
-
-      const result = await ttlAdapter.load();
-
-      expect(result).toEqual(mockEvents);
-
-      vi.useRealTimers();
-    });
-
     it("should handle invalid JSON gracefully", async () => {
       vi.mocked(mockLocalStorage.getItem).mockReturnValue("invalid json");
 
@@ -254,11 +234,15 @@ describe("LocalStorage", () => {
     const createMockEvents = (count: number): RippleEvent[] =>
       Array.from({ length: count }, (_, i) => ({
         name: `event${i}`,
-        payload: {},
-        metadata: {},
         issuedAt: Date.now(),
-        sessionId: "s",
+        anonymousId: "anon-user-123",
+        eventId: "event-id",
+        userId: "user-123",
+        payload: null,
+        metadata: null,
         platform: null,
+        schemaVersion: null,
+        sdk: { name: "", version: "" },
       }));
 
     it("should handle non-Error in retry", async () => {

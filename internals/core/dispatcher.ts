@@ -76,12 +76,18 @@ export type DispatcherConfig = {
   /**
    * Logger for internal logging
    */
-  loggerAdapter: LoggerAdapter;
+  logger: LoggerAdapter;
   /**
    * Maximum size of the in-memory event buffer (optional).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
   maxBufferSize: number;
+  /**
+   * Per-event time-to-live in milliseconds.
+   * Events older than this are filtered out at flush time.
+   * `null` means no expiry.
+   */
+  eventTTL: number | null;
 };
 
 /**
@@ -103,21 +109,21 @@ export class Dispatcher<
   #disposed = false;
 
   readonly #config: DispatcherConfig;
-  readonly #httpAdapter: HttpAdapter;
-  readonly #storageAdapter: StorageAdapter;
+  readonly #httpClient: HttpAdapter;
+  readonly #storage: StorageAdapter;
   readonly #logger: LoggerAdapter;
 
   /**
    * Create a new Dispatcher instance.
    *
    * @param config Dispatcher configuration
-   * @param httpAdapter HTTP adapter for sending events
-   * @param storageAdapter Storage adapter for persisting events
+   * @param httpClient HTTP adapter for sending events
+   * @param storage Storage adapter for persisting events
    */
   constructor(
     config: DispatcherConfig,
-    httpAdapter: HttpAdapter,
-    storageAdapter: StorageAdapter,
+    httpClient: HttpAdapter,
+    storage: StorageAdapter,
   ) {
     // Validate configuration
     if (config.maxBufferSize < config.batchOptions.size) {
@@ -128,9 +134,9 @@ export class Dispatcher<
     }
 
     this.#config = config;
-    this.#httpAdapter = httpAdapter;
-    this.#storageAdapter = storageAdapter;
-    this.#logger = config.loggerAdapter;
+    this.#httpClient = httpClient;
+    this.#storage = storage;
+    this.#logger = config.logger;
   }
 
   /**
@@ -151,7 +157,7 @@ export class Dispatcher<
     try {
       const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
 
-      await this.#storageAdapter.save(eventsToSave);
+      await this.#storage.save(eventsToSave);
     } catch (err) {
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
@@ -189,7 +195,11 @@ export class Dispatcher<
 
       this.#buffer.clear();
 
-      const batches = this.#createBatches(allEvents);
+      const events = this.#filterExpired(allEvents);
+
+      if (events.length === 0) return;
+
+      const batches = this.#createBatches(events);
 
       for (let i = 0; i < batches.length; i++) {
         const success = await this.#sendWithRetry(batches[i]!);
@@ -210,10 +220,6 @@ export class Dispatcher<
 
   /**
    * Apply persisted buffer limit using FIFO eviction.
-   *
-   * Note: With the validation requiring maxBufferSize >= maxBatchSize,
-   * this limit is primarily enforced during restore() when loading
-   * persisted events that may exceed the buffer limit.
    *
    * @param events Events to apply limit to
    * @returns Events after applying limit
@@ -266,6 +272,22 @@ export class Dispatcher<
   }
 
   /**
+   * Filter out events that have exceeded the configured eventTTL.
+   *
+   * @param events Events to filter
+   * @returns Events that are still within TTL
+   */
+  #filterExpired(events: Event<TMetadata>[]): Event<TMetadata>[] {
+    if (this.#config.eventTTL === null) return events;
+
+    const now = Date.now();
+
+    return events.filter(
+      event => now - event.issuedAt <= this.#config.eventTTL!,
+    );
+  }
+
+  /**
    * Send events with exponential backoff retry logic.
    *
    * @param events Events to send
@@ -277,7 +299,7 @@ export class Dispatcher<
     attempt: number = 0,
   ): Promise<boolean> {
     try {
-      const response = await this.#httpAdapter.send({
+      const response = await this.#httpClient.send({
         events,
         endpoint: this.#config.endpoint,
         headers: {
@@ -449,7 +471,7 @@ export class Dispatcher<
    */
   async #clearStorage(errorMessage: string): Promise<void> {
     try {
-      await this.#storageAdapter.clear();
+      await this.#storage.clear();
     } catch (err) {
       this.#logger.error(errorMessage, {
         error: err instanceof Error ? err.message : String(err),
@@ -474,7 +496,7 @@ export class Dispatcher<
     try {
       const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
 
-      await this.#storageAdapter.save(eventsToSave);
+      await this.#storage.save(eventsToSave);
     } catch (err) {
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
@@ -517,7 +539,7 @@ export class Dispatcher<
     this.#reset();
 
     try {
-      const stored = await this.#storageAdapter.load();
+      const stored = await this.#storage.load();
       const limited = this.#applyBufferLimit(stored as Event<TMetadata>[]);
 
       this.#buffer.fromArray(limited);
@@ -547,6 +569,6 @@ export class Dispatcher<
 
     this.#buffer.clear();
     this.#flushMutex.release();
-    void this.#storageAdapter.close();
+    void this.#storage.close();
   }
 }

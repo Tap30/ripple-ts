@@ -155,13 +155,25 @@ Custom storage adapters must now implement `init(): Promise<void>`.
 -import { IndexedDBAdapter } from "@tapsioss/ripple-browser";
 -const storage = new IndexedDBAdapter({ ttl: 3600000 });
 +import { WebStorage } from "@tapsioss/ripple-browser";
-+const storage = new WebStorage({ ttl: 3600000 });
++const storage = new WebStorage();
 ```
 
 ### Storage class renames
 
-| v1                      | v2            |
-| ----------------------- | ------------- |
-| `IndexedDBAdapter`      | (internal)    |
-| `LocalStorageAdapter`   | (internal)    |
-| `NoOpStorageAdapter`    | `NoOpStorage` |
+| v1                    | v2            |
+| --------------------- | ------------- |
+| `IndexedDBAdapter`    | (internal)    |
+| `LocalStorageAdapter` | (internal)    |
+| `NoOpStorageAdapter`  | `NoOpStorage` |
+
+### `ttl` removed from storage layer
+
+The `ttl` option has been removed from storage adapters. Event expiry is now
+handled at the dispatcher level via `eventTTL` in client config:
+
+```ts
+const client = new RippleClient({
+  eventTTL: 86400000, // Drop events older than 24 hours at flush time
+  // ...
+});
+```

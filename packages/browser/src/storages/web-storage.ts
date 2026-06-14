@@ -13,27 +13,25 @@ export type WebStorageConfig = {
   prefer?: "indexed-db" | "local-storage";
   /**
    * The name of the IndexedDB database (default: "ripple_db").
+   *
+   * @default "ripple_db"
    */
   dbName?: string;
   /**
    * The name of the IndexedDB object store (default: "events").
+   *
+   * @default "events"
    */
   storeName?: string;
   /**
    * The key for storage (default: "ripple_events" for localStorage, "queue" for IndexedDB).
    */
   key?: string;
-  /**
-   * Time-to-live in milliseconds for stored events.
-   */
-  ttl?: number;
 };
 
 /**
  * Isomorphic browser storage adapter that auto-selects the best available
  * storage backend (IndexedDB → localStorage → NoOp).
- *
- * Call `init()` to detect availability and initialize the underlying adapter.
  */
 export class WebStorage implements StorageAdapter {
   readonly #config: WebStorageConfig;
@@ -59,7 +57,6 @@ export class WebStorage implements StorageAdapter {
       if (await LocalStorage.isAvailable()) {
         return new LocalStorage({
           key: this.#config.key,
-          ttl: this.#config.ttl,
         });
       }
     }
@@ -70,7 +67,6 @@ export class WebStorage implements StorageAdapter {
           dbName: this.#config.dbName,
           storeName: this.#config.storeName,
           key: this.#config.key,
-          ttl: this.#config.ttl,
         });
       }
     }
@@ -78,7 +74,6 @@ export class WebStorage implements StorageAdapter {
     if (!prefer && (await LocalStorage.isAvailable())) {
       return new LocalStorage({
         key: this.#config.key,
-        ttl: this.#config.ttl,
       });
     }
 

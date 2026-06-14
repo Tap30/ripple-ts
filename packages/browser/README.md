@@ -25,7 +25,8 @@ for browsers.
 - 🔄 **Retry Logic**: Configurable exponential backoff with jitter
 - 🆔 **Anonymous ID**: Persistent anonymous identity via sessionStorage
 - 🔒 **Concurrency Safe**: Thread-safe flush operations with mutex protection
-- 💾 **Auto-Detecting Storage**: IndexedDB, localStorage, with automatic fallback
+- 💾 **Auto-Detecting Storage**: IndexedDB, localStorage, with automatic
+  fallback
 - 🔌 **Pluggable Adapters**: Custom HTTP, storage, and logger implementations
 - 📘 **Type-Safe**: Full TypeScript support with predefined CDP events + custom
   events
@@ -113,6 +114,7 @@ const client = new RippleClient({
   // Other options
   apiKeyHeader: "X-API-Key", // Header name (default: "X-API-Key")
   maxBufferSize: 1000, // Max persisted events (default: unlimited)
+  eventTTL: 86400000, // Drop events older than 24h at flush (default: disabled)
   sessionStoreKey: "ripple_anonymous_id", // sessionStorage key (default)
   loggerAdapter: new ConsoleLoggerAdapter(LogLevel.WARN),
   eventSampler: event => Math.random() < 0.5, // Sample 50% of events
@@ -173,10 +175,10 @@ Cleans up resources, cancels timers, clears session.
 
 ## Storage
 
-| Adapter          | Description                                               |
-| ---------------- | --------------------------------------------------------- |
-| **WebStorage**   | Auto-detects best backend (IndexedDB → localStorage → NoOp) |
-| **NoOpStorage**  | Discards all events (when persistence not needed)         |
+| Adapter         | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| **WebStorage**  | Auto-detects best backend (IndexedDB → localStorage → NoOp) |
+| **NoOpStorage** | Discards all events (when persistence not needed)           |
 
 ```ts
 import { RippleClient, WebStorage } from "@tapsioss/ripple-browser";
@@ -190,10 +192,9 @@ const client = new RippleClient({
 // Or with preferences
 const client2 = new RippleClient({
   storageAdapter: new WebStorage({
-    prefer: "localstorage", // or "indexeddb" (default)
-    ttl: 3600000,           // Optional: expire events after 1 hour
-    dbName: "my_app_db",    // Optional: custom IndexedDB name
-    key: "my_events",       // Optional: custom storage key
+    prefer: "local-storage", // or "indexed-db" (default)
+    dbName: "my_app_db", // Optional: custom IndexedDB name
+    key: "my_events", // Optional: custom storage key
   }),
   // ...
 });

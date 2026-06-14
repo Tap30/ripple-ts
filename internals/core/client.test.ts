@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Client, type ClientConfig, type EventSampler } from "./client.ts";
-import type { Event, Platform } from "./types.ts";
+import type { Event, Platform, SdkInfo } from "./types.ts";
 
 type TestMetadata = {
   userId: string;
@@ -30,6 +30,10 @@ type TestCustomEvents = {
 class TestClient extends Client<TestCustomEvents, TestMetadata> {
   protected _getPlatform(): Platform | null {
     return { type: "server" };
+  }
+
+  protected _getSdkInfo(): SdkInfo {
+    return { name: "test-sdk", version: "1.0.0" };
   }
 }
 
@@ -73,9 +77,7 @@ describe("Client", () => {
           storageAdapter: undefined as unknown as StorageAdapter,
           httpAdapter: createMockHttpAdapter(),
         });
-      }).toThrow(
-        "`storageAdapter` must be provided in `config`.",
-      );
+      }).toThrow("`storageAdapter` must be provided in `config`.");
     });
 
     it("should throw error if apiKey is missing", () => {

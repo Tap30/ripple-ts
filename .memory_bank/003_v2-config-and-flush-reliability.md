@@ -163,6 +163,15 @@ preserve jitter effectiveness at the cap.
   → `NoOpLogger`
 - Package-specific `FetchHttpAdapter` files removed
 
+### Event TTL
+
+- `ttl`/`staleThreshold` removed from storage layer entirely
+- `eventTTL` added to `ClientConfig` → `DispatcherConfig`
+- Filtering happens in dispatcher's `flush()` via `#filterExpired()`, before
+  `#createBatches()`
+- Events where `Date.now() - event.issuedAt > eventTTL` are dropped
+- Enforced at flush time (every batch send), not just on restore
+
 ## References
 
 - Client config: `internals/core/client.ts`

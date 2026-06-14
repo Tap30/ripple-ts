@@ -1,4 +1,3 @@
-import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
 import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { type StorageAdapter } from "./adapters/storage-adapter.ts";
@@ -64,6 +63,11 @@ export type ClientConfig = {
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
   maxBufferSize?: number;
+  /**
+   * Per-event time-to-live in milliseconds.
+   * Events older than this (based on `issuedAt`) are dropped at flush time.
+   */
+  eventTTL?: number;
   /**
    * HTTP adapter for sending events (default: built-in `HttpClient`).
    */
@@ -223,7 +227,8 @@ export abstract class Client<
         backoffFactor: config.retryOptions?.backoffFactor ?? 2,
       },
       maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
-      loggerAdapter: this._logger,
+      eventTTL: config.eventTTL ?? null,
+      logger: this._logger,
     };
 
     this._storage = config.storageAdapter;
@@ -238,6 +243,8 @@ export abstract class Client<
   protected _generateAnonymousId(): string {
     return IdGenerator.generate();
   }
+
+  protected abstract _getSdkInfo(): SdkInfo;
 
   /**
    * Get platform information for the current runtime.
@@ -321,21 +328,16 @@ export abstract class Client<
 
     await this.init();
 
-    const sdkInfo: SdkInfo = {
-      name: SDK_NAME,
-      version: SDK_VERSION,
-    };
-
     const event: Event<TMetadata> = {
       eventId: IdGenerator.generate(),
       schemaVersion: schemaVersion ?? null,
-      sdk: sdkInfo,
       anonymousId: this._anonymousId,
       userId: this._userId,
       name: name as string,
-      metadata: this.getMetadata(),
       payload: payload ?? null,
       issuedAt: Date.now(),
+      sdk: this._getSdkInfo(),
+      metadata: this.getMetadata(),
       platform: this._getPlatform(),
     };
 

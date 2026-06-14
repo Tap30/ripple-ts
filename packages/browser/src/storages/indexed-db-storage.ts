@@ -25,15 +25,6 @@ export type IndexedDBStorageConfig = {
    * The key under which to store the events (default: "queue").
    */
   key?: string;
-  /**
-   * Time-to-live in milliseconds.
-   *
-   * Design Intention: The TTL acts as a "session" timeout for the entire batch.
-   * Because the `savedAt` timestamp is overwritten on every `save()` operation,
-   * frequent saves will continually reset the expiration timer for all stored
-   * events. Events will only expire if no saves occur for the duration of the TTL.
-   */
-  ttl?: number;
 };
 
 /**
@@ -44,22 +35,15 @@ export class IndexedDBStorage implements StorageAdapter {
   readonly #dbName: string;
   readonly #storeName: string;
   readonly #key: string;
-  readonly #ttl: number | null;
 
   public static readonly SCHEMA_VERSION = 2;
 
   #dbPromise: Promise<IDBDatabase> | null = null;
 
-  /**
-   * Create a new IndexedDBStorage instance.
-   *
-   * @param config Configuration object
-   */
   constructor(config: IndexedDBStorageConfig = {}) {
     this.#dbName = config.dbName ?? "ripple_db";
     this.#storeName = config.storeName ?? "events";
     this.#key = config.key ?? "queue";
-    this.#ttl = config.ttl ?? null;
   }
 
   public async init(): Promise<void> {}
@@ -183,17 +167,6 @@ export class IndexedDBStorage implements StorageAdapter {
 
         if (!data) {
           resolve(null);
-
-          return;
-        }
-
-        if (this.#ttl !== null && Date.now() - data.savedAt > this.#ttl) {
-          this.clear()
-            .catch(err =>
-              // eslint-disable-next-line no-console
-              console.error("Failed to clear expired TTL data:", err),
-            )
-            .finally(() => resolve(null));
 
           return;
         }

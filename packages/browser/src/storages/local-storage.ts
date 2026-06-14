@@ -11,33 +11,25 @@ type StorageData = {
 
 export type LocalStorageConfig = {
   key?: string;
-  ttl?: number;
 };
 
 /**
  * Storage adapter implementation using localStorage.
- * Provides persistent storage across browser sessions with optional TTL.
+ * Provides persistent storage across browser sessions.
  */
 export class LocalStorage implements StorageAdapter {
   readonly #key: string;
-  readonly #ttl: number | null;
 
-  /**
-   * Create a new LocalStorage instance.
-   *
-   * @param config Configuration object
-   */
   constructor(config: LocalStorageConfig = {}) {
     this.#key = config.key ?? "ripple_events";
-    this.#ttl = config.ttl ?? null;
   }
 
   public async init(): Promise<void> {}
 
   /**
-   * Check if localStorage is available.
+   * Check if `localStorage` is available.
    *
-   * @returns Promise resolving to true if localStorage is available
+   * @returns Promise resolving to `true` if `localStorage` is available
    */
   public static isAvailable(): Promise<boolean> {
     try {
@@ -56,7 +48,7 @@ export class LocalStorage implements StorageAdapter {
   }
 
   /**
-   * Save events to localStorage.
+   * Save events to `localStorage`.
    *
    * @param events Array of events to save
    * @throws {StorageQuotaExceededError} When quota exceeded and events are dropped
@@ -99,7 +91,7 @@ export class LocalStorage implements StorageAdapter {
   }
 
   /**
-   * Load events from localStorage.
+   * Load events from `localStorage`.
    *
    * @returns Promise resolving to array of events
    */
@@ -111,13 +103,8 @@ export class LocalStorage implements StorageAdapter {
     try {
       const data = JSON.parse(stored) as StorageData;
 
-      if (this.#ttl !== null && Date.now() - data.savedAt > this.#ttl) {
-        await this.clear();
+      return Promise.resolve(data.events);
 
-        return [];
-      }
-
-      return data.events;
       // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
       // Older iOS Safari versions don't support optional catch binding.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

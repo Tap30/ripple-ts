@@ -40,10 +40,20 @@ import { WebStorage } from "@tapsioss/ripple-browser";
 const client = new RippleClient({
   storageAdapter: new WebStorage(),           // auto-detect
   // or with preferences:
-  storageAdapter: new WebStorage({ prefer: "localstorage", ttl: 3600000 }),
+  storageAdapter: new WebStorage({ prefer: "local-storage" }),
 });
 ```
 
 ##### `StorageAdapter.init()` called automatically
 
 The base `Client.init()` now calls `storageAdapter.init()` before restoring events. Custom storage adapters can use this for async setup.
+
+##### `eventTTL` in client config
+
+Per-event expiry is now handled at the dispatcher level. Events older than `eventTTL` (based on `issuedAt`) are dropped at flush time:
+
+```ts
+const client = new RippleClient({
+  eventTTL: 86400000, // 24 hours
+});
+```

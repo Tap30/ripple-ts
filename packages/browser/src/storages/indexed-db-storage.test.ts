@@ -172,7 +172,6 @@ describe("IndexedDBStorage", () => {
           dbName: "db",
           storeName: "store",
           key: "k",
-          ttl: 60000,
         }),
       ).toBeInstanceOf(IndexedDBStorage);
     });
@@ -407,28 +406,6 @@ describe("IndexedDBStorage", () => {
       );
     });
 
-    it("discards expired TTL data on save", async () => {
-      vi.setSystemTime(5000);
-
-      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
-      const getReq = mockGetReq(mockObjectStore);
-      const putReq = mockPutReq(mockObjectStore);
-
-      const savePromise = ttlAdapter.save(mockEvents);
-
-      await resolveOpen(openRequest, mockDB);
-      await resolveGet(getReq, { events: [createEvent("old")], savedAt: 1000 });
-
-      completeTx(putReq, mockTransaction);
-
-      await savePromise;
-
-      expect(mockObjectStore.put).toHaveBeenCalledWith(
-        { events: mockEvents, savedAt: 5000 },
-        "queue",
-      );
-    });
-
     it("rejects on db open error (with and without message)", async () => {
       const savePromise1 = adapter.save(mockEvents);
 
@@ -587,68 +564,6 @@ describe("IndexedDBStorage", () => {
       await resolveGet(getReq, undefined);
 
       expect(await loadPromise).toEqual([]);
-    });
-
-    it("returns events when TTL not expired", async () => {
-      vi.setSystemTime(2000);
-      const ttlAdapter = new IndexedDBStorage({ ttl: 5000 });
-      const getReq = mockGetReq(mockObjectStore);
-      const loadPromise = ttlAdapter.load();
-
-      await resolveOpen(openRequest, mockDB);
-      await resolveGet(getReq, { events: mockEvents, savedAt: 1000 });
-
-      expect(await loadPromise).toEqual(mockEvents);
-    });
-
-    it("clears and returns empty array when TTL expired", async () => {
-      vi.setSystemTime(2000);
-      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
-      const getReq = mockGetReq(mockObjectStore);
-      const deleteReq = mockDeleteReq(mockObjectStore);
-      const loadPromise = ttlAdapter.load();
-
-      await resolveOpen(openRequest, mockDB);
-      await resolveGet(getReq, { events: mockEvents, savedAt: 0 });
-
-      await Promise.resolve();
-
-      await resolveOpen(openRequest, mockDB);
-
-      await Promise.resolve();
-
-      completeTx(deleteReq, mockTransaction);
-
-      await expect(loadPromise).resolves.toEqual([]);
-    });
-
-    it("logs error and returns empty array when TTL clear fails", async () => {
-      vi.setSystemTime(2000);
-
-      const ttlAdapter = new IndexedDBStorage({ ttl: 1000 });
-      const getReq = mockGetReq(mockObjectStore);
-
-      vi.spyOn(ttlAdapter, "clear").mockRejectedValueOnce(
-        new Error("Clear failed"),
-      );
-
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      const loadPromise = ttlAdapter.load();
-
-      await resolveOpen(openRequest, mockDB);
-      await resolveGet(getReq, { events: mockEvents, savedAt: 0 });
-
-      await expect(loadPromise).resolves.toEqual([]);
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Failed to clear expired TTL data:",
-        expect.any(Error),
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it("rejects on db open error", async () => {

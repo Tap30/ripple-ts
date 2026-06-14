@@ -124,20 +124,11 @@ during flush.
 **Decision:** Automatically persist unsent events with time-to-live and buffer
 limits.
 
-**Rationale:**
+**Rationale:**z
 
 - Durability: Survive page reloads and app crashes
 - Storage management: TTL and size limits prevent unbounded growth
 - Privacy: Old events automatically expire
-
-**Configuration:**
-
-```ts
-{
-  maxBufferSize: 1000,    // Max stored events
-  eventTTL: 86400000,     // 24 hours in ms
-}
-```
 
 ## Technology Choices
 

@@ -5,6 +5,7 @@ import { NoOpStorage } from "./noop-storage.ts";
 describe("NoOpStorage", () => {
   it("should init without error", async () => {
     const adapter = new NoOpStorage();
+
     await expect(adapter.init()).resolves.toBeUndefined();
   });
 
@@ -15,10 +16,17 @@ describe("NoOpStorage", () => {
       adapter.save([
         {
           name: "test",
-          payload: {},
+          payload: null,
           issuedAt: 0,
-          metadata: {},
-          sessionId: "",
+          metadata: null,
+          anonymousId: "anon-user-123",
+          eventId: "event-id",
+          schemaVersion: null,
+          sdk: {
+            name: "",
+            version: "",
+          },
+          userId: null,
           platform: null,
         } satisfies RippleEvent,
       ]),

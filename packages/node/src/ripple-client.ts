@@ -3,8 +3,10 @@ import {
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type SdkInfo,
   type ServerPlatform,
 } from "@internals/core";
+import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
 
 /**
  * Node.js-specific client configuration
@@ -31,6 +33,13 @@ export class RippleClient<
    */
   constructor(config: NodeClientConfig) {
     super(config);
+  }
+
+  protected override _getSdkInfo(): SdkInfo {
+    return {
+      name: SDK_NAME,
+      version: SDK_VERSION,
+    };
   }
 
   /**

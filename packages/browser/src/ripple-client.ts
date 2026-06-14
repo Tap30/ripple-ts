@@ -3,9 +3,11 @@ import {
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type SdkInfo,
   type WebPlatform,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
+import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
 import { IdentityManager } from "./identity-manager.ts";
 
 /**
@@ -42,6 +44,13 @@ export class RippleClient<
   constructor(config: BrowserClientConfig) {
     super(config);
     this.#identityManager = new IdentityManager(config.sessionStoreKey);
+  }
+
+  protected override _getSdkInfo(): SdkInfo {
+    return {
+      name: SDK_NAME,
+      version: SDK_VERSION,
+    };
   }
 
   /**

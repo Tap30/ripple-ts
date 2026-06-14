@@ -104,8 +104,7 @@ definitions.
 - **Dynamic Rebatching** - Automatically rebatches accumulated events during
   flush for optimal throughput
 - **Retry Logic** - Exponential backoff with jitter
-- **Event Persistence** - Automatic storage of unsent events with TTL and buffer
-  limits
+- **Event Persistence** - Automatic storage of unsent events with buffer limits
 - **Storage Availability Detection** - Static `isAvailable()` method on all
   storage adapters for graceful degradation
 - **Race Condition Prevention** - Mutex-protected operations and atomic
