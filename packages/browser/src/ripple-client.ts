@@ -1,10 +1,13 @@
 import {
   Client,
+  type AllEvents,
+  type Campaign,
   type ClientConfig,
   type EventPayload,
   type Platform,
   type SdkInfo,
   type WebPlatform,
+  type WebScreenedPayload,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
 import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
@@ -90,6 +93,119 @@ export class RippleClient<
   public override async init(): Promise<void> {
     this._anonymousId = this.#identityManager.init();
     await super.init();
+  }
+
+  /**
+   * Track a screen/page view event.
+   * Automatically captures page title, URL, pathname, referrer, and search from the browser.
+   * Provided parameters take precedence over auto-captured values.
+   *
+   * @param payload Optional override for auto-captured screen data
+   * @param schemaVersion Event schema version
+   */
+  public async screen(
+    payload?: Partial<WebScreenedPayload>,
+    schemaVersion?: string,
+  ): Promise<void> {
+    const auto: WebScreenedPayload = {
+      title: this.#extractTitle(),
+      url: this.#extractUrl(),
+      pathname: this.#extractPathname(),
+      referrer: this.#extractReferrer(),
+      search: this.#extractSearch(),
+      keywords: this.#extractKeywords(),
+      campaign: this.#extractCampaign(),
+    };
+
+    return this.track(
+      "screened",
+      { ...auto, ...payload } as AllEvents<TCustomEvents>["screened"],
+      schemaVersion,
+    );
+  }
+
+  /**
+   * Extract url from the documents's `title` field.
+   */
+  #extractTitle(): string {
+    if (typeof document !== "undefined") return document.title;
+
+    return "";
+  }
+
+  /**
+   * Extract url from the location's `href` field.
+   */
+  #extractUrl(): string {
+    if (typeof location !== "undefined") return location.href;
+
+    return "";
+  }
+
+  /**
+   * Extract url from the location's `pathname` field.
+   */
+  #extractPathname(): string | undefined {
+    if (typeof location !== "undefined") return location.pathname;
+
+    return undefined;
+  }
+
+  /**
+   * Extract url from the location's search field.
+   */
+  #extractSearch(): string | undefined {
+    if (typeof location !== "undefined") return location.search;
+
+    return undefined;
+  }
+
+  /**
+   * Extract referrer from the document's `referrer` field.
+   */
+  #extractReferrer(): string | undefined {
+    if (typeof document !== "undefined") return document.referrer;
+
+    return undefined;
+  }
+
+  /**
+   * Extract keywords from the page's meta keywords tag.
+   */
+  #extractKeywords(): string[] | undefined {
+    if (typeof document === "undefined") return undefined;
+
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="keywords"]',
+    );
+
+    if (!meta?.content) return undefined;
+
+    return meta.content
+      .split(",")
+      .map(k => k.trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * Extract UTM campaign parameters from the current URL.
+   */
+  #extractCampaign(): Campaign | undefined {
+    if (typeof location === "undefined") return undefined;
+
+    const params = new URLSearchParams(location.search);
+    const source = params.get("utm_source");
+    const medium = params.get("utm_medium");
+
+    if (!source || !medium) return undefined;
+
+    return {
+      source,
+      medium,
+      name: params.get("utm_campaign") ?? undefined,
+      term: params.get("utm_term") ?? undefined,
+      content: params.get("utm_content") ?? undefined,
+    };
   }
 
   /**

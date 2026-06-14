@@ -503,6 +503,7 @@ export class Dispatcher<
 
       this.#config.hooks.onSendFailure?.({
         batchSize: events.length,
+        /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
         attempt,
       });

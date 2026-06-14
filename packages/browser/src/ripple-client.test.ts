@@ -301,4 +301,113 @@ describe("RippleClient", () => {
       );
     });
   });
+
+  describe("screen", () => {
+    it("should auto-capture page info", async () => {
+      Object.defineProperty(global, "document", {
+        value: {
+          title: "Test Page",
+          referrer: "https://google.com",
+          querySelector: () => ({ content: "seo, keywords" }),
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      Object.defineProperty(global, "location", {
+        value: {
+          href: "https://example.com/path?utm_source=google&utm_medium=cpc",
+          pathname: "/path",
+          search: "?utm_source=google&utm_medium=cpc",
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      await client.screen();
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "Test Page",
+                url: "https://example.com/path?utm_source=google&utm_medium=cpc",
+                pathname: "/path",
+                referrer: "https://google.com",
+                keywords: ["seo", "keywords"],
+                campaign: expect.objectContaining({
+                  source: "google",
+                  medium: "cpc",
+                }) as object,
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+
+    it("should handle undefined document and location", async () => {
+      // @ts-expect-error: mocking global environment for tests
+      delete global.document;
+      // @ts-expect-error: mocking global environment for tests
+      delete global.location;
+
+      await client.init();
+      await client.screen();
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "",
+                url: "",
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+
+    it("should allow overriding auto-captured values", async () => {
+      Object.defineProperty(global, "document", {
+        value: { title: "Auto Title", referrer: "", querySelector: () => null },
+        writable: true,
+        configurable: true,
+      });
+
+      Object.defineProperty(global, "location", {
+        value: { href: "https://auto.com", pathname: "/auto", search: "" },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      await client.screen({
+        title: "Override Title",
+        url: "https://override.com",
+      });
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "Override Title",
+                url: "https://override.com",
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+  });
 });

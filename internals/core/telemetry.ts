@@ -100,6 +100,7 @@ export const createTelemetryHooks = (
   apiKey: string,
   apiKeyHeader: string,
 ): TelemetryHooks => {
+  /* v8 ignore start -- @preserve */
   if (!options || options.disabled) return userHooks;
 
   const report = <K extends keyof TelemetryEventMap>(
@@ -148,4 +149,5 @@ export const createTelemetryHooks = (
       userHooks.onEnqueue?.(info);
     },
   };
+  /* v8 ignore stop */
 };

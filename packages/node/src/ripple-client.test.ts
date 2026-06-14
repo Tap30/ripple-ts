@@ -169,6 +169,25 @@ describe("RippleClient", () => {
     });
   });
 
+  describe("screen", () => {
+    it("should track screened event with payload", async () => {
+      await client.init();
+      await client.screen({ title: "Home", url: "https://example.com" });
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: { title: "Home", url: "https://example.com" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+  });
+
   describe("dispose", () => {
     it("should dispose without error", () => {
       expect(() => client.dispose()).not.toThrow();
