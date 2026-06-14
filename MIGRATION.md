@@ -1,0 +1,99 @@
+# Migration Guide: v1 → v2
+
+## Configuration
+
+### `flushInterval`, `maxBatchSize`, `maxRetries` → `batchOptions`, `retryOptions`
+
+Flat configuration fields have been replaced with structured option objects.
+
+```diff
+ const client = new RippleClient({
+   apiKey: "your-api-key",
+   endpoint: "https://api.example.com/events",
+-  flushInterval: 5000,
+-  maxBatchSize: 10,
+-  maxRetries: 3,
++  batchOptions: {
++    interval: 10000,       // default changed from 5000 to 10000
++    size: 10,
++    maxPayloadSize: 65536, // NEW: 64KB limit per batch
++  },
++  retryOptions: {
++    maxAttempts: 3,
++    minDelay: 1000,        // NEW
++    maxDelay: 360000,      // NEW
++    backoffFactor: 2,      // NEW
++  },
+   httpAdapter: new FetchHttpAdapter(),
+   storageAdapter: new IndexedDBAdapter(),
+ });
+```
+
+> **Note:** The default flush interval changed from 5000ms to 10000ms.
+
+## Event Type System
+
+### Custom events no longer need to redeclare predefined events
+
+The `TEvents` generic parameter is now `TCustomEvents`. Predefined CDP events
+are always available — no need to include them in your custom type map.
+
+```diff
+-type MyEvents = {
+-  product_viewed: { product: Product };   // no longer needed
+-  "custom.event": { foo: string };
+-};
+-const client = new RippleClient<MyEvents, Metadata>(config);
++type MyCustomEvents = {
++  "custom.event": { foo: string };
++};
++const client = new RippleClient<MyCustomEvents, Metadata>(config);
+```
+
+All predefined events (`product_viewed`, `order_completed`, etc.) are available
+with full autocomplete and type checking out of the box.
+
+## `track()` API
+
+### Third parameter changed from metadata to `schemaVersion`
+
+Per-event metadata has been removed from `track()`. Use `setMetadata()` for
+global metadata instead.
+
+```diff
+-await client.track("event", payload, { schemaVersion: "1.0", source: "web" });
++client.setMetadata("source", "web");
++await client.track("event", payload, "1.0");
+```
+
+## Event Structure
+
+### New fields on the `Event` object
+
+| Field           | Type             | Description                 |
+| --------------- | ---------------- | --------------------------- |
+| `eventId`       | `string`         | UUID for deduplication      |
+| `anonymousId`   | `string`         | Anonymous user/device ID    |
+| `userId`        | `string \| null` | Authenticated user ID       |
+| `schemaVersion` | `string \| null` | Custom event schema version |
+| `sdk`           | `SdkInfo`        | SDK name and version        |
+
+### Removed fields
+
+| Field       | Migration                            |
+| ----------- | ------------------------------------ |
+| `sessionId` | Moved to platform-specific (browser) |
+
+## New Convenience Methods
+
+```ts
+// Identify a user
+await client.identify("user-123", { email: "user@example.com" });
+
+// Track element interactions
+await client.click({ elementId: "btn-signup", elementType: "button" });
+await client.view({ elementId: "hero-banner" });
+```
+
+These are shorthand for `client.track("user_identified", ...)`,
+`client.track("clicked", ...)`, and `client.track("viewed", ...)`.

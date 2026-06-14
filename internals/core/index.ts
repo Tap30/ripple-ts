@@ -5,3 +5,4 @@ export * from "./client.ts";
 export * from "./event-specs.ts";
 export * from "./logger.ts";
 export * from "./types.ts";
+export { IdGenerator } from "./utils.ts";

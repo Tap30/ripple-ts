@@ -9,50 +9,76 @@ import {
 describe("utils", () => {
   describe("calculateBackoff", () => {
     it("should calculate backoff for attempt 0", () => {
-      const result = calculateBackoff(0);
+      const result = calculateBackoff(0, 1000, 360000, 2);
 
       expect(result).toBeGreaterThanOrEqual(1000);
       expect(result).toBeLessThan(2000);
     });
 
     it("should calculate backoff for attempt 1", () => {
-      const result = calculateBackoff(1);
+      const result = calculateBackoff(1, 1000, 360000, 2);
 
       expect(result).toBeGreaterThanOrEqual(2000);
       expect(result).toBeLessThan(3000);
     });
 
     it("should calculate backoff for attempt 2", () => {
-      const result = calculateBackoff(2);
+      const result = calculateBackoff(2, 1000, 360000, 2);
 
       expect(result).toBeGreaterThanOrEqual(4000);
       expect(result).toBeLessThan(5000);
     });
 
     it("should calculate backoff for attempt 3", () => {
-      const result = calculateBackoff(3);
+      const result = calculateBackoff(3, 1000, 360000, 2);
 
       expect(result).toBeGreaterThanOrEqual(8000);
       expect(result).toBeLessThan(9000);
+    });
+
+    it("should cap exponential at maxDelay", () => {
+      const result = calculateBackoff(20, 1000, 5000, 2);
+
+      expect(result).toBeGreaterThanOrEqual(5000);
+      expect(result).toBeLessThan(6000);
+    });
+
+    it("should respect custom minDelay", () => {
+      const result = calculateBackoff(0, 500, 360000, 2);
+
+      expect(result).toBeGreaterThanOrEqual(500);
+      expect(result).toBeLessThan(1500);
+    });
+
+    it("should respect custom backoffFactor", () => {
+      const result = calculateBackoff(1, 1000, 360000, 3);
+
+      expect(result).toBeGreaterThanOrEqual(3000);
+      expect(result).toBeLessThan(4000);
     });
 
     it("should include jitter in calculation", () => {
       const results = new Set<number>();
 
       for (let i = 0; i < 100; i++) {
-        results.add(calculateBackoff(0));
+        results.add(calculateBackoff(0, 1000, 360000, 2));
       }
 
       expect(results.size).toBeGreaterThan(1);
     });
 
     it("should follow exponential formula", () => {
-      const attempt0 = calculateBackoff(0);
-      const attempt1 = calculateBackoff(1);
-      const attempt2 = calculateBackoff(2);
+      vi.spyOn(Math, "random").mockReturnValue(0);
 
-      expect(attempt1).toBeGreaterThan(attempt0);
-      expect(attempt2).toBeGreaterThan(attempt1);
+      const attempt0 = calculateBackoff(0, 1000, 360000, 2);
+      const attempt1 = calculateBackoff(1, 1000, 360000, 2);
+      const attempt2 = calculateBackoff(2, 1000, 360000, 2);
+
+      expect(attempt0).toBe(1000);
+      expect(attempt1).toBe(2000);
+      expect(attempt2).toBe(4000);
+
+      vi.restoreAllMocks();
     });
   });
 

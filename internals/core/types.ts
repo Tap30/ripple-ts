@@ -210,21 +210,6 @@ export type Cart = {
 };
 
 /**
- * Represents a payment method.
- */
-export type PaymentMethod =
-  | "credit_card"
-  | "debit_card"
-  | "paypal"
-  | "apple_pay"
-  | "google_pay"
-  | "bank_transfer"
-  | "cash_on_delivery"
-  | "cryptocurrency"
-  | "buy_now_pay_later"
-  | "other";
-
-/**
  * Represents a payment transaction.
  */
 export type Payment = {
@@ -239,7 +224,7 @@ export type Payment = {
   /**
    * The payment method used.
    */
-  method: PaymentMethod;
+  method: string;
   /**
    * The amount being charged.
    */
@@ -468,6 +453,7 @@ export type UserTraits = {
   email?: string;
   phone?: string;
   gender?: "male" | "female" | "other";
+  verified?: boolean;
   /**
    * UNIX timestamp in milliseconds.
    */
@@ -475,7 +461,7 @@ export type UserTraits = {
   /**
    * UNIX timestamp in milliseconds.
    */
-  createdAt?: number;
+  registeredAt?: number;
   address?: {
     city?: string;
     country?: string;

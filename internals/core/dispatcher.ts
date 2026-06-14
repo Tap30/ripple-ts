@@ -10,6 +10,46 @@ import type { Event } from "./types.ts";
 import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
 
 /**
+ * Batching configuration.
+ */
+export type BatchOptions = {
+  /**
+   * Interval in milliseconds between automatic flushes (default: `10000`).
+   */
+  interval?: number;
+  /**
+   * Maximum number of events per batch before auto-flush (default: `10`).
+   */
+  size?: number;
+  /**
+   * Maximum total serialized payload size in bytes per batch before auto-flush (default: `65536` — 64 KB).
+   */
+  maxPayloadSize?: number;
+};
+
+/**
+ * Retry configuration.
+ */
+export type RetryOptions = {
+  /**
+   * Maximum number of retry attempts per request (default: `3`).
+   */
+  maxAttempts?: number;
+  /**
+   * Minimum delay in milliseconds before the first retry (default: `1000`).
+   */
+  minDelay?: number;
+  /**
+   * Maximum delay in milliseconds between retries (default: `360000`).
+   */
+  maxDelay?: number;
+  /**
+   * Multiplicative factor applied to the delay on each retry (default: `2`).
+   */
+  backoffFactor?: number;
+};
+
+/**
  * Configuration for the Dispatcher.
  */
 export type DispatcherConfig = {
@@ -26,17 +66,13 @@ export type DispatcherConfig = {
    */
   endpoint: string;
   /**
-   * Interval in milliseconds between automatic flushes
+   * Batching options
    */
-  flushInterval: number;
+  batchOptions: Required<BatchOptions>;
   /**
-   * Maximum number of events before auto-flush
+   * Retry options
    */
-  maxBatchSize: number;
-  /**
-   * Maximum retry attempts for failed requests
-   */
-  maxRetries: number;
+  retryOptions: Required<RetryOptions>;
   /**
    * Logger for internal logging
    */
@@ -59,10 +95,12 @@ export class Dispatcher<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
   #buffer = new Buffer<Event<TMetadata>>();
-  #timer: ReturnType<typeof setTimeout> | null = null;
   #flushMutex = new Mutex();
-  #disposed = false;
   #retryAbortController = new AbortController();
+
+  #timer: ReturnType<typeof setTimeout> | null = null;
+
+  #disposed = false;
 
   readonly #config: DispatcherConfig;
   readonly #httpAdapter: HttpAdapter;
@@ -82,9 +120,9 @@ export class Dispatcher<
     storageAdapter: StorageAdapter,
   ) {
     // Validate configuration
-    if (config.maxBufferSize < config.maxBatchSize) {
+    if (config.maxBufferSize < config.batchOptions.size) {
       throw new Error(
-        `Invalid configuration: maxBufferSize (${config.maxBufferSize}) must be >= maxBatchSize (${config.maxBatchSize}). ` +
+        `Invalid configuration: maxBufferSize (${config.maxBufferSize}) must be >= batchOptions.size (${config.batchOptions.size}). ` +
           `The batch size will never be reached and events will be dropped unnecessarily.`,
       );
     }
@@ -125,7 +163,7 @@ export class Dispatcher<
       }
     }
 
-    if (this.#buffer.size() >= this.#config.maxBatchSize) {
+    if (this.#buffer.size() >= this.#config.batchOptions.size) {
       await this.flush();
     } else {
       this.#scheduleFlush();
@@ -151,10 +189,21 @@ export class Dispatcher<
 
       this.#buffer.clear();
 
-      for (let i = 0; i < allEvents.length; i += this.#config.maxBatchSize) {
-        const batch = allEvents.slice(i, i + this.#config.maxBatchSize);
+      const batches = this.#createBatches(allEvents);
 
-        await this.#sendWithRetry(batch);
+      for (let i = 0; i < batches.length; i++) {
+        const success = await this.#sendWithRetry(batches[i]!);
+
+        if (!success) {
+          const remaining = batches.slice(i).flat();
+
+          await this.#requeueEvents(
+            remaining,
+            "Failed to persist remaining events after send failure",
+          );
+
+          return;
+        }
       }
     });
   }
@@ -178,15 +227,55 @@ export class Dispatcher<
   }
 
   /**
+   * Split events into batches respecting both count and payload size limits.
+   *
+   * @param events Events to batch
+   * @returns Array of event batches
+   */
+  #createBatches(events: Event<TMetadata>[]): Event<TMetadata>[][] {
+    const { size, maxPayloadSize } = this.#config.batchOptions;
+    const batches: Event<TMetadata>[][] = [];
+
+    let currentBatch: Event<TMetadata>[] = [];
+    let currentSize = 0;
+
+    for (const event of events) {
+      const eventSize = JSON.stringify(event).length;
+
+      if (
+        currentBatch.length > 0 &&
+        (currentBatch.length >= size ||
+          currentSize + eventSize > maxPayloadSize)
+      ) {
+        batches.push(currentBatch);
+
+        currentBatch = [];
+        currentSize = 0;
+      }
+
+      currentBatch.push(event);
+      currentSize += eventSize;
+    }
+
+    /* v8 ignore next -- @preserve */
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+
+    return batches;
+  }
+
+  /**
    * Send events with exponential backoff retry logic.
    *
    * @param events Events to send
    * @param attempt Current retry attempt number
+   * @returns Whether the send was successful (or non-retryable)
    */
   async #sendWithRetry(
     events: Event<TMetadata>[],
     attempt: number = 0,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const response = await this.#httpAdapter.send({
         events,
@@ -198,9 +287,9 @@ export class Dispatcher<
         apiKeyHeader: this.#config.apiKeyHeader,
       });
 
-      await this.#handleResponse(response, events, attempt);
+      return await this.#handleResponse(response, events, attempt);
     } catch (err) {
-      await this.#handleNetworkError(err, events, attempt);
+      return await this.#handleNetworkError(err, events, attempt);
     }
   }
 
@@ -210,14 +299,17 @@ export class Dispatcher<
    * @param response HTTP response
    * @param events Events that were sent
    * @param attempt Current retry attempt
+   * @returns Whether the request was successful (or non-retryable)
    */
   async #handleResponse(
     response: { status: number },
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (response.status >= 200 && response.status < 300) {
       await this.#clearStorage("Failed to clear storage after successful send");
+
+      return true;
     } else if (response.status >= 400 && response.status < 500) {
       this.#logger.warn("4xx client error, dropping events", {
         status: response.status,
@@ -225,8 +317,10 @@ export class Dispatcher<
       });
 
       await this.#clearStorage("Failed to clear storage after 4xx error");
+
+      return true;
     } else if (response.status >= 500) {
-      await this.#handleServerError(response.status, events, attempt);
+      return await this.#handleServerError(response.status, events, attempt);
     } else {
       // 1xx, 3xx: Unexpected status codes, treat as client error and drop
       this.#logger.warn("Unexpected status code, dropping events", {
@@ -237,6 +331,8 @@ export class Dispatcher<
       await this.#clearStorage(
         "Failed to clear storage after unexpected status",
       );
+
+      return true;
     }
   }
 
@@ -246,28 +342,35 @@ export class Dispatcher<
    * @param status HTTP status code
    * @param events Events to retry
    * @param attempt Current retry attempt
+   * @returns Whether the retry eventually succeeded
    */
   async #handleServerError(
     status: number,
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
-    if (attempt < this.#config.maxRetries) {
+  ): Promise<boolean> {
+    if (attempt < this.#config.retryOptions.maxAttempts) {
       this.#logger.warn("5xx server error, retrying", {
         status,
         attempt: attempt + 1,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
       });
 
       try {
         await delay(
-          calculateBackoff(attempt),
+          calculateBackoff(
+            attempt,
+            this.#config.retryOptions.minDelay,
+            this.#config.retryOptions.maxDelay,
+            this.#config.retryOptions.backoffFactor,
+          ),
           this.#retryAbortController.signal,
         );
-        await this.#sendWithRetry(events, attempt + 1);
+
+        return await this.#sendWithRetry(events, attempt + 1);
       } catch (err) {
         /* v8 ignore next -- @preserve */
-        if (err instanceof DelayAbortedError) return;
+        if (err instanceof DelayAbortedError) return false;
 
         /* v8 ignore next -- @preserve */
         throw err;
@@ -275,14 +378,11 @@ export class Dispatcher<
     } else {
       this.#logger.error("5xx server error, max retries reached", {
         status,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         eventsCount: events.length,
       });
 
-      await this.#requeueEvents(
-        events,
-        "Failed to persist events after max retries",
-      );
+      return false;
     }
   }
 
@@ -292,49 +392,53 @@ export class Dispatcher<
    * @param err Error that occurred
    * @param events Events to retry
    * @param attempt Current retry attempt
+   * @returns Whether the retry eventually succeeded
    */
   async #handleNetworkError(
     err: unknown,
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     /* v8 ignore next -- @preserve */
-    if (err instanceof DelayAbortedError) return;
+    if (err instanceof DelayAbortedError) return false;
 
     this.#logger.error("Network error occurred", { err });
 
-    if (attempt < this.#config.maxRetries) {
+    if (attempt < this.#config.retryOptions.maxAttempts) {
       this.#logger.warn("Network error, retrying", {
         attempt: attempt + 1,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         error: err instanceof Error ? err.message : String(err),
       });
 
       try {
         await delay(
-          calculateBackoff(attempt),
+          calculateBackoff(
+            attempt,
+            this.#config.retryOptions.minDelay,
+            this.#config.retryOptions.maxDelay,
+            this.#config.retryOptions.backoffFactor,
+          ),
           this.#retryAbortController.signal,
         );
-        await this.#sendWithRetry(events, attempt + 1);
+
+        return await this.#sendWithRetry(events, attempt + 1);
       } catch (delayErr) {
         /* v8 ignore next -- @preserve */
-        if (delayErr instanceof DelayAbortedError) return;
+        if (delayErr instanceof DelayAbortedError) return false;
 
         /* v8 ignore next -- @preserve */
         throw delayErr;
       }
     } else {
       this.#logger.error("Network error, max retries reached", {
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         eventsCount: events.length,
         /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
       });
 
-      await this.#requeueEvents(
-        events,
-        "Failed to persist events after network error",
-      );
+      return false;
     }
   }
 
@@ -393,7 +497,7 @@ export class Dispatcher<
 
     this.#timer = setTimeout(() => {
       void this.flush();
-    }, this.#config.flushInterval);
+    }, this.#config.batchOptions.interval);
   }
 
   /**

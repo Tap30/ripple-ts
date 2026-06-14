@@ -1,13 +1,24 @@
 /**
  * Calculate exponential backoff delay with jitter.
- * Formula: 1000ms * 2^attempt + random(0-1000ms)
+ * Formula: min(minDelay * backoffFactor^attempt, maxDelay) + random(0-1000ms)
  *
  * @param attempt The retry attempt number
+ * @param minDelay Minimum delay in milliseconds
+ * @param maxDelay Maximum delay in milliseconds
+ * @param backoffFactor Multiplicative factor per attempt
  * @returns Delay in milliseconds
  */
-export const calculateBackoff = (attempt: number): number => {
-  const baseDelay = 1000;
-  const exponential = Math.min(baseDelay * Math.pow(2, attempt), 30000);
+export const calculateBackoff = (
+  attempt: number,
+  minDelay: number,
+  maxDelay: number,
+  backoffFactor: number,
+): number => {
+  const exponential = Math.min(
+    minDelay * Math.pow(backoffFactor, attempt),
+    maxDelay,
+  );
+
   const jitter = Math.random() * 1000;
 
   return exponential + jitter;

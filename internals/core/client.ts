@@ -2,7 +2,12 @@ import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
 import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { type StorageAdapter } from "./adapters/storage-adapter.ts";
-import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
+import {
+  Dispatcher,
+  type BatchOptions,
+  type DispatcherConfig,
+  type RetryOptions,
+} from "./dispatcher.ts";
 import type {
   ClickedPayload,
   PredefinedEvents,
@@ -27,6 +32,8 @@ export type EventSampler<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > = (event: Event<TMetadata>) => boolean;
 
+export type { BatchOptions, RetryOptions };
+
 /**
  * Configuration for the Ripple client.
  */
@@ -44,17 +51,13 @@ export type ClientConfig = {
    */
   apiKeyHeader?: string;
   /**
-   * Interval in milliseconds between automatic flushes (default: `5000`).
+   * Batching options controlling flush interval, batch size, and payload size limits.
    */
-  flushInterval?: number;
+  batchOptions?: BatchOptions;
   /**
-   * Maximum number of events before auto-flush (default: `10`).
+   * Retry options controlling retry attempts, delays, and backoff strategy.
    */
-  maxBatchSize?: number;
-  /**
-   * Maximum retry attempts for failed requests (default: `3`).
-   */
-  maxRetries?: number;
+  retryOptions?: RetryOptions;
   /**
    * Maximum number of events to persist to storage (optional).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
@@ -132,16 +135,59 @@ export abstract class Client<
       throw new Error("`endpoint` must be provided in `config`.");
     }
 
-    if (config.flushInterval !== undefined && config.flushInterval <= 0) {
-      throw new Error("`flushInterval` must be a positive number.");
+    if (
+      config.batchOptions?.interval !== undefined &&
+      config.batchOptions.interval <= 0
+    ) {
+      throw new Error("`batchOptions.interval` must be a positive number.");
     }
 
-    if (config.maxBatchSize !== undefined && config.maxBatchSize <= 0) {
-      throw new Error("`maxBatchSize` must be a positive number.");
+    if (
+      config.batchOptions?.size !== undefined &&
+      config.batchOptions.size <= 0
+    ) {
+      throw new Error("`batchOptions.size` must be a positive number.");
     }
 
-    if (config.maxRetries !== undefined && config.maxRetries < 0) {
-      throw new Error("`maxRetries` must be a non-negative number.");
+    if (
+      config.batchOptions?.maxPayloadSize !== undefined &&
+      config.batchOptions.maxPayloadSize <= 0
+    ) {
+      throw new Error(
+        "`batchOptions.maxPayloadSize` must be a positive number.",
+      );
+    }
+
+    if (
+      config.retryOptions?.maxAttempts !== undefined &&
+      config.retryOptions.maxAttempts < 0
+    ) {
+      throw new Error(
+        "`retryOptions.maxAttempts` must be a non-negative number.",
+      );
+    }
+
+    if (
+      config.retryOptions?.minDelay !== undefined &&
+      config.retryOptions.minDelay <= 0
+    ) {
+      throw new Error("`retryOptions.minDelay` must be a positive number.");
+    }
+
+    if (
+      config.retryOptions?.maxDelay !== undefined &&
+      config.retryOptions.maxDelay <= 0
+    ) {
+      throw new Error("`retryOptions.maxDelay` must be a positive number.");
+    }
+
+    if (
+      config.retryOptions?.backoffFactor !== undefined &&
+      config.retryOptions.backoffFactor <= 0
+    ) {
+      throw new Error(
+        "`retryOptions.backoffFactor` must be a positive number.",
+      );
     }
 
     if (config.maxBufferSize !== undefined && config.maxBufferSize <= 0) {
@@ -166,9 +212,17 @@ export abstract class Client<
       apiKey: config.apiKey,
       endpoint: config.endpoint,
       apiKeyHeader: config.apiKeyHeader ?? "X-API-Key",
-      flushInterval: config.flushInterval ?? 5000,
-      maxBatchSize: config.maxBatchSize ?? 10,
-      maxRetries: config.maxRetries ?? 3,
+      batchOptions: {
+        interval: config.batchOptions?.interval ?? 10000,
+        size: config.batchOptions?.size ?? 10,
+        maxPayloadSize: config.batchOptions?.maxPayloadSize ?? 65536,
+      },
+      retryOptions: {
+        maxAttempts: config.retryOptions?.maxAttempts ?? 3,
+        minDelay: config.retryOptions?.minDelay ?? 1000,
+        maxDelay: config.retryOptions?.maxDelay ?? 360000,
+        backoffFactor: config.retryOptions?.backoffFactor ?? 2,
+      },
       maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
       loggerAdapter: this._logger,
     };

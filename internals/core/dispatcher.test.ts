@@ -34,10 +34,18 @@ const createConfig = (
   apiKey: "test-key",
   apiKeyHeader: "X-API-Key",
   endpoint: "https://api.test.com/events",
-  flushInterval: 5000,
-  maxBatchSize: 10,
+  batchOptions: {
+    interval: 5000,
+    size: 10,
+    maxPayloadSize: 65536,
+  },
+  retryOptions: {
+    maxAttempts: 3,
+    minDelay: 1000,
+    maxDelay: 360000,
+    backoffFactor: 2,
+  },
   maxBufferSize: Number.MAX_SAFE_INTEGER,
-  maxRetries: 3,
   loggerAdapter: new NoOpLoggerAdapter(),
   ...overrides,
 });
@@ -47,7 +55,11 @@ const createEvent = (name: string): Event<TestMetadata> => ({
   payload: { test: "data" },
   metadata: { userId: "123", schemaVersion: "1.0", eventType: "test" },
   issuedAt: Date.now(),
-  sessionId: "session-123",
+  eventId: "evt-123",
+  anonymousId: "anon-123",
+  userId: "user-123",
+  schemaVersion: null,
+  sdk: { name: "ripple-ts", version: "2.0.0" },
   platform: null,
 });
 
@@ -88,7 +100,10 @@ describe("Dispatcher", () => {
     it("should trigger auto-flush when batch size reached", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 2 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 2, maxPayloadSize: 65536 },
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -118,7 +133,10 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ flushInterval: 1000 });
+      const config = createConfig({
+        batchOptions: { interval: 1000, size: 10, maxPayloadSize: 65536 },
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -207,7 +225,10 @@ describe("Dispatcher", () => {
     it("should rebatch events when buffer exceeds maxBatchSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 2 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 2, maxPayloadSize: 65536 },
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -353,7 +374,15 @@ describe("Dispatcher", () => {
       });
 
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 2 });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 2,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -378,7 +407,16 @@ describe("Dispatcher", () => {
       vi.mocked(httpAdapter.send).mockRejectedValue(new Error("Network error"));
 
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 2, loggerAdapter: logger });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 2,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+        loggerAdapter: logger,
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -433,7 +471,9 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const events = [createEvent("event1"), createEvent("event2")];
-      const config = createConfig({ flushInterval: 1000 });
+      const config = createConfig({
+        batchOptions: { interval: 1000, size: 10, maxPayloadSize: 65536 },
+      });
 
       vi.mocked(storageAdapter.load).mockResolvedValue(events);
 
@@ -531,7 +571,9 @@ describe("Dispatcher", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
-        createConfig({ flushInterval: 1000 }),
+        createConfig({
+          batchOptions: { interval: 1000, size: 10, maxPayloadSize: 65536 },
+        }),
         httpAdapter,
         storageAdapter,
       );
@@ -588,7 +630,14 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 3 });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 3,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+      });
 
       vi.mocked(httpAdapter.send).mockImplementation(() => {
         sendCount++;
@@ -626,7 +675,14 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 3 });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 3,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+      });
 
       vi.mocked(httpAdapter.send).mockImplementation(() => {
         sendCount++;
@@ -770,7 +826,15 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 1, loggerAdapter: logger });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 1,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+        loggerAdapter: logger,
+      });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({ status: 500 });
       vi.mocked(storageAdapter.save)
@@ -787,7 +851,7 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to persist events after max retries",
+        "Failed to persist remaining events after send failure",
         expect.objectContaining({ error: "Save error" }),
       );
     });
@@ -798,7 +862,15 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxRetries: 1, loggerAdapter: logger });
+      const config = createConfig({
+        retryOptions: {
+          maxAttempts: 1,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+        loggerAdapter: logger,
+      });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({
         status: 500,
@@ -876,7 +948,11 @@ describe("Dispatcher", () => {
     it("should apply FIFO eviction when buffer limit exceeded", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 12 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 10, maxPayloadSize: 65536 },
+        maxBufferSize: 12,
+      });
+
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -898,7 +974,11 @@ describe("Dispatcher", () => {
     it("should apply limit when buffer exceeds maxBufferSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 12 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 10, maxPayloadSize: 65536 },
+        maxBufferSize: 12,
+      });
+
       const persistedEvents = Array.from({ length: 15 }, (_, i) =>
         createEvent(`persisted${i + 1}`),
       );
@@ -927,7 +1007,10 @@ describe("Dispatcher", () => {
     it("should throw when maxBufferSize < maxBatchSize", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 100, maxBufferSize: 50 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 100, maxPayloadSize: 65536 },
+        maxBufferSize: 50,
+      });
 
       expect(() => {
         createDispatcher({ config, httpAdapter, storageAdapter });
@@ -937,7 +1020,10 @@ describe("Dispatcher", () => {
     it("should not throw when maxBufferSize >= maxBatchSize", () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ maxBatchSize: 10, maxBufferSize: 10 });
+      const config = createConfig({
+        batchOptions: { interval: 5000, size: 10, maxPayloadSize: 65536 },
+        maxBufferSize: 10,
+      });
 
       expect(() => {
         createDispatcher({ config, httpAdapter, storageAdapter });

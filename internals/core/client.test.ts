@@ -2,20 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAdapter } from "./adapters/http-adapter.ts";
 import type { StorageAdapter } from "./adapters/storage-adapter.ts";
 import { Client, type ClientConfig, type EventSampler } from "./client.ts";
-import type { Event, EventPayload, Platform } from "./types.ts";
+import type { Event, Platform } from "./types.ts";
 
 type TestMetadata = {
   userId: string;
   sessionId: string;
-  schemaVersion: string;
-  eventType: string;
 };
 
-type TestEvents = {
+type TestCustomEvents = {
   test_event: { key: string };
   user_signup: { email: string; plan: string };
   simple_event: Record<string, unknown>;
-  typed_event: { data: string };
   event1: Record<string, unknown>;
   event2: Record<string, unknown>;
   event_0: Record<string, unknown>;
@@ -30,13 +27,9 @@ type TestEvents = {
   event_9: Record<string, unknown>;
 };
 
-class TestClient extends Client<TestEvents, TestMetadata> {
+class TestClient extends Client<TestCustomEvents, TestMetadata> {
   protected _getPlatform(): Platform | null {
     return { type: "server" };
-  }
-
-  public testSetSessionId(sessionId: string): void {
-    this._sessionId = sessionId;
   }
 }
 
@@ -56,7 +49,7 @@ const createTestClient = (opts: {
   httpAdapter: HttpAdapter;
   storageAdapter: StorageAdapter;
 }): TestClient => {
-  const { config, httpAdapter, storageAdapter } = opts ?? {};
+  const { config, httpAdapter, storageAdapter } = opts;
 
   return new TestClient({
     apiKey: "test-key",
@@ -115,70 +108,110 @@ describe("Client", () => {
       }).toThrow("`endpoint` must be provided in `config`.");
     });
 
-    it("should throw error if flushInterval is negative", () => {
+    it("should throw error if batchOptions.interval is zero", () => {
       expect(() => {
         createTestClient({
-          config: { flushInterval: -1 },
+          config: { batchOptions: { interval: 0 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`flushInterval` must be a positive number.");
+      }).toThrow("`batchOptions.interval` must be a positive number.");
     });
 
-    it("should throw error if flushInterval is zero", () => {
+    it("should throw error if batchOptions.interval is negative", () => {
       expect(() => {
         createTestClient({
-          config: { flushInterval: 0 },
+          config: { batchOptions: { interval: -1 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`flushInterval` must be a positive number.");
+      }).toThrow("`batchOptions.interval` must be a positive number.");
     });
 
-    it("should throw error if maxBatchSize is negative", () => {
+    it("should throw error if batchOptions.size is zero", () => {
       expect(() => {
         createTestClient({
-          config: { maxBatchSize: -1 },
+          config: { batchOptions: { size: 0 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`maxBatchSize` must be a positive number.");
+      }).toThrow("`batchOptions.size` must be a positive number.");
     });
 
-    it("should throw error if maxBatchSize is zero", () => {
+    it("should throw error if batchOptions.size is negative", () => {
       expect(() => {
         createTestClient({
-          config: { maxBatchSize: 0 },
+          config: { batchOptions: { size: -1 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`maxBatchSize` must be a positive number.");
+      }).toThrow("`batchOptions.size` must be a positive number.");
     });
 
-    it("should throw error if maxRetries is negative", () => {
+    it("should throw error if batchOptions.maxPayloadSize is zero", () => {
       expect(() => {
         createTestClient({
-          config: { maxRetries: -1 },
+          config: { batchOptions: { maxPayloadSize: 0 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`maxRetries` must be a non-negative number.");
+      }).toThrow("`batchOptions.maxPayloadSize` must be a positive number.");
     });
 
-    it("should throw error if maxBufferSize is negative", () => {
+    it("should throw error if retryOptions.maxAttempts is negative", () => {
       expect(() => {
         createTestClient({
-          config: { maxBufferSize: -1 },
+          config: { retryOptions: { maxAttempts: -1 } },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
-      }).toThrow("`maxBufferSize` must be a positive number.");
+      }).toThrow("`retryOptions.maxAttempts` must be a non-negative number.");
+    });
+
+    it("should throw error if retryOptions.minDelay is zero", () => {
+      expect(() => {
+        createTestClient({
+          config: { retryOptions: { minDelay: 0 } },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        });
+      }).toThrow("`retryOptions.minDelay` must be a positive number.");
+    });
+
+    it("should throw error if retryOptions.maxDelay is zero", () => {
+      expect(() => {
+        createTestClient({
+          config: { retryOptions: { maxDelay: 0 } },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        });
+      }).toThrow("`retryOptions.maxDelay` must be a positive number.");
+    });
+
+    it("should throw error if retryOptions.backoffFactor is zero", () => {
+      expect(() => {
+        createTestClient({
+          config: { retryOptions: { backoffFactor: 0 } },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        });
+      }).toThrow("`retryOptions.backoffFactor` must be a positive number.");
     });
 
     it("should throw error if maxBufferSize is zero", () => {
       expect(() => {
         createTestClient({
           config: { maxBufferSize: 0 },
+          httpAdapter: createMockHttpAdapter(),
+          storageAdapter: createMockStorageAdapter(),
+        });
+      }).toThrow("`maxBufferSize` must be a positive number.");
+    });
+
+    it("should throw error if maxBufferSize is negative", () => {
+      expect(() => {
+        createTestClient({
+          config: { maxBufferSize: -1 },
           httpAdapter: createMockHttpAdapter(),
           storageAdapter: createMockStorageAdapter(),
         });
@@ -238,61 +271,16 @@ describe("Client", () => {
   });
 
   describe("track", () => {
-    it("should queue events before initialization", async () => {
+    it("should auto-initialize on first track", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
         httpAdapter: createMockHttpAdapter(),
       });
 
-      const trackPromise = client.track("test_event", { key: "value" });
+      await client.track("test_event", { key: "value" });
 
-      await client.init();
-      await trackPromise;
-
-      const savedEvents = (storageAdapter.save as ReturnType<typeof vi.fn>).mock
-        .calls[0]?.[0] as Event<TestMetadata>[];
-
-      expect(savedEvents[0]).toMatchObject({
-        name: "test_event",
-        payload: { key: "value" },
-      });
-    });
-
-    it("should queue multiple events before initialization", async () => {
-      const storageAdapter = createMockStorageAdapter();
-      const client = createTestClient({
-        storageAdapter,
-        httpAdapter: createMockHttpAdapter(),
-      });
-
-      const track1 = client.track("event1", { key: "value1" });
-      const track2 = client.track("event2", { key: "value2" });
-
-      await client.init();
-      await Promise.all([track1, track2]);
-
-      expect(storageAdapter.save).toHaveBeenCalledTimes(2);
-    });
-
-    it("should track simple event", async () => {
-      const storageAdapter = createMockStorageAdapter();
-      const client = createTestClient({
-        storageAdapter,
-        httpAdapter: createMockHttpAdapter(),
-      });
-
-      await client.init();
-      await client.track("test_event");
-
-      const savedEvents = vi.mocked(storageAdapter.save).mock
-        .calls[0]?.[0] as Event<TestMetadata>[];
-
-      expect(savedEvents[0]).toMatchObject({
-        name: "test_event",
-        payload: null,
-        metadata: null,
-      });
+      expect(storageAdapter.load).toHaveBeenCalled();
     });
 
     it("should track event with payload", async () => {
@@ -314,7 +302,7 @@ describe("Client", () => {
       });
     });
 
-    it("should track event with metadata", async () => {
+    it("should track event without payload", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -322,45 +310,18 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.track(
-        "test_event",
-        { key: "value" },
-        { schemaVersion: "1.0", eventType: "user_action" },
-      );
-
-      const savedEvents = vi.mocked(storageAdapter.save).mock
-        .calls[0]?.[0] as Event<TestMetadata>[];
-
-      expect(savedEvents[0]?.metadata).toEqual({
-        schemaVersion: "1.0",
-        eventType: "user_action",
-      });
-    });
-
-    it("should attach shared metadata to event", async () => {
-      const storageAdapter = createMockStorageAdapter();
-      const client = createTestClient({
-        storageAdapter,
-        httpAdapter: createMockHttpAdapter(),
-      });
-
-      await client.init();
-
-      client.setMetadata("userId", "123");
-      client.setMetadata("sessionId", "abc");
-
       await client.track("test_event");
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
-      expect(savedEvents[0]?.metadata).toEqual({
-        userId: "123",
-        sessionId: "abc",
+      expect(savedEvents[0]).toMatchObject({
+        name: "test_event",
+        payload: null,
       });
     });
 
-    it("should merge shared and event metadata", async () => {
+    it("should include schemaVersion when provided", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -368,28 +329,15 @@ describe("Client", () => {
       });
 
       await client.init();
-
-      client.setMetadata("userId", "123");
-      client.setMetadata("sessionId", "abc");
-
-      await client.track(
-        "test_event",
-        { key: "value" },
-        { schemaVersion: "1.0", eventType: "user_action" },
-      );
+      await client.track("test_event", { key: "value" }, "2.0.0");
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
-      expect(savedEvents[0]?.metadata).toEqual({
-        userId: "123",
-        sessionId: "abc",
-        schemaVersion: "1.0",
-        eventType: "user_action",
-      });
+      expect(savedEvents[0]?.schemaVersion).toBe("2.0.0");
     });
 
-    it("should prioritize event metadata over shared metadata", async () => {
+    it("should default schemaVersion to null", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -397,24 +345,63 @@ describe("Client", () => {
       });
 
       await client.init();
-
-      client.setMetadata("userId", "123");
-      client.setMetadata("schemaVersion", "0.5");
-
-      await client.track(
-        "test_event",
-        { key: "value" },
-        { schemaVersion: "1.0", eventType: "user_action" },
-      );
+      await client.track("test_event", { key: "value" });
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
-      expect(savedEvents[0]?.metadata).toEqual({
-        userId: "123",
-        // Event metadata takes precedence
-        schemaVersion: "1.0",
-        eventType: "user_action",
+      expect(savedEvents[0]?.schemaVersion).toBeNull();
+    });
+
+    it("should include eventId", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.eventId).toBeDefined();
+      expect(typeof savedEvents[0]?.eventId).toBe("string");
+    });
+
+    it("should include anonymousId", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.anonymousId).toBe(client.getAnonymousId());
+    });
+
+    it("should include sdk info", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.sdk).toMatchObject({
+        name: expect.any(String) as string,
+        version: expect.any(String) as string,
       });
     });
 
@@ -452,6 +439,45 @@ describe("Client", () => {
 
       expect(savedEvents[0]?.issuedAt).toBeGreaterThanOrEqual(beforeTime);
       expect(savedEvents[0]?.issuedAt).toBeLessThanOrEqual(afterTime);
+    });
+
+    it("should attach shared metadata to event", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+
+      client.setMetadata("userId", "123");
+      client.setMetadata("sessionId", "abc");
+
+      await client.track("test_event");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.metadata).toEqual({
+        userId: "123",
+        sessionId: "abc",
+      });
+    });
+
+    it("should default metadata to empty object when none set", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.track("test_event");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.metadata).toEqual({});
     });
 
     it("should enqueue event when sampler returns true", async () => {
@@ -502,7 +528,7 @@ describe("Client", () => {
       );
     });
 
-    it("should enqueue all events when no sampler is provided", async () => {
+    it("should track predefined events with type safety", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -510,10 +536,98 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.track("event1");
-      await client.track("event2");
+      await client.track("product_viewed", {
+        product: { productId: "123", price: { amount: 10, currency: "USD" } },
+      });
 
-      expect(storageAdapter.save).toHaveBeenCalledTimes(2);
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]).toMatchObject({
+        name: "product_viewed",
+        payload: {
+          product: { productId: "123", price: { amount: 10, currency: "USD" } },
+        },
+      });
+    });
+  });
+
+  describe("identify", () => {
+    it("should track user_identified event", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.identify("user-123", { email: "test@example.com" });
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]).toMatchObject({
+        name: "user_identified",
+        payload: { userId: "user-123", traits: { email: "test@example.com" } },
+      });
+    });
+
+    it("should pass schemaVersion", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.identify("user-123", {}, "1.0.0");
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]?.schemaVersion).toBe("1.0.0");
+    });
+  });
+
+  describe("click", () => {
+    it("should track clicked event", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.click({ elementId: "btn-1", elementType: "button" });
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]).toMatchObject({
+        name: "clicked",
+        payload: { elementId: "btn-1", elementType: "button" },
+      });
+    });
+  });
+
+  describe("view", () => {
+    it("should track viewed event", async () => {
+      const storageAdapter = createMockStorageAdapter();
+      const client = createTestClient({
+        storageAdapter,
+        httpAdapter: createMockHttpAdapter(),
+      });
+
+      await client.init();
+      await client.view({ elementId: "banner-1" });
+
+      const savedEvents = vi.mocked(storageAdapter.save).mock
+        .calls[0]?.[0] as Event<TestMetadata>[];
+
+      expect(savedEvents[0]).toMatchObject({
+        name: "viewed",
+        payload: { elementId: "banner-1" },
+      });
     });
   });
 
@@ -526,7 +640,6 @@ describe("Client", () => {
       });
 
       await client.init();
-
       client.setMetadata("userId", "123");
 
       await client.track("test_event");
@@ -545,7 +658,6 @@ describe("Client", () => {
       });
 
       await client.init();
-
       client.setMetadata("userId", "123");
       client.setMetadata("userId", "456");
 
@@ -555,6 +667,29 @@ describe("Client", () => {
         .calls[0]?.[0] as Event<TestMetadata>[];
 
       expect(savedEvents[0]?.metadata).toEqual({ userId: "456" });
+    });
+  });
+
+  describe("getAnonymousId", () => {
+    it("should return a non-empty string", () => {
+      const client = createTestClient({
+        httpAdapter: createMockHttpAdapter(),
+        storageAdapter: createMockStorageAdapter(),
+      });
+
+      expect(client.getAnonymousId()).toBeDefined();
+      expect(client.getAnonymousId().length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("getUserId", () => {
+    it("should return null by default", () => {
+      const client = createTestClient({
+        httpAdapter: createMockHttpAdapter(),
+        storageAdapter: createMockStorageAdapter(),
+      });
+
+      expect(client.getUserId()).toBeNull();
     });
   });
 
@@ -575,7 +710,7 @@ describe("Client", () => {
   });
 
   describe("dispose", () => {
-    it("should dispose client", () => {
+    it("should dispose client without error", () => {
       const client = createTestClient({
         httpAdapter: createMockHttpAdapter(),
         storageAdapter: createMockStorageAdapter(),
@@ -591,29 +726,36 @@ describe("Client", () => {
       });
 
       await client.init();
-
       client.setMetadata("userId", "123");
       client.dispose();
 
-      // Re-init and check metadata is cleared
       await client.init();
 
       expect(client.getMetadata()).toEqual({});
     });
 
-    it("should clear session ID on dispose", async () => {
+    it("should clear anonymousId on dispose", async () => {
       const client = createTestClient({
         httpAdapter: createMockHttpAdapter(),
         storageAdapter: createMockStorageAdapter(),
       });
 
       await client.init();
-
-      client.testSetSessionId("test-session-123");
-      expect(client.getSessionId()).toBe("test-session-123");
-
       client.dispose();
-      expect(client.getSessionId()).toBeNull();
+
+      expect(client.getAnonymousId()).toBe("");
+    });
+
+    it("should clear userId on dispose", async () => {
+      const client = createTestClient({
+        httpAdapter: createMockHttpAdapter(),
+        storageAdapter: createMockStorageAdapter(),
+      });
+
+      await client.init();
+      client.dispose();
+
+      expect(client.getUserId()).toBeNull();
     });
 
     it("should allow re-initialization after dispose", async () => {
@@ -622,45 +764,29 @@ describe("Client", () => {
         storageAdapter: createMockStorageAdapter(),
       });
 
-      // First init
       await client.init();
-
-      client.testSetSessionId("session-1");
-      expect(client.getSessionId()).toBe("session-1");
-
-      // Dispose
       client.dispose();
-      expect(client.getSessionId()).toBeNull();
 
-      // Re-init should work
       await expect(client.init()).resolves.not.toThrow();
-
-      // Base client doesn't auto-generate sessions
-      expect(client.getSessionId()).toBeNull();
     });
 
     it("should work normally after dispose and re-init", async () => {
+      const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         httpAdapter: createMockHttpAdapter(),
-        storageAdapter: createMockStorageAdapter(),
+        storageAdapter,
       });
 
-      // First lifecycle
       await client.init();
-
       client.setMetadata("userId", "123");
-
       await client.track("user_signup", {
         email: "test@example.com",
         plan: "premium",
       });
 
-      // Dispose
       client.dispose();
 
-      // Re-init and use normally
       await client.init();
-
       client.setMetadata("userId", "456");
 
       await expect(
@@ -694,16 +820,13 @@ describe("Client", () => {
       });
 
       await client.init();
-
       client.dispose();
 
-      // Track should be silently dropped
       await client.track("user_signup", {
         email: "test@example.com",
         plan: "premium",
       });
 
-      // Verify no events were enqueued (save not called after dispose)
       expect(storageAdapter.save).not.toHaveBeenCalled();
     });
 
@@ -715,43 +838,16 @@ describe("Client", () => {
       });
 
       await client.init();
-
       client.dispose();
 
-      // Explicitly re-init
       await client.init();
 
-      // Track should work now
       await client.track("user_signup", {
         email: "test@example.com",
         plan: "premium",
       });
 
-      // Verify event was enqueued
       expect(storageAdapter.save).toHaveBeenCalledTimes(1);
-    });
-
-    it("should allow subclasses to set _sessionId directly", () => {
-      class SubClient extends Client<Record<string, EventPayload>> {
-        protected _getPlatform(): Platform | null {
-          return null;
-        }
-
-        public testSetSessionId(sessionId: string): void {
-          this._sessionId = sessionId;
-        }
-      }
-
-      const client = new SubClient({
-        apiKey: "test-key",
-        endpoint: "https://api.example.com",
-        httpAdapter: createMockHttpAdapter(),
-        storageAdapter: createMockStorageAdapter(),
-      });
-
-      client.testSetSessionId("test-session-123");
-
-      expect(client.getSessionId()).toBe("test-session-123");
     });
   });
 
@@ -766,7 +862,7 @@ describe("Client", () => {
       await client.init();
 
       const promises = Array.from({ length: 10 }, (_, i) =>
-        client.track(`event_${i}` as keyof TestEvents),
+        client.track(`event_${i}` as keyof TestCustomEvents),
       );
 
       await Promise.all(promises);
@@ -784,11 +880,9 @@ describe("Client", () => {
       await client.init();
 
       client.setMetadata("userId", "123");
-
       await client.track("event1");
 
       client.setMetadata("userId", "456");
-
       await client.track("event2");
 
       expect(storageAdapter.save).toHaveBeenCalledTimes(2);

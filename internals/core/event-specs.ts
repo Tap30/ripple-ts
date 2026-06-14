@@ -238,10 +238,8 @@ export type OrderFailedPayload = {
  */
 export type OrderCancelledPayload = {
   order: Order;
-  /**
-   * Who cancelled the order (e.g., "customer", "admin", "system").
-   */
   issuer?: string;
+  reason?: string;
   customProperties?: Record<string, Primitive>;
 };
 
@@ -433,6 +431,7 @@ export type PaymentRefundedPayload = {
 export type PredefinedEvents = {
   user_identified: UserIdentifiedPayload;
   app_state_changed: AppStateChangedPayload;
+  screened: WebScreenedPayload | MobileScreenedPayload;
   clicked: ClickedPayload;
   viewed: ViewedPayload;
 

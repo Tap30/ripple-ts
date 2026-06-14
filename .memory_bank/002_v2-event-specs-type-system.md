@@ -1,7 +1,6 @@
 # V2 Event Specs & Type System
 
-**Date:** June 10, 2026  
-**Status:** In Progress
+**Date:** June 10, 2026 **Status:** In Progress
 
 ## Context
 
@@ -38,75 +37,34 @@ internals/core/
 ### 2. Predefined Event Coverage
 
 **Decision:** Implement comprehensive CDP event specs covering the full
-ecommerce funnel.
-
-**Event Categories (43 events):**
-
-- **Identity & Lifecycle:** `identify`, `screen`, `app_state_changed`
-- **Product Discovery:** `product_clicked`, `product_viewed`, `product_shared`,
-  `products_searched`, `product_list_viewed`, `product_list_filtered`
-- **Wishlist:** `product_added_to_wishlist`, `product_removed_from_wishlist`
-- **Cart:** `product_added_to_cart`, `product_removed_from_cart`, `cart_viewed`,
-  `cart_emptied`
-- **Reviews:** `product_reviewed`
-- **Checkout:** `checkout_started`, `checkout_step_viewed`,
-  `checkout_step_completed`
-- **Orders:** `order_completed`, `order_failed`, `order_cancelled`,
-  `order_shipped`, `order_refunded`, `order_updated`, `order_product_fulfilled`,
-  `order_product_returned`, `order_fulfillment_status_updated`
-- **Coupons:** `coupon_entered`, `coupon_removed`, `coupon_denied`,
-  `coupon_redeemed`
-- **Promotions:** `promotion_viewed`, `promotion_clicked`
-- **Payments:** `payment_authorized`, `payment_captured`, `payment_failed`,
-  `payment_refunded`
+ecommerce funnel — industry-standard names aligned with common CDP platforms
+(Segment, Amplitude, Mixpanel).
 
 **Rationale:**
 
-- Industry-standard event names align with common CDP platforms (Segment,
-  Amplitude, Mixpanel)
 - Covers complete purchase funnel from discovery to post-purchase
 - Enables out-of-the-box analytics dashboards and funnels
+
+> See `internals/core/event-specs.ts` → `PredefinedEvents` for the full list.
 
 ### 3. Shared Domain Types
 
 **Decision:** Define reusable domain types in `types.ts` that compose into event
 payloads.
 
-**Core Domain Types:**
-
-- `Money` - amount + currency (ISO 4217)
-- `Product` - complete product representation with SKU, category, price,
-  discount, quantity
-- `Order` - order with products, revenue, shipping, tax, coupons, totals
-- `Cart` - shopping cart with products
-- `Checkout` - checkout session with partial order and step tracking
-- `Payment` - payment transaction with method, amount, gateway
-- `Coupon` - discount code with amount
-- `Category`, `Address`, `Shipping` - supporting types
-- `Pagination`, `Filter`, `Sort` - list navigation types
-- `Campaign` - UTM parameters for attribution
-
 **Rationale:**
 
-- **Composition over duplication:** `Order` type reused across
-  `order_completed`, `order_shipped`, `order_refunded`, etc.
+- **Composition over duplication:** Domain types reused across multiple events
 - **Type safety:** Strong typing prevents field name typos and ensures
   consistent data shape
-- **Validation:** Single source of truth for domain concepts
+- **Single source of truth:** One definition per domain concept
+
+> See `internals/core/types.ts` for all domain type definitions.
 
 ### 4. PredefinedEvents Type Map
 
 **Decision:** Create a single `PredefinedEvents` type mapping event names to
-payload types.
-
-```ts
-export type PredefinedEvents = {
-  product_viewed: ProductViewedPayload;
-  cart_viewed: CartViewedPayload;
-  order_completed: OrderCompletedPayload;
-  // ... 40 more events
-};
-```
+payload types, merged with user custom events via `AllEvents<TCustomEvents>`.
 
 **Rationale:**
 
@@ -115,91 +73,63 @@ export type PredefinedEvents = {
 - **Merge with custom events:** `PredefinedEvents & TCustomEvents` enables both
   predefined and user-defined events
 
+> See `internals/core/event-specs.ts` → `PredefinedEvents` type.
+
 ### 5. Updated Event Structure
 
-**Decision:** Enhance root `Event<TMetadata>` type with CDP-required fields.
-
-**V2 Changes:**
-
-```diff
- type Event<TMetadata> = {
-   name: string;
-   payload: EventPayload | null;
-   metadata: TMetadata | null;
-   platform: Platform | null;
-+  sdk: SdkInfo;                    // NEW: SDK name + version
-   issuedAt: number;
--  sessionId: string | null;        // REMOVED: moved to metadata
-+  anonymousId: string;             // NEW: anonymous user ID
-+  eventId: string;                 // NEW: UUID for deduplication
-+  schemaVersion: string | null;    // NEW: custom event schema version
-+  userId: string | null;           // NEW: authenticated user ID
- };
-```
+**Decision:** Enhance root `Event<TMetadata>` type with CDP-required fields:
+`sdk`, `anonymousId`, `eventId`, `schemaVersion`, `userId`. Removed `sessionId`
+(moved to platform-specific implementations).
 
 **Rationale:**
 
-- **CDP standard fields:** `anonymousId`, `userId`, `eventId` align with Segment
-  spec
+- **CDP standard fields:** Align with Segment spec for identity resolution
 - **Deduplication:** `eventId` prevents duplicate event processing
-- **Identity resolution:** `anonymousId` + `userId` enable cross-device tracking
 - **Schema evolution:** `schemaVersion` supports custom event versioning
+
+> See `internals/core/types.ts` → `Event<TMetadata>` type for the full shape.
 
 ### 6. Custom Properties Pattern
 
-**Decision:** Every event payload includes
+**Decision:** Every predefined event payload includes
 `customProperties?: Record<string, Primitive>` for extensibility.
 
 **Rationale:**
 
 - **Flexibility:** Users can add domain-specific fields without forking types
-- **Type safety:** `Primitive` union (`number | boolean | string`) prevents
-  complex nested objects
+- **Type safety:** `Primitive` union prevents complex nested objects
 - **Future-proof:** New business requirements don't require SDK updates
 
-## API Design Decisions (In Progress)
+## API Design Decisions
 
 ### Decided
 
-1. ✅ **Track API:** `client.track(eventName, payload, schemaVersion?)`
-   - Used for all predefined and custom events
-   - `schemaVersion` parameter only for custom events
-2. ✅ **Identity API:** `client.identify(userId, traits?)`
-3. ✅ **Screen API:** `client.screen(screenName, properties?)`
-4. ✅ **Metadata API:** `client.setMetadata(metadata)`
-   - Removed metadata from `.track()` third parameter
+1. ✅ **Track API:** `client.track(eventName, payload?, schemaVersion?)`
+2. ✅ **Identity API:** `client.identify(userId, traits, schemaVersion?)` —
+   sends a `user_identified` event
+3. ✅ **Click API:** `client.click(payload, schemaVersion?)`
+4. ✅ **View API:** `client.view(payload, schemaVersion?)`
+5. ✅ **Metadata API:** `client.setMetadata(key, value)` — per-event metadata
+   removed from `track()`
 
 ### Pending
 
-- Should `identify()` send an event or just set `userId`?
-- Should `screen()` auto-trigger a predefined event?
+- Should `screen()` be added and auto-trigger a predefined event?
 - Schema version default for predefined events?
-- Custom event name collision handling?
+- Custom event name collision handling with predefined events?
 
 ## Migration Impact
 
-**Breaking Changes:**
-
-- `Event<TMetadata>` structure changed (added fields, removed `sessionId`)
-- Generic signature will change: `RippleClient<TEvents, TMetadata>` →
+- `Event<TMetadata>` structure changed (see decision #5)
+- Generic: `RippleClient<TEvents, TMetadata>` →
   `RippleClient<TCustomEvents, TMetadata>`
-- Third parameter of `.track()` changed from metadata to schemaVersion
-
-**Migration Path:**
-
-- Major version bump (v2.0.0)
-- Changeset-based migration guide
-
-## Next Steps
-
-1. Update `Client` base class to support merged event map
-2. Implement auto-capture for platform and SDK info
-3. Build-time script to inject SDK version
-4. Update tests for new event structure
-5. Create migration guide document
+- `track()` third parameter changed from metadata to `schemaVersion`
+- Major version bump (v2.0.0) with migration guide at `MIGRATION.md`
 
 ## References
 
 - Core types: `internals/core/types.ts`
 - Event specs: `internals/core/event-specs.ts`
+- Client: `internals/core/client.ts`
+- Migration guide: `MIGRATION.md`
 - V1 architecture: `.memory_bank/001_v1-architecture-foundation.md`
