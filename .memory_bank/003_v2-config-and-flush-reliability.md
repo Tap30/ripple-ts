@@ -149,7 +149,7 @@ preserve jitter effectiveness at the cap.
   `getAnonymousId()`
 - Anonymous ID persisted in `sessionStorage` (survives page reloads, cleared on
   tab close)
-- Default storage key: `"ripple_anonymous_id"`
+- Default storage key: `"ripple_session"`
 - `ua-parser-js` moved from `peerDependencies` to `dependencies`
 
 ### Adapter Consolidation

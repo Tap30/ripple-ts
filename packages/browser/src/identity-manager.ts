@@ -6,19 +6,17 @@ import { IdGenerator } from "@internals/core";
  */
 export class IdentityManager {
   readonly #storageKey: string;
+  readonly #userIdKey: string;
+
   #anonymousId: string | null = null;
 
-  /**
-   * Create a new SessionManager instance.
-   *
-   * @param storageKey The sessionStorage key to use (default: "ripple_anonymous_id")
-   */
-  constructor(storageKey: string = "ripple_anonymous_id") {
+  constructor(storageKey: string = "ripple_session") {
     this.#storageKey = storageKey;
+    this.#userIdKey = `${storageKey}_user`;
   }
 
   /**
-   * Initialize the session manager and get or create an anonymous ID.
+   * Initialize and get or create an anonymous ID.
    *
    * @returns The current anonymous ID
    */
@@ -36,6 +34,24 @@ export class IdentityManager {
   }
 
   /**
+   * Get the persisted user ID.
+   *
+   * @returns The user ID or null
+   */
+  public getUserId(): string | null {
+    return sessionStorage.getItem(this.#userIdKey);
+  }
+
+  /**
+   * Persist the user ID to sessionStorage.
+   *
+   * @param userId The user ID to persist
+   */
+  public setUserId(userId: string): void {
+    sessionStorage.setItem(this.#userIdKey, userId);
+  }
+
+  /**
    * Get the current anonymous ID.
    *
    * @returns The anonymous ID or null if not initialized
@@ -45,10 +61,11 @@ export class IdentityManager {
   }
 
   /**
-   * Clear the current session.
+   * Clear all identity state.
    */
   public clear(): void {
     this.#anonymousId = null;
     sessionStorage.removeItem(this.#storageKey);
+    sessionStorage.removeItem(this.#userIdKey);
   }
 }

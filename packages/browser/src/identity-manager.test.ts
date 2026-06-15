@@ -55,9 +55,7 @@ describe("IdentityManager", () => {
 
       const id = sessionManager.init();
 
-      expect(mockSessionStorage.getItem).toHaveBeenCalledWith(
-        "ripple_anonymous_id",
-      );
+      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("ripple_session");
       expect(id).toBe("existing-anon-id");
       expect(sessionManager.getAnonymousId()).toBe("existing-anon-id");
       expect(mockSessionStorage.setItem).not.toHaveBeenCalled();
@@ -70,7 +68,7 @@ describe("IdentityManager", () => {
 
       expect(id).toBe("mock-uuid-1234");
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "ripple_anonymous_id",
+        "ripple_session",
         "mock-uuid-1234",
       );
     });
@@ -93,7 +91,7 @@ describe("IdentityManager", () => {
 
       expect(id).toBe("mock-uuid-1234");
       expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "ripple_anonymous_id",
+        "ripple_session",
         "mock-uuid-1234",
       );
     });
@@ -134,7 +132,7 @@ describe("IdentityManager", () => {
 
       expect(sessionManager.getAnonymousId()).toBeNull();
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
-        "ripple_anonymous_id",
+        "ripple_session",
       );
     });
   });
@@ -166,6 +164,34 @@ describe("IdentityManager", () => {
 
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("my-app_anon.id");
       expect(id).toBe("special-id");
+    });
+  });
+
+  describe("userId", () => {
+    it("should return null when no userId is set", () => {
+      mockSessionStorage.getItem.mockReturnValue(null);
+
+      expect(sessionManager.getUserId()).toBeNull();
+    });
+
+    it("should persist and retrieve userId", () => {
+      sessionManager.setUserId("user-123");
+
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
+        "ripple_session_user",
+        "user-123",
+      );
+    });
+
+    it("should clear userId on clear()", () => {
+      mockSessionStorage.getItem.mockReturnValue(null);
+      sessionManager.init();
+      sessionManager.setUserId("user-123");
+      sessionManager.clear();
+
+      expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+        "ripple_session_user",
+      );
     });
   });
 });

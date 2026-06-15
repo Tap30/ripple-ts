@@ -32,6 +32,7 @@ vi.mock("ua-parser-js", () => ({
 vi.mock("./identity-manager.ts", () => ({
   IdentityManager: vi.fn().mockImplementation(function () {
     let anonymousId: string | null = null;
+    let userId: string | null = null;
     let initCounter = 0;
 
     return {
@@ -41,8 +42,13 @@ vi.mock("./identity-manager.ts", () => ({
         return anonymousId;
       }),
       getAnonymousId: vi.fn().mockImplementation(() => anonymousId),
+      getUserId: vi.fn().mockImplementation(() => userId),
+      setUserId: vi.fn().mockImplementation((id: string) => {
+        userId = id;
+      }),
       clear: vi.fn().mockImplementation(() => {
         anonymousId = null;
+        userId = null;
       }),
     };
   }),
@@ -281,6 +287,15 @@ describe("RippleClient", () => {
           ]) as Array<unknown>,
         } as Partial<HttpAdapterContext>),
       );
+    });
+  });
+
+  describe("identify", () => {
+    it("should persist userId in sessionStorage", async () => {
+      await client.init();
+      await client.identify("user-456", { email: "u@e.com" });
+
+      expect(client.getUserId()).toBe("user-456");
     });
   });
 

@@ -19,7 +19,7 @@ persisted in `sessionStorage` and used for cross-event identity resolution.
 ##### Default `sessionStoreKey` changed
 
 The default storage key changed from `"ripple_session_id"` to
-`"ripple_anonymous_id"`.
+`"ripple_session"`.
 
 ##### `ua-parser-js` moved from `peerDependencies` to `dependencies`
 

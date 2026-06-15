@@ -8,6 +8,7 @@ import {
   type Platform,
   type ScreenPayload,
   type SdkInfo,
+  type UserTraits,
   type WebPlatform,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
@@ -19,7 +20,7 @@ import { IdentityManager } from "./identity-manager.ts";
  */
 export type BrowserClientConfig = ClientConfig & {
   /**
-   * Custom session storage key for anonymous ID persistence (default: "ripple_anonymous_id")
+   * Custom session storage key for anonymous ID persistence (default: "ripple_session")
    */
   sessionStoreKey?: string;
 };
@@ -107,12 +108,24 @@ export class RippleClient<
    */
   public override async init(): Promise<void> {
     this._anonymousId = this.#identityManager.init();
+    this._userId = this.#identityManager.getUserId();
 
     await super.init();
 
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", this.#onVisibilityChange);
     }
+  }
+
+  /**
+   * Identify a user and persist the userId in sessionStorage.
+   */
+  public override async identify(
+    userId: string,
+    traits: UserTraits,
+  ): Promise<void> {
+    await super.identify(userId, traits);
+    this.#identityManager.setUserId(userId);
   }
 
   /**

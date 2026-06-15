@@ -299,11 +299,13 @@ export abstract class Client<
    * @param traits User profile attributes (e.g., name, email)
    */
   public async identify(userId: string, traits: UserTraits): Promise<void> {
-    return this._trackInternal(
+    await this._trackInternal(
       "user_identified",
       { userId, traits },
       PREDEFINED_SCHEMA_VERSION,
     );
+
+    this._userId = userId;
   }
 
   /**

@@ -115,7 +115,7 @@ const client = new RippleClient({
   apiKeyHeader: "X-API-Key", // Header name (default: "X-API-Key")
   maxBufferSize: 1000, // Max persisted events (default: unlimited)
   eventTtl: 86400000, // Drop events older than 24h at flush (default: disabled)
-  sessionStoreKey: "ripple_anonymous_id", // sessionStorage key (default)
+  sessionStoreKey: "ripple_session", // sessionStorage key (default)
   loggerAdapter: new ConsoleLogger(LogLevel.WARN),
   eventSampler: event => Math.random() < 0.5, // Sample 50% of events
 });
