@@ -104,22 +104,6 @@ describe("RippleClient", () => {
       );
     });
 
-    it("should track predefined events", async () => {
-      await client.init();
-      await client.track("product_viewed", {
-        product: { productId: "p-1", price: { amount: 99, currency: "USD" } },
-      });
-      await client.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({ name: "product_viewed" }),
-          ]) as Array<unknown>,
-        } as Partial<HttpAdapterContext>),
-      );
-    });
-
     it("should include schemaVersion", async () => {
       await client.init();
       await client.track("test_event", { key: "v" }, "2.0.0");

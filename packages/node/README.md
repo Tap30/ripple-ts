@@ -155,7 +155,7 @@ Tracks a `viewed` event.
 
 ### `screen(payload): Promise<void>`
 
-Tracks a `screened` page view event. Requires `WebScreenedPayload`.
+Tracks a `screened` page view event. Requires `ScreenPayload`.
 
 ### `setMetadata(key, value): void`
 

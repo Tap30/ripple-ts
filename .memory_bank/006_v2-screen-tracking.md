@@ -14,10 +14,10 @@ rich context available via DOM APIs that should be auto-captured.
 **Decision:** `screen()` is implemented on each package's `RippleClient`, not on
 the base `Client`.
 
-- **Browser:** `screen(payload?: Partial<WebScreenedPayload>, schemaVersion?)` —
-  all fields optional, auto-captured from DOM
-- **Node:** `screen(payload: WebScreenedPayload, schemaVersion?)` — mandatory,
-  no auto-capture available
+- **Browser:** `screen(payload?: Partial<ScreenPayload>, schemaVersion?)` — all
+  fields optional, auto-captured from DOM
+- **Node:** `screen(payload: ScreenPayload, schemaVersion?)` — mandatory, no
+  auto-capture available
 
 **Rationale:** The base client has no access to DOM APIs. Auto-capture is a
 platform concern, not a core concern.
@@ -52,4 +52,4 @@ workers).
 
 - Browser: `packages/browser/src/ripple-client.ts`
 - Node: `packages/node/src/ripple-client.ts`
-- Payload types: `internals/core/event-specs.ts` → `WebScreenedPayload`
+- Payload types: `internals/core/event-specs.ts` → `ScreenPayload`

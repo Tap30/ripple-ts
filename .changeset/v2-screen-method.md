@@ -28,7 +28,7 @@ await client.screen({ title: "Custom Title" }); // override title only
 
 ##### Node: `screen(payload, schemaVersion?)`
 
-Requires a `WebScreenedPayload` — no auto-capture in server environments.
+Requires a `ScreenPayload` — no auto-capture in server environments.
 
 ```ts
 await client.screen({ title: "Dashboard", url: "/dashboard" });

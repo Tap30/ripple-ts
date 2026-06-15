@@ -189,26 +189,6 @@ await client.identify("user-123", {
   firstName: "John",
 });
 
-// Track predefined events (with autocomplete!)
-await client.track("product_viewed", {
-  product: {
-    productId: "prod-456",
-    productTitle: "Awesome Product",
-    price: { amount: 49.99, currency: "USD" },
-  },
-});
-
-await client.track("order_completed", {
-  order: {
-    orderId: "order-789",
-    products: [
-      /* ... */
-    ],
-    revenue: { amount: 49.99, currency: "USD" },
-    total: { amount: 54.99, currency: "USD" },
-  },
-});
-
 // Track custom events
 await client.track("feature.enabled", { featureName: "dark-mode" }, "1.0.0");
 

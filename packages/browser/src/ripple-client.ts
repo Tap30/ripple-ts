@@ -6,9 +6,9 @@ import {
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type ScreenPayload,
   type SdkInfo,
   type WebPlatform,
-  type WebScreenedPayload,
 } from "@internals/core";
 import { UAParser } from "ua-parser-js";
 import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
@@ -122,8 +122,8 @@ export class RippleClient<
    *
    * @param payload Optional override for auto-captured screen data
    */
-  public async screen(payload?: Partial<WebScreenedPayload>): Promise<void> {
-    const auto: WebScreenedPayload = {
+  public async screen(payload?: Partial<ScreenPayload>): Promise<void> {
+    const auto: ScreenPayload = {
       title: this.#extractTitle(),
       url: this.#extractUrl(),
       pathname: this.#extractPathname(),

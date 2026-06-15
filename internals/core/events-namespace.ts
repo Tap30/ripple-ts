@@ -5,11 +5,17 @@ import {
   type CartEmptiedPayload,
   type CartModificationPayload,
   type CartViewedPayload,
+  type ChallengeCompletedPayload,
+  type ChallengeStartedPayload,
+  type ChallengeStepCompletedPayload,
   type CheckoutStartedPayload,
   type CheckoutStepPayload,
   type CouponDeniedPayload,
   type CouponEnteredRemovedPayload,
-  type CouponRedeemedPayload,
+  type IncentiveClaimedPayload,
+  type IncentiveExpiredPayload,
+  type IncentiveGrantedPayload,
+  type IncentiveRedeemedPayload,
   type OrderCancelledPayload,
   type OrderCompletedPayload,
   type OrderFailedPayload,
@@ -32,6 +38,8 @@ import {
   type ProductWishlistPayload,
   type ProductsSearchedPayload,
   type PromotionPayload,
+  type ReferralAppliedPayload,
+  type ReferralSharedPayload,
 } from "./event-specs.ts";
 
 /**
@@ -43,6 +51,15 @@ export class EventsNamespace {
 
   constructor(client: Client) {
     this.#client = client;
+  }
+
+  // App State
+  appStateChanged(payload: AppStateChangedPayload) {
+    return this.#client.track(
+      "app_state_changed",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
   }
 
   // Product Discovery
@@ -252,13 +269,6 @@ export class EventsNamespace {
       PREDEFINED_SCHEMA_VERSION,
     );
   }
-  couponRedeemed(payload: CouponRedeemedPayload) {
-    return this.#client.track(
-      "coupon_redeemed",
-      payload,
-      PREDEFINED_SCHEMA_VERSION,
-    );
-  }
 
   // Promotions
   promotionViewed(payload: PromotionPayload) {
@@ -306,10 +316,70 @@ export class EventsNamespace {
     );
   }
 
-  // App State
-  appStateChanged(payload: AppStateChangedPayload) {
+  // Referral
+  referralShared(payload: ReferralSharedPayload) {
     return this.#client.track(
-      "app_state_changed",
+      "referral_shared",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  referralApplied(payload: ReferralAppliedPayload) {
+    return this.#client.track(
+      "referral_applied",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+
+  // Incentives
+  incentiveGranted(payload: IncentiveGrantedPayload) {
+    return this.#client.track(
+      "incentive_granted",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  incentiveRedeemed(payload: IncentiveRedeemedPayload) {
+    return this.#client.track(
+      "incentive_redeemed",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  incentiveClaimed(payload: IncentiveClaimedPayload) {
+    return this.#client.track(
+      "incentive_claimed",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  incentiveExpired(payload: IncentiveExpiredPayload) {
+    return this.#client.track(
+      "incentive_expired",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+
+  // Gamification Challenges
+  challengeStarted(payload: ChallengeStartedPayload) {
+    return this.#client.track(
+      "challenge_started",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  challengeCompleted(payload: ChallengeCompletedPayload) {
+    return this.#client.track(
+      "challenge_completed",
+      payload,
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+  challengeStepCompleted(payload: ChallengeStepCompletedPayload) {
+    return this.#client.track(
+      "challenge_step_completed",
       payload,
       PREDEFINED_SCHEMA_VERSION,
     );
