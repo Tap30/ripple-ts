@@ -6,7 +6,6 @@ export {
   HttpClient,
   LogLevel,
   NoOpLogger,
-  type AllEvents,
   type BatchOptions,
   type ClientConfig,
   type Event,

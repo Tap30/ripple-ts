@@ -1,6 +1,6 @@
 import {
   Client,
-  type AllEvents,
+  PREDEFINED_SCHEMA_VERSION,
   type AppState,
   type Campaign,
   type ClientConfig,
@@ -121,12 +121,8 @@ export class RippleClient<
    * Provided parameters take precedence over auto-captured values.
    *
    * @param payload Optional override for auto-captured screen data
-   * @param schemaVersion Event schema version
    */
-  public async screen(
-    payload?: Partial<WebScreenedPayload>,
-    schemaVersion?: string,
-  ): Promise<void> {
+  public async screen(payload?: Partial<WebScreenedPayload>): Promise<void> {
     const auto: WebScreenedPayload = {
       title: this.#extractTitle(),
       url: this.#extractUrl(),
@@ -137,10 +133,10 @@ export class RippleClient<
       campaign: this.#extractCampaign(),
     };
 
-    return this.track(
+    return this._trackInternal(
       "screened",
-      { ...auto, ...payload } as AllEvents<TCustomEvents>["screened"],
-      schemaVersion,
+      { ...auto, ...payload },
+      PREDEFINED_SCHEMA_VERSION,
     );
   }
 
@@ -192,14 +188,14 @@ export class RippleClient<
   /**
    * Track an app opened state change.
    */
-  public openApp(): void {
+  public appOpened(): void {
     this.#trackAppStateChange("opened");
   }
 
   /**
    * Track an app closed state change.
    */
-  public closeApp(): void {
+  public appClosed(): void {
     this.#trackAppStateChange("closed");
   }
 
@@ -208,10 +204,11 @@ export class RippleClient<
 
     this.#appState = newState;
 
-    void this.track("app_state_changed", {
-      newState,
-      previousState,
-    } as AllEvents<TCustomEvents>["app_state_changed"]);
+    void this._trackInternal(
+      "app_state_changed",
+      { newState, previousState },
+      PREDEFINED_SCHEMA_VERSION,
+    );
   }
 
   /**

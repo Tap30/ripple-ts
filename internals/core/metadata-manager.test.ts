@@ -41,8 +41,8 @@ describe("MetadataManager", () => {
   });
 
   describe("getAll", () => {
-    it("should return empty object when no metadata set", () => {
-      expect(manager.getAll()).toEqual({});
+    it("should return null when no metadata set", () => {
+      expect(manager.getAll()).toEqual(null);
     });
 
     it("should return all metadata", () => {

@@ -23,7 +23,9 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    *
    * @returns All metadata or empty object if none set
    */
-  public getAll(): Partial<TMetadata> {
+  public getAll(): Partial<TMetadata> | null {
+    if (this.isEmpty()) return null;
+
     return { ...this.#metadata };
   }
 

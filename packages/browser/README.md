@@ -71,13 +71,13 @@ await client.init();
 client.setMetadata("appVersion", "2.0.0");
 client.setMetadata("environment", "prod");
 
-// Track predefined events (autocomplete available!)
-await client.track("product_viewed", {
+// Track predefined events via events namespace (schema version auto-managed)
+await client.events.productViewed({
   product: { productId: "123", price: { amount: 29.99, currency: "USD" } },
 });
 
-// Track custom events with schema version
-await client.track("feature.enabled", { featureName: "dark-mode" }, "1.0.0");
+// Track custom events with explicit schema version
+await client.track("feature.enabled", { featureName: "dark-mode" }, "1");
 
 // Identity
 await client.identify("user-123", { email: "user@example.com" });
@@ -116,7 +116,7 @@ const client = new RippleClient({
   maxBufferSize: 1000, // Max persisted events (default: unlimited)
   eventTTL: 86400000, // Drop events older than 24h at flush (default: disabled)
   sessionStoreKey: "ripple_anonymous_id", // sessionStorage key (default)
-  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.WARN),
+  loggerAdapter: new ConsoleLogger(LogLevel.WARN),
   eventSampler: event => Math.random() < 0.5, // Sample 50% of events
 });
 ```
@@ -125,45 +125,43 @@ const client = new RippleClient({
 
 ### `new RippleClient<TCustomEvents, TMetadata>(config)`
 
-Creates a new client. `TCustomEvents` defines your custom events — predefined
-CDP events are always merged automatically.
+Creates a new client. `TCustomEvents` defines your custom events.
 
 ### `init(): Promise<void>`
 
 Initializes the client, restores persisted events, and persists anonymous ID.
 
-### `track<K>(name, payload?, schemaVersion?): Promise<void>`
+### `track(name, payload?, schemaVersion?): Promise<void>`
 
-Tracks an event. Accepts predefined event names and custom event names with full
-type safety.
+Tracks an event. Accepts custom event names with full type safety.
 
-### `identify(userId, traits, schemaVersion?): Promise<void>`
+### `identify(userId, traits): Promise<void>`
 
 Identifies a user. Sends a `user_identified` event.
 
-### `click(payload, schemaVersion?): Promise<void>`
+### `clicked(payload): Promise<void>`
 
 Tracks a `clicked` event.
 
-### `view(payload, schemaVersion?): Promise<void>`
+### `viewed(payload): Promise<void>`
 
 Tracks a `viewed` event.
 
-### `screen(payload?, schemaVersion?): Promise<void>`
+### `screen(payload?): Promise<void>`
 
 Tracks a `screened` page view event. Auto-captures title, URL, pathname,
 referrer, search, keywords (from meta tag), and UTM campaign params. Provided
 fields override auto-captured values.
 
-### `openApp(): void`
+### `appOpened(): void`
 
 Manually tracks `app_state_changed` with `newState: "opened"`.
 
-### `closeApp(): void`
+### `appClosed(): void`
 
 Manually tracks `app_state_changed` with `newState: "closed"`.
 
-### `setMetadata<K>(key, value): void`
+### `setMetadata(key, value): void`
 
 Sets global metadata attached to all subsequent events.
 

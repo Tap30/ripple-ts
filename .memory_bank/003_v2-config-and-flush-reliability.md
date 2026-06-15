@@ -114,20 +114,19 @@ flush():
 final result (jitter can push slightly above `maxDelay`). This is intentional to
 preserve jitter effectiveness at the cap.
 
-### 5. `AllEvents<TCustomEvents>` Type Alias
+### 5. `TCustomEvents` Generic & `_trackInternal`
 
-**Decision:** The `Client` class generic was renamed from `TEvents` to
-`TCustomEvents`. A public type
-`AllEvents<TCustomEvents> = PredefinedEvents & TCustomEvents` is used in
-`track()` and convenience methods.
+**Decision:** The `Client` class generic `TCustomEvents` is used only by
+`track()`. Predefined events are sent via `_trackInternal()` which delegates to
+`track()` with type assertions.
 
 **Rationale:**
 
-- Makes it explicit that users only define _custom_ events
-- Predefined CDP events are always available with autocomplete
-- Convenience methods (`identify`, `click`, `view`) use
-  `as AllEvents<TCustomEvents>[K]` casts since TypeScript can't prove the
-  intersection is satisfied when `TCustomEvents` is generic
+- `track()` only covers user-defined custom events — clean generic constraint
+- Predefined events bypass the constraint via
+  `_trackInternal(name, payload, schemaVersion)`
+- No `AllEvents` merge type needed — simpler type system
+- `EventsNamespace` and convenience methods use `_trackInternal`
 
 ## Migration Impact
 

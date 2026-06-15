@@ -1,7 +1,6 @@
 # V2 Event Lifecycle & Build Infrastructure
 
-**Date:** June 14, 2026
-**Status:** Implemented
+**Date:** June 14, 2026 **Status:** Implemented
 
 ## Context
 
@@ -28,7 +27,8 @@ to `ClientConfig` → `DispatcherConfig`, enforced at flush time.
 
 - `ClientConfig.eventTTL?: number` (optional, disabled by default)
 - `DispatcherConfig.eventTTL: number | null`
-- `#filterExpired()` in dispatcher, called in `flush()` before `#createBatches()`
+- `#filterExpired()` in dispatcher, called in `flush()` before
+  `#createBatches()`
 - Events where `Date.now() - event.issuedAt > eventTTL` are dropped silently
 
 ### 2. Build-Time SDK Info Injection

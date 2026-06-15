@@ -1,6 +1,6 @@
 import {
   Client,
-  type AllEvents,
+  PREDEFINED_SCHEMA_VERSION,
   type ClientConfig,
   type EventPayload,
   type Platform,
@@ -66,14 +66,7 @@ export class RippleClient<
    * @param payload Screen event data (required in Node.js)
    * @param schemaVersion Event schema version
    */
-  public async screen(
-    payload: WebScreenedPayload,
-    schemaVersion?: string,
-  ): Promise<void> {
-    return this.track(
-      "screened",
-      payload as AllEvents<TCustomEvents>["screened"],
-      schemaVersion,
-    );
+  public async screen(payload: WebScreenedPayload): Promise<void> {
+    return this._trackInternal("screened", payload, PREDEFINED_SCHEMA_VERSION);
   }
 }

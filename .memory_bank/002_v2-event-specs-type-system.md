@@ -64,7 +64,8 @@ payloads.
 ### 4. PredefinedEvents Type Map
 
 **Decision:** Create a single `PredefinedEvents` type mapping event names to
-payload types, merged with user custom events via `AllEvents<TCustomEvents>`.
+payload types. `track()` uses `TCustomEvents` generic; predefined events are
+sent via `_trackInternal()` which bypasses the generic constraint.
 
 **Rationale:**
 
@@ -107,8 +108,8 @@ payload types, merged with user custom events via `AllEvents<TCustomEvents>`.
 1. ✅ **Track API:** `client.track(eventName, payload?, schemaVersion?)`
 2. ✅ **Identity API:** `client.identify(userId, traits, schemaVersion?)` —
    sends a `user_identified` event
-3. ✅ **Click API:** `client.click(payload, schemaVersion?)`
-4. ✅ **View API:** `client.view(payload, schemaVersion?)`
+3. ✅ **Click API:** `client.clicked(payload, schemaVersion?)`
+4. ✅ **View API:** `client.viewed(payload, schemaVersion?)`
 5. ✅ **Metadata API:** `client.setMetadata(key, value)` — per-event metadata
    removed from `track()`
 

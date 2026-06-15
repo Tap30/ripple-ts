@@ -23,17 +23,8 @@ Previously users had to redeclare predefined event types in their `TEvents` to g
 
 #### New Features
 
-##### `AllEvents<TCustomEvents>` type export
-
-A new exported utility type merges predefined and custom events:
-
-```ts
-type AllEvents<TCustomEvents extends Record<string, EventPayload>> =
-  PredefinedEvents & TCustomEvents;
-```
-
 ##### New convenience methods on `Client`
 
-- `identify(userId, traits, schemaVersion?)` — tracks a `user_identified` event
-- `click(payload, schemaVersion?)` — tracks a `clicked` event
-- `view(payload, schemaVersion?)` — tracks a `viewed` event
+- `identify(userId, traits)` — tracks a `user_identified` event
+- `clicked(payload)` — tracks a `clicked` event
+- `viewed(payload)` — tracks a `viewed` event

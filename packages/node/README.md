@@ -66,8 +66,8 @@ await client.init();
 client.setMetadata("serverId", "srv-1");
 client.setMetadata("environment", "prod");
 
-// Track predefined events
-await client.track("order_completed", {
+// Track predefined events via events namespace (schema version auto-managed)
+await client.events.orderCompleted({
   order: {
     orderId: "order-789",
     products: [{ productId: "p-1", price: { amount: 49.99, currency: "USD" } }],
@@ -122,7 +122,7 @@ const client = new RippleClient({
   apiKeyHeader: "X-API-Key", // Header name (default: "X-API-Key")
   maxBufferSize: 1000, // Max persisted events (default: unlimited)
   eventTTL: 86400000, // Drop events older than 24h at flush (default: disabled)
-  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.INFO),
+  loggerAdapter: new ConsoleLogger(LogLevel.INFO),
   eventSampler: event => true, // Keep all events
 });
 ```
@@ -131,35 +131,33 @@ const client = new RippleClient({
 
 ### `new RippleClient<TCustomEvents, TMetadata>(config)`
 
-Creates a new client. `TCustomEvents` defines your custom events — predefined
-CDP events are always merged automatically.
+Creates a new client. `TCustomEvents` defines your custom events.
 
 ### `init(): Promise<void>`
 
 Initializes the client and restores persisted events.
 
-### `track<K>(name, payload?, schemaVersion?): Promise<void>`
+### `track(name, payload?, schemaVersion?): Promise<void>`
 
-Tracks an event. Accepts predefined event names and custom event names with full
-type safety.
+Tracks an event. Accepts custom event names with full type safety.
 
-### `identify(userId, traits, schemaVersion?): Promise<void>`
+### `identify(userId, traits): Promise<void>`
 
 Identifies a user. Sends a `user_identified` event.
 
-### `click(payload, schemaVersion?): Promise<void>`
+### `clicked(payload): Promise<void>`
 
 Tracks a `clicked` event.
 
-### `view(payload, schemaVersion?): Promise<void>`
+### `viewed(payload): Promise<void>`
 
 Tracks a `viewed` event.
 
-### `screen(payload, schemaVersion?): Promise<void>`
+### `screen(payload): Promise<void>`
 
 Tracks a `screened` page view event. Requires `WebScreenedPayload`.
 
-### `setMetadata<K>(key, value): void`
+### `setMetadata(key, value): void`
 
 Sets global metadata attached to all subsequent events.
 
@@ -209,6 +207,9 @@ class GrpcHttpAdapter implements HttpAdapter {
 import type { StorageAdapter, Event } from "@tapsioss/ripple-node";
 
 class RedisStorageAdapter implements StorageAdapter {
+  async init(): Promise<void> {
+    // initialization
+  }
   async save(events: Event[]): Promise<void> {
     await redis.set("ripple:events", JSON.stringify(events));
   }

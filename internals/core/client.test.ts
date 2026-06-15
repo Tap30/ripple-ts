@@ -456,7 +456,7 @@ describe("Client", () => {
       });
     });
 
-    it("should default metadata to empty object when none set", async () => {
+    it("should default metadata to null when none set", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -469,7 +469,7 @@ describe("Client", () => {
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
-      expect(savedEvents[0]?.metadata).toEqual({});
+      expect(savedEvents[0]?.metadata).toEqual(null);
     });
 
     it("should enqueue event when sampler returns true", async () => {
@@ -519,29 +519,6 @@ describe("Client", () => {
         }),
       );
     });
-
-    it("should track predefined events with type safety", async () => {
-      const storageAdapter = createMockStorageAdapter();
-      const client = createTestClient({
-        storageAdapter,
-        httpAdapter: createMockHttpAdapter(),
-      });
-
-      await client.init();
-      await client.track("product_viewed", {
-        product: { productId: "123", price: { amount: 10, currency: "USD" } },
-      });
-
-      const savedEvents = vi.mocked(storageAdapter.save).mock
-        .calls[0]?.[0] as Event<TestMetadata>[];
-
-      expect(savedEvents[0]).toMatchObject({
-        name: "product_viewed",
-        payload: {
-          product: { productId: "123", price: { amount: 10, currency: "USD" } },
-        },
-      });
-    });
   });
 
   describe("identify", () => {
@@ -564,7 +541,7 @@ describe("Client", () => {
       });
     });
 
-    it("should pass schemaVersion", async () => {
+    it("should use PREDEFINED_SCHEMA_VERSION", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
         storageAdapter,
@@ -572,16 +549,16 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.identify("user-123", {}, "1.0.0");
+      await client.identify("user-123", {});
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
-      expect(savedEvents[0]?.schemaVersion).toBe("1.0.0");
+      expect(savedEvents[0]?.schemaVersion).toBe("1");
     });
   });
 
-  describe("click", () => {
+  describe("clicked", () => {
     it("should track clicked event", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
@@ -590,7 +567,7 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.click({ elementId: "btn-1", elementType: "button" });
+      await client.clicked({ elementId: "btn-1", elementType: "button" });
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
@@ -602,7 +579,7 @@ describe("Client", () => {
     });
   });
 
-  describe("view", () => {
+  describe("viewed", () => {
     it("should track viewed event", async () => {
       const storageAdapter = createMockStorageAdapter();
       const client = createTestClient({
@@ -611,7 +588,7 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.view({ elementId: "banner-1" });
+      await client.viewed({ elementId: "banner-1" });
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
@@ -723,7 +700,7 @@ describe("Client", () => {
 
       await client.init();
 
-      expect(client.getMetadata()).toEqual({});
+      expect(client.getMetadata()).toEqual(null);
     });
 
     it("should clear anonymousId on dispose", async () => {

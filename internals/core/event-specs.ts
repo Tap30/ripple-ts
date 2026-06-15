@@ -16,6 +16,13 @@ import type {
 } from "./types.ts";
 
 /**
+ * Schema version for all predefined CDP events.
+ * Incremental, shared across all Ripple SDKs.
+ * Bump when predefined event payload shapes change.
+ */
+export const PREDEFINED_SCHEMA_VERSION = "1";
+
+/**
  * Payload for identify event.
  */
 export type UserIdentifiedPayload = {

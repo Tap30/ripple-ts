@@ -266,24 +266,6 @@ describe("RippleClient", () => {
       );
     });
 
-    it("should track predefined events", async () => {
-      await client.init();
-      await client.track("product_viewed", {
-        product: { productId: "123", price: { amount: 10, currency: "USD" } },
-      });
-      await client.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({
-              name: "product_viewed",
-            }),
-          ]) as Array<unknown>,
-        } as Partial<HttpAdapterContext>),
-      );
-    });
-
     it("should support metadata", async () => {
       await client.init();
       client.setMetadata("appVersion", "2.0.0");
@@ -494,9 +476,9 @@ describe("RippleClient", () => {
       );
     });
 
-    it("should track opened state via openApp()", async () => {
+    it("should track opened state via appOpened()", async () => {
       await client.init();
-      client.openApp();
+      client.appOpened();
 
       await new Promise(r => {
         setTimeout(r, 0);
@@ -516,9 +498,9 @@ describe("RippleClient", () => {
       );
     });
 
-    it("should track closed state via closeApp()", async () => {
+    it("should track closed state via appClosed()", async () => {
       await client.init();
-      client.closeApp();
+      client.appClosed();
 
       await new Promise(r => {
         setTimeout(r, 0);

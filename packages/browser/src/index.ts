@@ -8,7 +8,6 @@ export {
   LogLevel,
   NoOpLogger,
   StorageQuotaExceededError,
-  type AllEvents,
   type BatchOptions,
   type ClientConfig,
   type Event,

@@ -91,8 +91,8 @@ global metadata instead.
 await client.identify("user-123", { email: "user@example.com" });
 
 // Track element interactions
-await client.click({ elementId: "btn-signup", elementType: "button" });
-await client.view({ elementId: "hero-banner" });
+await client.clicked({ elementId: "btn-signup", elementType: "button" });
+await client.viewed({ elementId: "hero-banner" });
 ```
 
 These are shorthand for `client.track("user_identified", ...)`,
@@ -208,4 +208,32 @@ const client = new RippleClient({
     endpoint: "https://telemetry.example.com/sdk",
   },
 });
+```
+
+## Schema Versioning
+
+### `schemaVersion` removed from convenience methods
+
+`identify()`, `clicked()`, `viewed()`, and `screen()` no longer accept
+`schemaVersion`. The SDK auto-manages it.
+
+```diff
+-await client.identify("user-123", { email: "..." }, "1.0.0");
++await client.identify("user-123", { email: "..." });
+```
+
+### New: `client.events.*` namespace
+
+Use typed methods for predefined CDP events — schema version is auto-managed:
+
+```ts
+await client.events.productViewed({ product: { ... } });
+await client.events.orderCompleted({ order: { ... } });
+await client.events.checkoutStarted({ checkout: { ... } });
+```
+
+### Custom events still use explicit `schemaVersion`
+
+```ts
+await client.track("custom.event", { foo: "bar" }, "2.0.0");
 ```

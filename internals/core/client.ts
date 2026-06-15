@@ -7,11 +7,12 @@ import {
   type DispatcherConfig,
   type RetryOptions,
 } from "./dispatcher.ts";
-import type {
-  ClickedPayload,
-  PredefinedEvents,
-  ViewedPayload,
+import {
+  PREDEFINED_SCHEMA_VERSION,
+  type ClickedPayload,
+  type ViewedPayload,
 } from "./event-specs.ts";
+import { EventsNamespace } from "./events-namespace.ts";
 import { HttpClient } from "./http-client.ts";
 import { ConsoleLogger } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
@@ -102,12 +103,6 @@ export type ClientConfig = {
 };
 
 /**
- * Merges predefined CDP events with user-defined custom events.
- */
-export type AllEvents<TCustomEvents extends Record<string, EventPayload>> =
-  PredefinedEvents & TCustomEvents;
-
-/**
  * Abstract base class for Ripple SDK clients.
  * Provides core event tracking functionality with type-safe metadata management.
  *
@@ -128,6 +123,11 @@ export abstract class Client<
   protected readonly _sampler: EventSampler;
 
   readonly #hooks: TelemetryHooks;
+
+  /**
+   * Typed namespace for predefined CDP events.
+   */
+  public readonly events: EventsNamespace;
 
   protected _anonymousId: string;
   protected _userId: string | null = null;
@@ -231,6 +231,9 @@ export abstract class Client<
       config.apiKeyHeader ?? "X-API-Key",
     );
     this._logger = config.loggerAdapter ?? new ConsoleLogger(LogLevel.WARN);
+
+    this.events = new EventsNamespace(this);
+
     this._metadataManager = new MetadataManager<TMetadata>();
 
     const dispatcherConfig: DispatcherConfig = {
@@ -294,17 +297,12 @@ export abstract class Client<
    *
    * @param userId The authenticated user's unique identifier
    * @param traits User profile attributes (e.g., name, email)
-   * @param schemaVersion Event schema version
    */
-  public async identify(
-    userId: string,
-    traits: UserTraits,
-    schemaVersion?: string,
-  ): Promise<void> {
-    return this.track(
+  public async identify(userId: string, traits: UserTraits): Promise<void> {
+    return this._trackInternal(
       "user_identified",
-      { userId, traits } as AllEvents<TCustomEvents>["user_identified"],
-      schemaVersion,
+      { userId, traits },
+      PREDEFINED_SCHEMA_VERSION,
     );
   }
 
@@ -312,32 +310,36 @@ export abstract class Client<
    * Track a click interaction on a UI element.
    *
    * @param payload Click event data including element identifier
-   * @param schemaVersion Event schema version
    */
-  public async click(
-    payload: ClickedPayload,
-    schemaVersion?: string,
-  ): Promise<void> {
-    return this.track(
-      "clicked",
-      payload as AllEvents<TCustomEvents>["clicked"],
-      schemaVersion,
-    );
+  public async clicked(payload: ClickedPayload): Promise<void> {
+    return this._trackInternal("clicked", payload, PREDEFINED_SCHEMA_VERSION);
   }
 
   /**
    * Track a view impression of a UI element.
    *
    * @param payload View event data including element identifier
-   * @param schemaVersion Event schema version
    */
-  public async view(
-    payload: ViewedPayload,
-    schemaVersion?: string,
+  public async viewed(payload: ViewedPayload): Promise<void> {
+    return this._trackInternal("viewed", payload, PREDEFINED_SCHEMA_VERSION);
+  }
+
+  /**
+   * Internal method for tracking predefined events without generic constraints.
+   * Used by convenience methods and EventsNamespace.
+   *
+   * @param name Event name
+   * @param payload Event payload
+   * @param schemaVersion Schema version
+   */
+  protected async _trackInternal(
+    name: string,
+    payload: EventPayload,
+    schemaVersion: string,
   ): Promise<void> {
     return this.track(
-      "viewed",
-      payload as AllEvents<TCustomEvents>["viewed"],
+      name,
+      payload as TCustomEvents[keyof TCustomEvents],
       schemaVersion,
     );
   }
@@ -350,9 +352,9 @@ export abstract class Client<
    * @param payload Event data payload
    * @param schemaVersion Event schema version
    */
-  public async track<K extends keyof AllEvents<TCustomEvents>>(
+  public async track<K extends keyof TCustomEvents>(
     name: K,
-    payload?: AllEvents<TCustomEvents>[K],
+    payload?: TCustomEvents[K],
     schemaVersion?: string,
   ): Promise<void> {
     if (this.#disposed) {
@@ -403,9 +405,9 @@ export abstract class Client<
   /**
    * Get all current metadata.
    *
-   * @returns All metadata or empty object if none set
+   * @returns All metadata or null if none set
    */
-  public getMetadata(): Partial<TMetadata> {
+  public getMetadata(): Partial<TMetadata> | null {
     return this._metadataManager.getAll();
   }
 
