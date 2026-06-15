@@ -221,48 +221,72 @@ export abstract class Client<
       throw new Error("`eventSampler` must be a function.");
     }
 
+    const {
+      apiKey,
+      endpoint,
+      storageAdapter,
+      httpAdapter = new HttpClient(),
+      hooks = {},
+      eventSampler = () => true,
+      maxBufferSize = Number.MAX_SAFE_INTEGER,
+      eventTtl = null,
+      telemetryOptions = null,
+      apiKeyHeader = "X-API-Key",
+      loggerAdapter = new ConsoleLogger(LogLevel.WARN),
+    } = config;
+
+    const {
+      interval: batchInterval = 10000,
+      maxPayloadSize: batchMaxPayloadSize = 64 * 1024,
+      size: batchSize = 10,
+    } = config.batchOptions ?? {};
+
+    const {
+      backoffFactor: retryBackoffFactor = 2,
+      maxAttempts: retryMaxAttempts = 3,
+      maxDelay: retryMaxDelay = 360000,
+      minDelay: retryMinDelay = 1000,
+    } = config.retryOptions ?? {};
+
+    this._sampler = eventSampler;
     this._anonymousId = this._generateAnonymousId();
-
-    this._sampler = config.eventSampler ?? (() => true);
-    this.#hooks = createTelemetryHooks(
-      config.hooks ?? {},
-      config.telemetryOptions ?? null,
-      config.apiKey,
-      config.apiKeyHeader ?? "X-API-Key",
-    );
-    this._logger = config.loggerAdapter ?? new ConsoleLogger(LogLevel.WARN);
-
+    this._logger = loggerAdapter;
     this.events = new EventsNamespace(this);
-
     this._metadataManager = new MetadataManager<TMetadata>();
+    this._storage = storageAdapter;
+
+    this.#hooks = createTelemetryHooks(
+      hooks,
+      telemetryOptions,
+      apiKey,
+      apiKeyHeader,
+    );
 
     const dispatcherConfig: DispatcherConfig = {
-      apiKey: config.apiKey,
-      endpoint: config.endpoint,
-      apiKeyHeader: config.apiKeyHeader ?? "X-API-Key",
+      apiKey,
+      endpoint,
+      apiKeyHeader,
+      maxBufferSize,
+      eventTtl,
       batchOptions: {
-        interval: config.batchOptions?.interval ?? 10000,
-        size: config.batchOptions?.size ?? 10,
-        maxPayloadSize: config.batchOptions?.maxPayloadSize ?? 65536,
+        interval: batchInterval,
+        size: batchSize,
+        maxPayloadSize: batchMaxPayloadSize,
       },
       retryOptions: {
-        maxAttempts: config.retryOptions?.maxAttempts ?? 3,
-        minDelay: config.retryOptions?.minDelay ?? 1000,
-        maxDelay: config.retryOptions?.maxDelay ?? 360000,
-        backoffFactor: config.retryOptions?.backoffFactor ?? 2,
+        maxAttempts: retryMaxAttempts,
+        minDelay: retryMinDelay,
+        maxDelay: retryMaxDelay,
+        backoffFactor: retryBackoffFactor,
       },
-      maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
-      eventTtl: config.eventTtl ?? null,
       hooks: this.#hooks,
       logger: this._logger,
     };
 
-    this._storage = config.storageAdapter;
     this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
-      /* v8 ignore next -- @preserve */
-      config.httpAdapter ?? new HttpClient(),
-      config.storageAdapter,
+      httpAdapter,
+      storageAdapter,
     );
   }
 
@@ -327,8 +351,8 @@ export abstract class Client<
   }
 
   /**
-   * Internal method for tracking predefined events without generic constraints.
-   * Used by convenience methods and EventsNamespace.
+   * Internal method for tracking predefined/internal events without generic constraints.
+   * Used by convenience methods.
    *
    * @param name Event name
    * @param payload Event payload
@@ -369,14 +393,14 @@ export abstract class Client<
 
     const event: Event<TMetadata> = {
       eventId: IdGenerator.generate(),
-      schemaVersion: schemaVersion ?? null,
       anonymousId: this._anonymousId,
       userId: this._userId,
       name: name as string,
+      schemaVersion: schemaVersion ?? null,
       payload: payload ?? null,
       issuedAt: Date.now(),
-      sdk: this._getSdkInfo(),
       metadata: this.getMetadata(),
+      sdk: this._getSdkInfo(),
       platform: this._getPlatform(),
     };
 
@@ -440,18 +464,17 @@ export abstract class Client<
 
   /**
    * Initialize the client and restore persisted events.
-   * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    if (this.#initialized) return await Promise.resolve();
+    if (this.#initialized) return;
 
     if (this.#disposed) {
       this.#disposed = false;
       this.#initMutex.reset();
     }
 
-    await this.#initMutex.runAtomic(async () => {
-      if (this.#initialized) return await Promise.resolve();
+    return this.#initMutex.runAtomic(async () => {
+      if (this.#initialized) return;
 
       await this._storage.init();
       await this._dispatcher.restore();
@@ -468,6 +491,7 @@ export abstract class Client<
     this._dispatcher.dispose();
     this._metadataManager.clear();
     this.#initMutex.release();
+
     this._userId = null;
     this.#disposed = true;
     this._anonymousId = "";

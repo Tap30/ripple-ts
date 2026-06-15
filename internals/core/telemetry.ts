@@ -101,19 +101,22 @@ export const createTelemetryHooks = (
   apiKeyHeader: string,
 ): TelemetryHooks => {
   /* v8 ignore start -- @preserve */
-  if (!options || options.disabled) return userHooks;
+  const { disabled = false, endpoint } = options ?? {};
+
+  if (!endpoint || disabled) return userHooks;
 
   const report = <K extends keyof TelemetryEventMap>(
     type: K,
     data: TelemetryEventMap[K],
   ): void => {
     try {
-      fetch(options.endpoint, {
+      fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           [apiKeyHeader]: apiKey,
         },
+        // TODO: consider the event schema
         body: JSON.stringify({ type, data, timestamp: Date.now() }),
         keepalive: true,
       }).catch(() => {});
@@ -126,26 +129,32 @@ export const createTelemetryHooks = (
   return {
     onFlush: info => {
       report("sdk_event_flush", info);
+
       userHooks.onFlush?.(info);
     },
     onSendSuccess: info => {
       report("sdk_event_send_success", info);
+
       userHooks.onSendSuccess?.(info);
     },
     onSendFailure: info => {
       report("sdk_event_send_failure", info);
+
       userHooks.onSendFailure?.(info);
     },
     onRetry: info => {
       report("sdk_event_retry", info);
+
       userHooks.onRetry?.(info);
     },
     onDrop: info => {
       report("sdk_event_drop", info);
+
       userHooks.onDrop?.(info);
     },
     onEnqueue: info => {
       report("sdk_event_enqueue", info);
+
       userHooks.onEnqueue?.(info);
     },
   };

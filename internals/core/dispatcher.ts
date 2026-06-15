@@ -154,7 +154,7 @@ export class Dispatcher<
     if (this.#disposed) {
       this.#logger.warn("Cannot enqueue event: Dispatcher has been disposed");
 
-      return Promise.resolve();
+      return;
     }
 
     this.#buffer.enqueue(event);
@@ -349,6 +349,7 @@ export class Dispatcher<
   ): Promise<boolean> {
     if (response.status >= 200 && response.status < 300) {
       await this.#clearStorage("Failed to clear storage after successful send");
+
       this.#config.hooks.onSendSuccess?.({
         batchSize: events.length,
         status: response.status,
@@ -362,6 +363,7 @@ export class Dispatcher<
       });
 
       await this.#clearStorage("Failed to clear storage after 4xx error");
+
       this.#config.hooks.onDrop?.({
         eventCount: events.length,
         reason: "client_error",

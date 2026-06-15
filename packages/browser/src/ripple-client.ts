@@ -125,6 +125,7 @@ export class RippleClient<
     traits: UserTraits,
   ): Promise<void> {
     await super.identify(userId, traits);
+
     this.#identityManager.setUserId(userId);
   }
 
