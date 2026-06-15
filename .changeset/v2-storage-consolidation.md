@@ -48,12 +48,12 @@ const client = new RippleClient({
 
 The base `Client.init()` now calls `storageAdapter.init()` before restoring events. Custom storage adapters can use this for async setup.
 
-##### `eventTTL` in client config
+##### `eventTtl` in client config
 
-Per-event expiry is now handled at the dispatcher level. Events older than `eventTTL` (based on `issuedAt`) are dropped at flush time:
+Per-event expiry is now handled at the dispatcher level. Events older than `eventTtl` (based on `issuedAt`) are dropped at flush time:
 
 ```ts
 const client = new RippleClient({
-  eventTTL: 86400000, // 24 hours
+  eventTtl: 86400000, // 24 hours
 });
 ```

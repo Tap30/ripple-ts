@@ -73,7 +73,7 @@ export type ClientConfig = {
    * Per-event time-to-live in milliseconds.
    * Events older than this (based on `issuedAt`) are dropped at flush time.
    */
-  eventTTL?: number;
+  eventTtl?: number;
   /**
    * HTTP adapter for sending events (default: built-in `HttpClient`).
    */
@@ -252,7 +252,7 @@ export abstract class Client<
         backoffFactor: config.retryOptions?.backoffFactor ?? 2,
       },
       maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
-      eventTTL: config.eventTTL ?? null,
+      eventTtl: config.eventTtl ?? null,
       hooks: this.#hooks,
       logger: this._logger,
     };

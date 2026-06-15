@@ -121,7 +121,7 @@ const client = new RippleClient({
   // Other options
   apiKeyHeader: "X-API-Key", // Header name (default: "X-API-Key")
   maxBufferSize: 1000, // Max persisted events (default: unlimited)
-  eventTTL: 86400000, // Drop events older than 24h at flush (default: disabled)
+  eventTtl: 86400000, // Drop events older than 24h at flush (default: disabled)
   loggerAdapter: new ConsoleLogger(LogLevel.INFO),
   eventSampler: event => true, // Keep all events
 });

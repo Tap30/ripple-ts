@@ -11,7 +11,7 @@ SDK info injection at build time.
 
 ### 1. Event TTL Moved to Dispatcher
 
-**Decision:** Remove `ttl`/`staleThreshold` from storage layer. Add `eventTTL`
+**Decision:** Remove `ttl`/`staleThreshold` from storage layer. Add `eventTtl`
 to `ClientConfig` → `DispatcherConfig`, enforced at flush time.
 
 **Rationale:**
@@ -25,11 +25,11 @@ to `ClientConfig` → `DispatcherConfig`, enforced at flush time.
 
 **Implementation:**
 
-- `ClientConfig.eventTTL?: number` (optional, disabled by default)
-- `DispatcherConfig.eventTTL: number | null`
+- `ClientConfig.eventTtl?: number` (optional, disabled by default)
+- `DispatcherConfig.eventTtl: number | null`
 - `#filterExpired()` in dispatcher, called in `flush()` before
   `#createBatches()`
-- Events where `Date.now() - event.issuedAt > eventTTL` are dropped silently
+- Events where `Date.now() - event.issuedAt > eventTtl` are dropped silently
 
 ### 2. Build-Time SDK Info Injection
 

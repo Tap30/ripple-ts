@@ -47,7 +47,7 @@ const createConfig = (
     backoffFactor: 2,
   },
   maxBufferSize: Number.MAX_SAFE_INTEGER,
-  eventTTL: null,
+  eventTtl: null,
   hooks: {},
   logger: new NoOpLogger(),
   ...overrides,
@@ -246,13 +246,13 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
     });
 
-    it("should filter out expired events by eventTTL", async () => {
+    it("should filter out expired events by eventTtl", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(10000);
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ eventTTL: 5000 });
+      const config = createConfig({ eventTtl: 5000 });
       const dispatcher = createDispatcher({
         config,
         httpAdapter,
@@ -278,7 +278,7 @@ describe("Dispatcher", () => {
 
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
-      const config = createConfig({ eventTTL: 1000 });
+      const config = createConfig({ eventTtl: 1000 });
       const dispatcher = createDispatcher({
         config,
         httpAdapter,

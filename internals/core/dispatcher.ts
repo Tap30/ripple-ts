@@ -88,7 +88,7 @@ export type DispatcherConfig = {
    * Events older than this are filtered out at flush time.
    * `null` means no expiry.
    */
-  eventTTL: number | null;
+  eventTtl: number | null;
   /**
    * Telemetry hooks for monitoring.
    */
@@ -291,18 +291,18 @@ export class Dispatcher<
   }
 
   /**
-   * Filter out events that have exceeded the configured eventTTL.
+   * Filter out events that have exceeded the configured eventTtl.
    *
    * @param events Events to filter
    * @returns Events that are still within TTL
    */
   #filterExpired(events: Event<TMetadata>[]): Event<TMetadata>[] {
-    if (this.#config.eventTTL === null) return events;
+    if (this.#config.eventTtl === null) return events;
 
     const now = Date.now();
 
     return events.filter(
-      event => now - event.issuedAt <= this.#config.eventTTL!,
+      event => now - event.issuedAt <= this.#config.eventTtl!,
     );
   }
 

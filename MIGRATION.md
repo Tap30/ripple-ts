@@ -169,11 +169,11 @@ Custom storage adapters must now implement `init(): Promise<void>`.
 ### `ttl` removed from storage layer
 
 The `ttl` option has been removed from storage adapters. Event expiry is now
-handled at the dispatcher level via `eventTTL` in client config:
+handled at the dispatcher level via `eventTtl` in client config:
 
 ```ts
 const client = new RippleClient({
-  eventTTL: 86400000, // Drop events older than 24 hours at flush time
+  eventTtl: 86400000, // Drop events older than 24 hours at flush time
   // ...
 });
 ```

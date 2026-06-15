@@ -4,9 +4,8 @@
 import { appendFileSync, writeFileSync } from "node:fs";
 
 import {
-  FetchHttpAdapter,
   LogLevel,
-  NoOpStorageAdapter,
+  NoOpStorage,
   RippleClient,
   type LoggerAdapter,
 } from "@tapsioss/ripple-node";
@@ -25,7 +24,6 @@ class HybridLogger implements LoggerAdapter {
   constructor(filePath: string, level: LogLevel = LogLevel.INFO) {
     this.#filePath = filePath;
     this.#level = level;
-
     writeFileSync(this.#filePath, "");
   }
 
@@ -40,70 +38,124 @@ class HybridLogger implements LoggerAdapter {
 
   #log(
     level: LogLevel,
-    consoleMethod: "debug" | "info" | "warn" | "error",
+    method: "debug" | "info" | "warn" | "error",
     message: string,
     args: unknown[],
   ): void {
     if (!this.#shouldLog(level)) return;
 
-    const timestamp = new Date().toISOString();
-    const argsStr = args.length > 0 ? ` ${JSON.stringify(args)}` : "";
-    const line = `[${timestamp}] [${level.toUpperCase()}] ${message}${argsStr}\n`;
+    const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}${args.length ? ` ${JSON.stringify(args)}` : ""}\n`;
 
     appendFileSync(this.#filePath, line);
-    console[consoleMethod](`[Ripple] ${message}`, ...args);
+    console[method](`[Ripple] ${message}`, ...args);
   }
 
   public debug(message: string, ...args: unknown[]): void {
     this.#log(LogLevel.DEBUG, "debug", message, args);
   }
-
   public info(message: string, ...args: unknown[]): void {
     this.#log(LogLevel.INFO, "info", message, args);
   }
-
   public warn(message: string, ...args: unknown[]): void {
     this.#log(LogLevel.WARN, "warn", message, args);
   }
-
   public error(message: string, ...args: unknown[]): void {
     this.#log(LogLevel.ERROR, "error", message, args);
   }
 }
 
-const log = (message: string): void => {
-  console.log(`[${new Date().toISOString()}] ${message}`);
+type CustomEvents = {
+  server_start: { port: number; nodeVersion: string };
+  api_request: {
+    method: string;
+    path: string;
+    statusCode: number;
+    duration: number;
+  };
+  batch_event: { index: number; timestamp: number };
+  high_volume_event: { index: number };
+  error_test: { shouldFail: boolean };
 };
 
-const separator = (): void => {
-  console.log("\n" + "=".repeat(60) + "\n");
-};
+const log = (msg: string) =>
+  console.log(`[${new Date().toISOString()}] ${msg}`);
+
+const separator = () => console.log("\n" + "=".repeat(60) + "\n");
 
 log("Starting Node.js Playground...");
 separator();
 
-const client = new RippleClient({
+const client = new RippleClient<CustomEvents>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
-  maxBatchSize: 5,
-  maxRetries: 3,
-  flushInterval: 5000,
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new NoOpStorageAdapter(),
+  batchOptions: { size: 5, interval: 5000 },
+  retryOptions: { maxAttempts: 3 },
+  storageAdapter: new NoOpStorage(),
   loggerAdapter: new HybridLogger("ripple.log", LogLevel.DEBUG),
 });
 
 await client.init();
-log("✓ Client initialized with NoOpStorage");
+log("✓ Client initialized");
 
 separator();
-log("Test Case 2: Basic Event Tracking");
+log("Test: Predefined Events (client.events.*)");
+
+await client.events.productViewed({
+  product: { productId: "p-1", price: { amount: 49.99, currency: "USD" } },
+});
+log("✓ events.productViewed");
+
+await client.events.orderCompleted({
+  order: {
+    orderId: "ord-1",
+    products: [{ productId: "p-1", price: { amount: 49.99, currency: "USD" } }],
+    totalValue: { amount: 54.99, currency: "USD" },
+  },
+});
+log("✓ events.orderCompleted");
+
+await client.events.paymentCaptured({
+  payment: {
+    paymentId: "pay-1",
+    order: {
+      orderId: "ord-1",
+      products: [
+        { productId: "p-1", price: { amount: 49.99, currency: "USD" } },
+      ],
+      totalValue: { amount: 54.99, currency: "USD" },
+    },
+    method: "credit_card",
+    value: { amount: 54.99, currency: "USD" },
+  },
+});
+log("✓ events.paymentCaptured");
+
+separator();
+log("Test: Convenience Methods");
+
+await client.identify("user-123", { email: "user@example.com" });
+log("✓ identify()");
+
+await client.clicked({ elementId: "cta-btn", elementType: "button" });
+log("✓ click()");
+
+await client.viewed({ elementId: "hero-banner" });
+log("✓ view()");
+
+await client.screen({
+  title: "Dashboard",
+  url: "https://app.example.com/dashboard",
+});
+log("✓ screen()");
+
+separator();
+log("Test: Custom Events (client.track)");
 
 await client.track("server_start", {
   port: 3000,
   nodeVersion: process.version,
 });
-log("✓ Tracked: server_start");
+log("✓ track() server_start");
 
 await client.track("api_request", {
   method: "POST",
@@ -111,169 +163,43 @@ await client.track("api_request", {
   statusCode: 201,
   duration: 45,
 });
-log("✓ Tracked: api_request");
-
-await client.track("database_query", {
-  query: "SELECT * FROM users",
-  duration: 12,
-  rows: 150,
-});
-log("✓ Tracked: database_query");
+log("✓ track() api_request");
 
 separator();
-log("Test Case 3: Event with Metadata");
+log("Test: Metadata");
 
-await client.track(
-  "user_created",
-  {
-    userId: "user-789",
-    email: "user@example.com",
-    plan: "premium",
-  },
-  {
-    schemaVersion: "2.0.0",
-    eventType: "user_lifecycle",
-    source: "registration_api",
-    experimentId: "onboarding-v2",
-  },
-);
-log("✓ Tracked: user_created with rich metadata");
-
-separator();
-log("Test Case 4: Metadata Management");
-
-client.setMetadata("deploymentId", "deploy-xyz-123");
 client.setMetadata("region", "us-east-1");
-log("✓ Set shared metadata");
+client.setMetadata("deploymentId", "deploy-xyz");
+log("✓ Set metadata");
 
 separator();
-log("Test Case 5: Batch Processing (10 events)");
+log("Test: Batch (10 events)");
 
 for (let i = 0; i < 10; i++) {
-  await client.track("batch_event", {
-    index: i,
-    timestamp: Date.now(),
-  });
+  await client.track("batch_event", { index: i, timestamp: Date.now() });
 }
 
-log("✓ Tracked 10 events (should auto-flush at batch size 5)");
+log("✓ Tracked 10 events (auto-flush at size 5)");
 
 separator();
-log("Test Case 6: Dynamic Rebatching (25 events)");
+log("Test: High Volume (100 events)");
 
-log("Simulating offline accumulation scenario...");
-
-for (let i = 0; i < 25; i++) {
-  await client.track("rebatch_event", {
-    index: i,
-    batch: Math.floor(i / 5),
-  });
-}
-
-log("✓ Tracked 25 events - flush will rebatch into 5 batches of 5 events each");
-log("Check server logs to see multiple batch requests");
-
-separator();
-log("Test Case 7: Manual Flush");
-
-await client.track("pre_flush_event", { test: true });
-await client.flush();
-log("✓ Manually flushed events");
-
-separator();
-log("Test Case 8: Multiple Client Instances");
-
-const customPathClient = new RippleClient({
-  endpoint: "http://localhost:3000/events",
-  apiKey: "test-api-key",
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new NoOpStorageAdapter(),
-});
-
-await customPathClient.init();
-await customPathClient.track("custom_client_test", { instance: "secondary" });
-await customPathClient.flush();
-log("✓ Tested multiple client instances");
-
-separator();
-log("Test Case 9: Error Handling (Invalid Endpoint)");
-
-try {
-  const errorClient = new RippleClient({
-    endpoint: "http://localhost:9999/invalid",
-    apiKey: "test-api-key",
-    maxRetries: 2,
-    httpAdapter: new FetchHttpAdapter(),
-    storageAdapter: new NoOpStorageAdapter(),
-    loggerAdapter: new HybridLogger("ripple-error.log", LogLevel.WARN),
-  });
-
-  await errorClient.init();
-  await errorClient.track("error_test", { shouldFail: true });
-  await errorClient.flush();
-  log(
-    "✓ Tracked event to invalid endpoint (check ripple-error.log for retry logs)",
-  );
-  // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
-  // Older iOS Safari versions don't support optional catch binding.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-} catch (_) {
-  log("✓ Error handling test completed (expected failure)");
-}
-
-separator();
-log("Test Case 10: High Volume (100 events)");
-
-const startTime = performance.now();
+const start = performance.now();
 
 for (let i = 0; i < 100; i++) {
-  await client.track("high_volume_event", {
-    index: i,
-    batch: Math.floor(i / 10),
-  });
+  await client.track("high_volume_event", { index: i });
 }
 
-const duration = performance.now() - startTime;
-
-log(`✓ Tracked 100 events in ${duration}ms`);
+log(`✓ Tracked 100 events in ${(performance.now() - start).toFixed(1)}ms`);
 
 separator();
-log("Test Case 11: Different Event Types");
-
-await client.track("error_occurred", {
-  error: "Database connection failed",
-  stack: "Error: Connection timeout...",
-  severity: "high",
-});
-log("✓ Tracked: error_occurred");
-
-await client.track("performance_metric", {
-  metric: "response_time",
-  value: 234,
-  unit: "ms",
-});
-log("✓ Tracked: performance_metric");
-
-await client.track("business_event", {
-  event: "subscription_renewed",
-  userId: "user-456",
-  plan: "enterprise",
-  amount: 999,
-});
-log("✓ Tracked: business_event");
-
-separator();
-log("Test Case 12: Lifecycle Management");
+log("Test: Flush & Dispose");
 
 await client.flush();
-log("✓ Final flush completed");
+log("✓ Flushed");
 
 client.dispose();
-log("✓ Client disposed");
+log("✓ Disposed");
 
 separator();
 log("Node.js Playground Complete!");
-log("Check the following files:");
-log("  - ripple.log (SDK logs - empty if no errors)");
-log("  - ripple-error.log (SDK logs from error test)");
-separator();
