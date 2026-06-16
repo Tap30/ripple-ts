@@ -5,7 +5,7 @@ import {
   type StorageAdapter,
 } from "./adapters/storage-adapter.ts";
 import { Buffer } from "./buffer.ts";
-import { Mutex } from "./mutex.ts";
+import { Mutex, MutexDisposedError } from "./mutex.ts";
 import type { TelemetryHooks } from "./telemetry.ts";
 import type { Event } from "./types.ts";
 import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
@@ -107,6 +107,7 @@ export class Dispatcher<
 > {
   #buffer!: Buffer<Event<TMetadata>>;
   #flushMutex = new Mutex();
+  #storageMutex = new Mutex();
   #retryAbortController = new AbortController();
 
   #timer: ReturnType<typeof setTimeout> | null = null;
@@ -161,18 +162,20 @@ export class Dispatcher<
     this.#buffer.enqueue(event);
     this.#config.hooks.onEnqueue?.({ bufferSize: this.#buffer.size() });
 
-    try {
-      await this.#storage.save(this.#buffer.toArray());
-    } catch (err) {
-      if (err instanceof StorageQuotaExceededError) {
-        this.#logger.warn(err.message);
-      } else {
-        this.#logger.error("Failed to persist events to storage", {
-          error: err instanceof Error ? err.message : String(err),
-          queueSize: this.#buffer.size(),
-        });
+    await this.#storageMutex.runAtomic(async () => {
+      try {
+        await this.#storage.save(this.#buffer.toArray());
+      } catch (err) {
+        if (err instanceof StorageQuotaExceededError) {
+          this.#logger.warn(err.message);
+        } else {
+          this.#logger.error("Failed to persist events to storage", {
+            error: err instanceof Error ? err.message : String(err),
+            queueSize: this.#buffer.size(),
+          });
+        }
       }
-    }
+    });
 
     if (this.#buffer.size() >= this.#config.batchOptions.size) {
       await this.flush();
@@ -506,8 +509,13 @@ export class Dispatcher<
    */
   async #clearStorage(errorMessage: string): Promise<void> {
     try {
-      await this.#storage.clear();
+      await this.#storageMutex.runAtomic(async () => {
+        await this.#storage.clear();
+      });
     } catch (err) {
+      /* v8 ignore next -- @preserve */
+      if (err instanceof MutexDisposedError) return;
+
       this.#logger.error(errorMessage, {
         error: err instanceof Error ? err.message : String(err),
       });
@@ -529,8 +537,12 @@ export class Dispatcher<
     this.#buffer.fromArray([...events, ...currentBuffer]);
 
     try {
-      await this.#storage.save(this.#buffer.toArray());
+      await this.#storageMutex.runAtomic(async () => {
+        await this.#storage.save(this.#buffer.toArray());
+      });
     } catch (err) {
+      if (err instanceof MutexDisposedError) return;
+
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
       } else {
@@ -561,6 +573,7 @@ export class Dispatcher<
   #reset(): void {
     this.#disposed = false;
     this.#flushMutex.reset();
+    this.#storageMutex.reset();
     this.#retryAbortController = new AbortController();
   }
 
@@ -601,6 +614,7 @@ export class Dispatcher<
 
     this.#buffer.clear();
     this.#flushMutex.release();
+    this.#storageMutex.release();
     void this.#storage.close();
   }
 }
