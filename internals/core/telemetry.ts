@@ -1,3 +1,7 @@
+import { PREDEFINED_SCHEMA_VERSION } from "./event-specs.ts";
+import type { Event } from "./types.ts";
+import { IdGenerator } from "./utils.ts";
+
 /**
  * Information provided to the onFlush hook.
  */
@@ -65,18 +69,6 @@ export type TelemetryHooks = {
 };
 
 /**
- * Map of telemetry event names to their payload types.
- */
-export type TelemetryEventMap = {
-  sdk_event_flush: FlushInfo;
-  sdk_event_send_success: SendSuccessInfo;
-  sdk_event_send_failure: SendFailureInfo;
-  sdk_event_retry: RetryInfo;
-  sdk_event_drop: DropInfo;
-  sdk_event_enqueue: EnqueueInfo;
-};
-
-/**
  * Configuration for automatic SDK telemetry reporting.
  */
 export type TelemetryOptions = {
@@ -90,6 +82,22 @@ export type TelemetryOptions = {
   endpoint: string;
 };
 
+type CustomTelemetryEventMap = {
+  sdk_event_flush: FlushInfo;
+  sdk_event_send_success: SendSuccessInfo;
+  sdk_event_send_failure: SendFailureInfo;
+  sdk_event_retry: RetryInfo;
+  sdk_event_drop: DropInfo;
+  sdk_event_enqueue: EnqueueInfo;
+};
+
+type ClientContext = {
+  apiKey: string;
+  apiKeyHeader: string;
+  getUserId: () => string | null;
+  getMetadata: () => Record<string, unknown> | null;
+} & Pick<Event, "anonymousId" | "platform" | "sdk">;
+
 /**
  * Creates a merged hooks object that wraps user hooks with auto-telemetry reporting.
  * If telemetry is disabled or not configured, returns user hooks as-is.
@@ -97,18 +105,40 @@ export type TelemetryOptions = {
 export const createTelemetryHooks = (
   userHooks: TelemetryHooks,
   options: TelemetryOptions | null,
-  apiKey: string,
-  apiKeyHeader: string,
+  clientCtx: ClientContext,
 ): TelemetryHooks => {
   /* v8 ignore start -- @preserve */
   const { disabled = false, endpoint } = options ?? {};
 
   if (!endpoint || disabled) return userHooks;
 
-  const report = <K extends keyof TelemetryEventMap>(
+  const {
+    apiKey,
+    apiKeyHeader,
+    anonymousId,
+    platform,
+    sdk,
+    getMetadata,
+    getUserId,
+  } = clientCtx;
+
+  const report = <K extends keyof CustomTelemetryEventMap>(
     type: K,
-    data: TelemetryEventMap[K],
+    data: CustomTelemetryEventMap[K],
   ): void => {
+    const event: Event = {
+      name: type,
+      payload: data,
+      eventId: IdGenerator.generate(),
+      issuedAt: Date.now(),
+      schemaVersion: PREDEFINED_SCHEMA_VERSION,
+      userId: getUserId(),
+      metadata: getMetadata(),
+      anonymousId,
+      platform,
+      sdk,
+    };
+
     try {
       fetch(endpoint, {
         method: "POST",
@@ -116,8 +146,7 @@ export const createTelemetryHooks = (
           "Content-Type": "application/json",
           [apiKeyHeader]: apiKey,
         },
-        // TODO: consider the event schema
-        body: JSON.stringify({ type, data, timestamp: Date.now() }),
+        body: JSON.stringify(event),
         keepalive: true,
       }).catch(() => {});
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

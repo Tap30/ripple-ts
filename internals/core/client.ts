@@ -255,12 +255,15 @@ export abstract class Client<
     this._metadataManager = new MetadataManager<TMetadata>();
     this._storage = storageAdapter;
 
-    this.#hooks = createTelemetryHooks(
-      hooks,
-      telemetryOptions,
+    this.#hooks = createTelemetryHooks(hooks, telemetryOptions, {
       apiKey,
       apiKeyHeader,
-    );
+      getUserId: this.getUserId,
+      getMetadata: this.getMetadata,
+      anonymousId: this.getAnonymousId(),
+      platform: this._getPlatform(),
+      sdk: this._getSdkInfo(),
+    });
 
     const dispatcherConfig: DispatcherConfig = {
       apiKey,
