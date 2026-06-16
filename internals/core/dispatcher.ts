@@ -105,7 +105,7 @@ export type DispatcherConfig = {
 export class Dispatcher<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
-  #buffer = new Buffer<Event<TMetadata>>();
+  #buffer!: Buffer<Event<TMetadata>>;
   #flushMutex = new Mutex();
   #retryAbortController = new AbortController();
 
@@ -142,6 +142,7 @@ export class Dispatcher<
     this.#httpClient = httpClient;
     this.#storage = storage;
     this.#logger = config.logger;
+    this.#buffer = new Buffer<Event<TMetadata>>(config.maxBufferSize);
   }
 
   /**
@@ -161,9 +162,7 @@ export class Dispatcher<
     this.#config.hooks.onEnqueue?.({ bufferSize: this.#buffer.size() });
 
     try {
-      const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
-
-      await this.#storage.save(eventsToSave);
+      await this.#storage.save(this.#buffer.toArray());
     } catch (err) {
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
@@ -235,20 +234,6 @@ export class Dispatcher<
         }
       }
     });
-  }
-
-  /**
-   * Apply persisted buffer limit using FIFO eviction.
-   *
-   * @param events Events to apply limit to
-   * @returns Events after applying limit
-   */
-  #applyBufferLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
-    if (events.length > this.#config.maxBufferSize) {
-      return events.slice(-this.#config.maxBufferSize);
-    }
-
-    return events;
   }
 
   /**
@@ -544,9 +529,7 @@ export class Dispatcher<
     this.#buffer.fromArray([...events, ...currentBuffer]);
 
     try {
-      const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
-
-      await this.#storage.save(eventsToSave);
+      await this.#storage.save(this.#buffer.toArray());
     } catch (err) {
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
@@ -590,9 +573,8 @@ export class Dispatcher<
 
     try {
       const stored = await this.#storage.load();
-      const limited = this.#applyBufferLimit(stored as Event<TMetadata>[]);
 
-      this.#buffer.fromArray(limited);
+      this.#buffer.fromArray(stored as Event<TMetadata>[]);
 
       if (this.#buffer.size() > 0) {
         this.#scheduleFlush();

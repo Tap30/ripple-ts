@@ -46,7 +46,7 @@ const createConfig = (
     maxDelay: 360000,
     backoffFactor: 2,
   },
-  maxBufferSize: Number.MAX_SAFE_INTEGER,
+  maxBufferSize: 50,
   eventTtl: null,
   hooks: {},
   logger: new NoOpLogger(),

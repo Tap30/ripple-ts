@@ -65,7 +65,7 @@ export type ClientConfig = {
    */
   retryOptions?: RetryOptions;
   /**
-   * Maximum number of events to persist to storage (optional).
+   * Maximum number of events the in-memory buffer can hold (default: `50`).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
   maxBufferSize?: number;
@@ -228,7 +228,7 @@ export abstract class Client<
       httpAdapter = new HttpClient(),
       hooks = {},
       eventSampler = () => true,
-      maxBufferSize = Number.MAX_SAFE_INTEGER,
+      maxBufferSize = 50,
       eventTtl = null,
       telemetryOptions = null,
       apiKeyHeader = "X-API-Key",
