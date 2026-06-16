@@ -188,9 +188,14 @@ export class Dispatcher<
    * Immediately flush all queued events.
    * Cancels any scheduled flush.
    * Uses mutex to prevent concurrent flush operations.
-   * Events are sent in batches according to `maxBatchSize` (dynamic rebatching).
    */
   public async flush(): Promise<void> {
+    /*
+      Drains the buffer incrementally via dequeue(), building and sending one
+      batch at a time. This streaming approach avoids allocating intermediate
+      arrays (no toArray + filterExpired + createBatches), keeping peak memory
+      at ~1 batch size regardless of total buffer contents.
+    */
     await this.#flushMutex.runAtomic(async () => {
       if (this.#timer) {
         clearTimeout(this.#timer);
@@ -199,12 +204,64 @@ export class Dispatcher<
 
       if (this.#buffer.isEmpty()) return;
 
-      const allEvents = this.#buffer.toArray();
+      const { size, maxPayloadSize } = this.#config.batchOptions;
+      const ttl = this.#config.eventTtl;
+      const now = ttl !== null ? Date.now() : 0;
 
-      this.#buffer.clear();
+      let totalEvents = 0;
+      let totalBatches = 0;
+      let droppedCount = 0;
 
-      const events = this.#filterExpired(allEvents);
-      const droppedCount = allEvents.length - events.length;
+      let batch: Event<TMetadata>[] = [];
+      let batchPayloadSize = 0;
+
+      // Drain the buffer one event at a time. For each event:
+      // 1. Filter expired events inline (no separate pass)
+      // 2. Check if adding it would overflow the current batch
+      // 3. If overflow: send the current batch, then start a new one
+      while (!this.#buffer.isEmpty()) {
+        const event = this.#buffer.dequeue()!;
+
+        // Inline TTL filtering — skip expired events without allocating a filtered array
+        if (ttl !== null && now - event.issuedAt > ttl) {
+          droppedCount++;
+
+          continue;
+        }
+
+        const eventSize = JSON.stringify(event).length;
+
+        // Batch boundary: send current batch when adding this event would
+        // exceed either the count limit or payload size limit
+        if (
+          batch.length > 0 &&
+          (batch.length >= size ||
+            batchPayloadSize + eventSize > maxPayloadSize)
+        ) {
+          totalEvents += batch.length;
+          totalBatches++;
+
+          const success = await this.#sendWithRetry(batch);
+
+          if (!success) {
+            // On failure, requeue the failed batch + the current event (already
+            // dequeued but not yet in any batch). Remaining buffer events are
+            // preserved since they haven't been dequeued yet.
+            await this.#requeueBatch(
+              [...batch, event],
+              "Failed to persist remaining events after send failure",
+            );
+
+            return;
+          }
+
+          batch = [];
+          batchPayloadSize = 0;
+        }
+
+        batch.push(event);
+        batchPayloadSize += eventSize;
+      }
 
       if (droppedCount > 0) {
         this.#config.hooks.onDrop?.({
@@ -213,23 +270,21 @@ export class Dispatcher<
         });
       }
 
-      if (events.length === 0) return;
+      // Send the trailing batch (events that didn't trigger an overflow)
+      if (batch.length > 0) {
+        totalEvents += batch.length;
+        totalBatches++;
 
-      const batches = this.#createBatches(events);
+        this.#config.hooks.onFlush?.({
+          eventCount: totalEvents,
+          batchCount: totalBatches,
+        });
 
-      this.#config.hooks.onFlush?.({
-        eventCount: events.length,
-        batchCount: batches.length,
-      });
-
-      for (let i = 0; i < batches.length; i++) {
-        const success = await this.#sendWithRetry(batches[i]!);
+        const success = await this.#sendWithRetry(batch);
 
         if (!success) {
-          const remaining = batches.slice(i).flat();
-
-          await this.#requeueEvents(
-            remaining,
+          await this.#requeueBatch(
+            batch,
             "Failed to persist remaining events after send failure",
           );
 
@@ -237,61 +292,6 @@ export class Dispatcher<
         }
       }
     });
-  }
-
-  /**
-   * Split events into batches respecting both count and payload size limits.
-   *
-   * @param events Events to batch
-   * @returns Array of event batches
-   */
-  #createBatches(events: Event<TMetadata>[]): Event<TMetadata>[][] {
-    const { size, maxPayloadSize } = this.#config.batchOptions;
-    const batches: Event<TMetadata>[][] = [];
-
-    let currentBatch: Event<TMetadata>[] = [];
-    let currentSize = 0;
-
-    for (const event of events) {
-      const eventSize = JSON.stringify(event).length;
-
-      if (
-        currentBatch.length > 0 &&
-        (currentBatch.length >= size ||
-          currentSize + eventSize > maxPayloadSize)
-      ) {
-        batches.push(currentBatch);
-
-        currentBatch = [];
-        currentSize = 0;
-      }
-
-      currentBatch.push(event);
-      currentSize += eventSize;
-    }
-
-    /* v8 ignore next -- @preserve */
-    if (currentBatch.length > 0) {
-      batches.push(currentBatch);
-    }
-
-    return batches;
-  }
-
-  /**
-   * Filter out events that have exceeded the configured eventTtl.
-   *
-   * @param events Events to filter
-   * @returns Events that are still within TTL
-   */
-  #filterExpired(events: Event<TMetadata>[]): Event<TMetadata>[] {
-    if (this.#config.eventTtl === null) return events;
-
-    const now = Date.now();
-
-    return events.filter(
-      event => now - event.issuedAt <= this.#config.eventTtl!,
-    );
   }
 
   /**
@@ -523,18 +523,18 @@ export class Dispatcher<
   }
 
   /**
-   * Re-queue events and persist to storage.
+   * Re-queue a failed batch plus any remaining buffered events and persist to storage.
    *
-   * @param events Events to re-queue
+   * @param batch The failed batch to re-queue
    * @param errorMessage Error message to log if save fails
    */
-  async #requeueEvents(
-    events: Event<TMetadata>[],
+  async #requeueBatch(
+    batch: Event<TMetadata>[],
     errorMessage: string,
   ): Promise<void> {
-    const currentBuffer = this.#buffer.toArray();
+    const remaining = this.#buffer.toArray();
 
-    this.#buffer.fromArray([...events, ...currentBuffer]);
+    this.#buffer.fromArray([...batch, ...remaining]);
 
     try {
       await this.#storageMutex.runAtomic(async () => {

@@ -246,6 +246,49 @@ describe("Dispatcher", () => {
       expect(httpAdapter.send).toHaveBeenCalledTimes(2);
     });
 
+    it("should requeue remaining events when a mid-flush batch fails", async () => {
+      const httpAdapter = createMockHttpAdapter();
+      const storageAdapter = createMockStorageAdapter();
+      const config = createConfig({
+        batchOptions: {
+          interval: 5000,
+          size: 10,
+          maxPayloadSize: 1,
+        },
+        retryOptions: {
+          maxAttempts: 0,
+          minDelay: 1000,
+          maxDelay: 360000,
+          backoffFactor: 2,
+        },
+      });
+
+      const dispatcher = createDispatcher({
+        config,
+        httpAdapter,
+        storageAdapter,
+      });
+
+      // flush: event1 fills batch, event2 triggers mid-loop send of [event1] → 200
+      // event2 fills batch, event3 triggers mid-loop send of [event2] → 500
+      vi.mocked(httpAdapter.send)
+        .mockResolvedValueOnce({ status: 200 })
+        .mockResolvedValueOnce({ status: 500 });
+
+      await dispatcher.enqueue(createEvent("event1"));
+      await dispatcher.enqueue(createEvent("event2"));
+      await dispatcher.enqueue(createEvent("event3"));
+      await dispatcher.flush();
+
+      expect(httpAdapter.send).toHaveBeenCalledTimes(2);
+      expect(storageAdapter.save).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "event2" }),
+          expect.objectContaining({ name: "event3" }),
+        ]),
+      );
+    });
+
     it("should filter out expired events by eventTtl", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(10000);
