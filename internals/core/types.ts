@@ -368,9 +368,9 @@ export type Checkout = {
    */
   order: Omit<Order, "orderId" | "transactionId" | "checkoutId">;
   /**
-   * Current step in the checkout funnel (e.g., 2 or "shipping").
+   * Current step in the checkout funnel (e.g., "2" or "shipping").
    */
-  step: number | string;
+  step: string;
   /**
    * Custom additional properties.
    */

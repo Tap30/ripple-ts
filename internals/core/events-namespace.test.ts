@@ -76,7 +76,7 @@ describe("EventsNamespace", () => {
     };
 
     const checkout: Checkout = {
-      step: 0,
+      step: "0",
       order,
     };
 
@@ -340,7 +340,7 @@ describe("EventsNamespace", () => {
       [
         "challengeStepCompleted",
         "challenge_step_completed",
-        { challenge, step: 0 } satisfies ChallengeStepCompletedPayload,
+        { challenge, step: "0" } satisfies ChallengeStepCompletedPayload,
       ],
     ];
 

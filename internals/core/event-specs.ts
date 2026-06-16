@@ -874,7 +874,7 @@ export type ChallengeStepCompletedPayload = {
   /**
    * The identifier or index of the step completed.
    */
-  step: string | number;
+  step: string;
   /**
    * Custom additional properties.
    */
