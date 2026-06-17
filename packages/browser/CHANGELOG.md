@@ -1,5 +1,547 @@
 # @tapsioss/ripple-browser
 
+## 2.0.0
+### Major Changes
+
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Consolidate HTTP and logger adapters into core.
+  
+  #### Breaking Changes
+  
+  ##### `FetchHttpAdapter` removed from packages
+  
+  The package-specific `FetchHttpAdapter` exports have been removed. The built-in
+  `HttpClient` from core is now used by default — no adapter needed in config.
+  
+  ```diff
+  -import { FetchHttpAdapter } from "@tapsioss/ripple-browser";
+  -
+   const client = new RippleClient({
+     apiKey: "your-api-key",
+     endpoint: "https://api.example.com/events",
+  -  httpAdapter: new FetchHttpAdapter(),
+     storageAdapter: new IndexedDBAdapter(),
+   });
+  ```
+  
+  For custom HTTP implementations, pass `httpAdapter` with your own `HttpAdapter`.
+  
+  ##### Logger class renames
+  
+  - `ConsoleLoggerAdapter` → `ConsoleLogger`
+  - `NoOpLoggerAdapter` → `NoOpLogger`
+  
+  #### New Features
+  
+  ##### `httpAdapter` is now optional
+  
+  The built-in isomorphic `HttpClient` (fetch-based with `keepalive`) is used by
+  default. Only `storageAdapter` remains required.
+  
+  ##### `HttpClient` exported from both packages
+  
+  ```ts
+  import { HttpClient } from "@tapsioss/ripple-browser";
+  import { HttpClient } from "@tapsioss/ripple-node";
+  ```
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Replace session-based identity with persistent anonymous ID.
+  
+  #### Breaking Changes
+  
+  ##### `getSessionId()` removed, replaced by `getAnonymousId()`
+  
+  The browser client no longer exposes a session ID. Instead, an anonymous ID is
+  persisted in `sessionStorage` and used for cross-event identity resolution.
+  
+  ```diff
+  -const sessionId = client.getSessionId();
+  +const anonymousId = client.getAnonymousId();
+  ```
+  
+  ##### Default `sessionStoreKey` changed
+  
+  The default storage key changed from `"ripple_session_id"` to
+  `"ripple_session"`.
+  
+  ##### `ua-parser-js` moved from `peerDependencies` to `dependencies`
+  
+  Users no longer need to install `ua-parser-js` separately — it's now bundled
+  as a direct dependency.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Merge predefined CDP events into the `Client` generic type system.
+  
+  #### Breaking Changes
+  
+  ##### `track()` now includes predefined events without explicit declaration
+  
+  Previously users had to redeclare predefined event types in their `TEvents` to get type safety. Now `PredefinedEvents` are always merged:
+  
+  ```diff
+  -type MyEvents = {
+  -  product_viewed: ProductViewedPayload; // no longer needed
+  -  "feature.enabled": { featureName: string };
+  -};
+  +type MyCustomEvents = {
+  +  "feature.enabled": { featureName: string };
+  +};
+  ```
+  
+  #### New Features
+  
+  ##### New convenience methods on `Client`
+  
+  - `identify(userId, traits)` — tracks a `user_identified` event
+  - `clicked(payload)` — tracks a `clicked` event
+  - `viewed(payload)` — tracks a `viewed` event
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Restructure client configuration and fix flush rebatching data loss.
+  
+  #### Breaking Changes
+  
+  ##### Configuration restructured into `batchOptions` and `retryOptions`
+  
+  Flat config fields replaced with nested option objects:
+  
+  ```diff
+   const client = new RippleClient({
+     apiKey: "your-api-key",
+     endpoint: "https://api.example.com/events",
+  -  flushInterval: 5000,
+  -  maxBatchSize: 10,
+  -  maxRetries: 3,
+  +  batchOptions: {
+  +    interval: 10000,
+  +    size: 10,
+  +    maxPayloadSize: 65536,
+  +  },
+  +  retryOptions: {
+  +    maxAttempts: 3,
+  +    minDelay: 1000,
+  +    maxDelay: 360000,
+  +    backoffFactor: 2,
+  +  },
+     httpAdapter: new FetchHttpAdapter(),
+     storageAdapter: new IndexedDBAdapter(),
+   });
+  ```
+  
+  ##### Default flush interval changed from 5000ms to 10000ms
+  
+  #### New Features
+  
+  ##### `batchOptions.maxPayloadSize`
+  
+  Batches are now split by both event count and serialized byte size (default 64KB). Prevents oversized HTTP requests rejected by gateways/proxies.
+  
+  ##### Full retry backoff control
+  
+  New configurable parameters: `retryOptions.minDelay`, `retryOptions.maxDelay`, `retryOptions.backoffFactor`.
+  
+  #### Bug Fixes
+  
+  ##### Flush rebatching data loss and ordering inversion
+  
+  Fixed: when multiple batches failed during flush, `#requeueEvents` was called per-batch causing ordering inversion (`[B, A]` instead of `[A, B]`). The dispatcher now stops on first failure and requeues the failed batch + all remaining unsent batches in original order.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - CDP Event Specifications & Type System Foundation.
+  
+  #### Breaking Changes
+  
+  ##### Event Structure Changes**
+  
+  The root `Event<TMetadata>` type has been significantly updated to align with CDP (Customer Data Platform) standards:
+  
+  **Added fields:**
+  
+  - `sdk: SdkInfo` - SDK name and version (auto-injected at build time)
+  - `anonymousId: string` - Anonymous user identifier for cross-device tracking
+  - `eventId: string` - Unique UUID for event deduplication
+  - `schemaVersion: string | null` - Schema version for custom events
+  - `userId: string | null` - Authenticated user identifier
+  
+  **Removed fields:**
+  
+  - `sessionId: string | null` - Moved to metadata (platform-specific implementation)
+  
+  **Migration:**
+  
+  ```diff
+   type Event<TMetadata> = {
+     name: string;
+     payload: EventPayload | null;
+     metadata: TMetadata | null;
+     platform: Platform | null;
+  +  sdk: SdkInfo;
+     issuedAt: number;
+  -  sessionId: string | null;
+  +  anonymousId: string;
+  +  eventId: string;
+  +  schemaVersion: string | null;
+  +  userId: string | null;
+   };
+  ```
+  
+  #### New Features
+  
+  ##### Predefined CDP Events
+  
+  Added predefined events covering the complete ecommerce funnel with full type safety:
+  
+  - **Product Discovery:** `product_viewed`, `product_clicked`, `products_searched`, `product_list_viewed`, `product_list_filtered`
+  - **Wishlist:** `product_added_to_wishlist`, `product_removed_from_wishlist`
+  - **Cart:** `product_added_to_cart`, `product_removed_from_cart`, `cart_viewed`, `cart_emptied`
+  - **Checkout:** `checkout_started`, `checkout_step_viewed`, `checkout_step_completed`
+  - **Orders:** `order_completed`, `order_failed`, `order_cancelled`, `order_shipped`, `order_refunded`, `order_updated`
+  - **Payments:** `payment_authorized`, `payment_captured`, `payment_failed`, `payment_refunded`
+  - **Coupons:** `coupon_entered`, `coupon_removed`, `coupon_denied`, `coupon_redeemed`
+  - **Promotions:** `promotion_viewed`, `promotion_clicked`
+  - **Identity & Lifecycle:** `identify`, `screen`, `app_state_changed`
+  
+  All predefined events include TypeScript autocomplete and compile-time validation.
+  
+  #### Shared Domain Types
+  
+  Added comprehensive domain types for ecommerce tracking:
+  
+  - `Money` - Amount with ISO 4217 currency code
+  - `Product` - Complete product representation with price, category, SKU, vendor
+  - `Order` - Order with products, revenue, shipping, tax, discounts, totals
+  - `Cart` - Shopping cart with products
+  - `Checkout` - Checkout session with step tracking
+  - `Payment` - Payment transaction with method, amount, gateway
+  - `Coupon` - Discount code with amount
+  - `Category`, `Address`, `Shipping` - Supporting types
+  - `Pagination`, `Filter`, `Sort` - List navigation
+  - `Campaign` - UTM attribution parameters
+  
+  #### New Module: event-specs.ts
+  
+  Created `internals/core/event-specs.ts` containing:
+  
+  - All predefined event payload types
+  - `PredefinedEvents` type map for event name → payload type mapping
+  - Event-specific types separate from core infrastructure types
+  
+  #### Type Safety Enhancements
+  
+  **PredefinedEvents Type Map:**
+  
+  ```ts
+  export type PredefinedEvents = {
+    product_viewed: ProductViewedPayload;
+    cart_viewed: CartViewedPayload;
+    order_completed: OrderCompletedPayload;
+    // ... 40 more events
+  };
+  ```
+  
+  **Merged Event Types:**
+  Custom events will be merged with predefined events:
+  
+  ```ts
+  type CustomEvents = {
+    "feature.enabled": { featureName: string };
+  };
+  
+  const client = new RippleClient<CustomEvents, AppMetadata>(config);
+  
+  // Both predefined and custom events available with autocomplete
+  await client.track("product_viewed", { product: {...} });
+  await client.track("feature.enabled", { featureName: "dark-mode" }, "1.0.0");
+  ```
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Replace in-memory event buffer with a fixed-capacity ring buffer.
+  
+  #### Breaking Changes
+  
+  ##### `maxBufferSize` default changed from unlimited to `50`
+  
+  The buffer now enforces its capacity structurally — oldest events are automatically evicted when the limit is reached. Previously, the limit was only applied when persisting to storage, allowing unbounded in-memory growth.
+  
+  If you rely on buffering more than 50 events in memory, set `maxBufferSize` explicitly:
+  
+  ```ts
+  const client = new RippleClient({
+    // ...
+    maxBufferSize: 200,
+  });
+  ```
+  
+  #### Improvements
+  
+  ##### Ring buffer with O(1) eviction
+  
+  The internal buffer is now array-backed with fixed allocation, providing:
+  
+  - Bounded memory usage regardless of enqueue rate
+  - O(1) enqueue with automatic FIFO eviction when full
+  - Better cache locality compared to the previous linked-list implementation
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Schema versioning and `client.events` namespace for predefined CDP events.
+  
+  #### Breaking Changes
+  
+  ##### `schemaVersion` removed from convenience methods
+  
+  `identify()`, `clicked()`, `viewed()`, and `screen()` no longer accept a
+  `schemaVersion` parameter. The SDK auto-manages it via `PREDEFINED_SCHEMA_VERSION`.
+  
+  ##### `track()` without `schemaVersion` now sends `null`
+  
+  Previously undefined behavior — now explicitly `null` on the event.
+  
+  #### New Features
+  
+  ##### `client.events.*` namespace
+  
+  Typed methods for all predefined CDP events with auto-managed schema version:
+  
+  ```ts
+  await client.events.productViewed({ product: { ... } });
+  await client.events.orderCompleted({ order: { ... } });
+  await client.events.paymentCaptured({ payment: { ... } });
+  ```
+  
+  ##### `PREDEFINED_SCHEMA_VERSION` constant
+  
+  Exported from `@internals/core` — value `"1"`. Shared across all Ripple SDKs.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Consolidate browser storage adapters into `WebStorage` and add `init()` to `StorageAdapter` interface.
+  
+  #### Breaking Changes
+  
+  ##### `StorageAdapter` interface now requires `init()` method
+  
+  All storage adapter implementations must implement `init(): Promise<void>`.
+  
+  ##### `IndexedDBAdapter`, `LocalStorageAdapter` removed from public exports
+  
+  These are now internal to `WebStorage`. Use `WebStorage` directly:
+  
+  ```diff
+  -import { IndexedDBAdapter } from "@tapsioss/ripple-browser";
+  -const client = new RippleClient({ storageAdapter: new IndexedDBAdapter() });
+  +import { WebStorage } from "@tapsioss/ripple-browser";
+  +const client = new RippleClient({ storageAdapter: new WebStorage() });
+  ```
+  
+  ##### Storage class renames
+  
+  - `IndexedDBAdapter` → `IndexedDBStorage` (internal)
+  - `LocalStorageAdapter` → `LocalStorage` (internal)
+  - `NoOpStorageAdapter` → `NoOpStorage`
+  
+  #### New Features
+  
+  ##### `WebStorage` — auto-detecting browser storage
+  
+  Automatically selects the best available backend (IndexedDB → localStorage → NoOp):
+  
+  ```ts
+  import { WebStorage } from "@tapsioss/ripple-browser";
+  
+  const client = new RippleClient({
+    storageAdapter: new WebStorage(),           // auto-detect
+    // or with preferences:
+    storageAdapter: new WebStorage({ prefer: "local-storage" }),
+  });
+  ```
+  
+  ##### `StorageAdapter.init()` called automatically
+  
+  The base `Client.init()` now calls `storageAdapter.init()` before restoring events. Custom storage adapters can use this for async setup.
+  
+  ##### `eventTtl` in client config
+  
+  Per-event expiry is now handled at the dispatcher level. Events older than `eventTtl` (based on `issuedAt`) are dropped at flush time:
+  
+  ```ts
+  const client = new RippleClient({
+    eventTtl: 86400000, // 24 hours
+  });
+  ```
+
+### Minor Changes
+
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Automatic `app_state_changed` tracking and manual `appOpened()`/`appClosed()` methods.
+  
+  #### New Features
+  
+  ##### Auto-tracking visibility changes
+  
+  The browser client automatically tracks `app_state_changed` events when page
+  visibility changes (`foreground` ↔ `background`). Starts after `init()`,
+  cleaned up on `dispose()`.
+  
+  ##### `appOpened()` and `appClosed()`
+  
+  Manual methods to explicitly signal app lifecycle state:
+  
+  ```ts
+  client.appOpened();  // { newState: "opened", previousState: ... }
+  client.appClosed(); // { newState: "closed", previousState: ... }
+  ```
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Add `screen()` method for page/screen view tracking.
+  
+  #### New Features
+  
+  ##### Browser: `screen(payload?, schemaVersion?)`
+  
+  Auto-captures page info from the browser environment:
+  
+  - `title` — from `document.title`
+  - `url` — from `location.href`
+  - `pathname` — from `location.pathname`
+  - `referrer` — from `document.referrer`
+  - `search` — from `location.search`
+  - `keywords` — from `<meta name="keywords">` tag
+  - `campaign` — from UTM query parameters (`utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`)
+  
+  Provided payload fields take precedence over auto-captured values.
+  
+  ```ts
+  await client.screen(); // fully auto-captured
+  await client.screen({ title: "Custom Title" }); // override title only
+  ```
+  
+  ##### Node: `screen(payload, schemaVersion?)`
+  
+  Requires a `ScreenPayload` — no auto-capture in server environments.
+  
+  ```ts
+  await client.screen({ title: "Dashboard", url: "/dashboard" });
+  ```
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Build-time SDK info injection.
+  
+  #### New Features
+  
+  ##### Automatic SDK name and version injection
+  
+  `SDK_NAME` and `SDK_VERSION` are now injected at build time from each package's
+  `package.json`. The `_getSdkInfo()` abstract method on `Client` provides this to
+  the event `sdk` field, ensuring every event carries the correct package name and
+  version without manual updates.
+  
+  The build step `build:inject-sdk-info` runs before package bundling via
+  `scripts/inject-sdk-info.ts`.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Add telemetry hooks and automatic telemetry reporting.
+  
+  #### New Features
+  
+  ##### Telemetry hooks for production monitoring
+  
+  Fire-and-forget callbacks for observing SDK internals:
+  
+  ```ts
+  const client = new RippleClient({
+    hooks: {
+      onFlush: info => console.log(`Flushed ${info.eventCount} events`),
+      onSendSuccess: info => metrics.increment("events.sent", info.batchSize),
+      onSendFailure: info => alerts.notify(`Send failed: ${info.error}`),
+      onRetry: info => console.log(`Retry #${info.attempt}`),
+      onDrop: info => console.warn(`Dropped ${info.eventCount}: ${info.reason}`),
+      onEnqueue: info => gauge.set("buffer_size", info.bufferSize),
+    },
+  });
+  ```
+  
+  ##### Automatic telemetry reporting
+  
+  When enabled, the SDK automatically reports internal metrics to a dedicated endpoint:
+  
+  ```ts
+  const client = new RippleClient({
+    telemetryOptions: {
+      disabled: false,
+      endpoint: "https://telemetry.example.com/sdk",
+    },
+  });
+  ```
+  
+  Uses the configured `apiKey` and `apiKeyHeader` for authentication. User hooks
+  and auto-telemetry work together — both fire on each event.
+
+### Patch Changes
+
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Cache platform and SDK info, use lazy telemetry context.
+  
+  #### Performance
+  
+  - Cache `_getPlatform()` result instead of parsing UA on every `track()` call (browser).
+  - Return a module-level constant from `_getSdkInfo()` instead of allocating per call.
+  
+  #### Refactor
+  
+  - Telemetry context now uses lazy getters (`getPlatform`, `getSdk`, `getAnonymousId`) instead of eagerly resolving values in the `Client` constructor. This fixes a private field access error when subclass fields aren't installed during `super()` and ensures telemetry events capture current state at report time.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Fix storage race condition on flush and improve enqueue throughput.
+  
+  #### Bug Fixes
+  
+  ##### Storage clear race condition
+  
+  Previously, `flush()` called `storage.clear()` after a successful send. If new events were enqueued during the flush, their persisted state was wiped — causing data loss on crash. Now flush persists the current buffer state (`storage.save(buffer)`) instead of clearing, ensuring newly-enqueued events survive in storage.
+  
+  #### Improvements
+  
+  ##### Fire-and-forget persistence in enqueue
+  
+  `enqueue()` no longer awaits the storage write. The in-memory buffer is the source of truth; persistence is a best-effort durability snapshot serialized via mutex. This removes disk I/O from the hot path, improving enqueue throughput.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Fix race condition between enqueue and flush, and optimize flush memory footprint.
+  
+  #### Bug Fixes
+  
+  ##### Enqueue/flush storage race condition
+  
+  Introduced a dedicated storage mutex that serializes storage I/O without blocking buffer mutations or network requests. Previously, an enqueue's `storage.save()` could interleave with flush's `storage.clear()`, causing already-sent events to persist in storage and replay on next initialization.
+  
+  #### Improvements
+  
+  ##### Streaming flush with O(1) peak memory per batch
+  
+  Flush now drains the buffer incrementally via `dequeue()`, building and sending one batch at a time. This replaces the previous approach of `toArray()` + `filterExpired()` + `createBatches()` + iterating all batches, which allocated ~3× buffer size in intermediate arrays. Peak memory is now ~1 batch size regardless of total buffer contents.
+
+
+- [#38](https://github.com/Tap30/ripple-ts/pull/38) [`5752de2`](https://github.com/Tap30/ripple-ts/commit/5752de2860d524f3bbf561c85ee9724a8ecc11d1) Thanks [@mimshins](https://github.com/mimshins)! - Performance, memory, and concurrency improvements from code review.
+  
+  #### Performance
+  
+  - **IndexedDB save:** Replace atomic read-write with direct `put` (removes unnecessary `get` request per save).
+  - **MetadataManager:** Cache a frozen snapshot on read, invalidate on `set()` — eliminates per-event shallow copy.
+  - **Buffer.clear():** Remove unnecessary `Array.fill(undefined)` — resetting head/length is sufficient.
+  - **HttpClient:** Skip `response.json()` on 204 No Content responses.
+  - **delay utility:** Clean up abort listener on natural resolve to prevent listener accumulation.
+  
+  #### Bug Fixes
+  
+  - **Mutex.release():** Reject queued tasks with `MutexDisposedError` instead of resolving them concurrently, preventing interleaved writes during shutdown.
+  
+  #### Refactoring
+  
+  - **Dispatcher `#requeueBatch`:** Simplified to use `#persistBuffer()`, eliminating duplicated error handling and reducing buffer allocations from 3 to 2.
+
 ## 1.2.1
 ### Patch Changes
 
