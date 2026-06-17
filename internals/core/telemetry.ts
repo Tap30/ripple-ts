@@ -1,5 +1,5 @@
 import { PREDEFINED_SCHEMA_VERSION } from "./event-specs.ts";
-import type { Event } from "./types.ts";
+import type { Event, Platform, SdkInfo } from "./types.ts";
 import { IdGenerator } from "./utils.ts";
 
 /**
@@ -96,7 +96,10 @@ type ClientContext = {
   apiKeyHeader: string;
   getUserId: () => string | null;
   getMetadata: () => Record<string, unknown> | null;
-} & Pick<Event, "anonymousId" | "platform" | "sdk">;
+  getPlatform: () => Platform | null;
+  getSdk: () => SdkInfo;
+  getAnonymousId: () => string;
+};
 
 /**
  * Creates a merged hooks object that wraps user hooks with auto-telemetry reporting.
@@ -115,9 +118,9 @@ export const createTelemetryHooks = (
   const {
     apiKey,
     apiKeyHeader,
-    anonymousId,
-    platform,
-    sdk,
+    getAnonymousId,
+    getPlatform,
+    getSdk,
     getMetadata,
     getUserId,
   } = clientCtx;
@@ -134,9 +137,9 @@ export const createTelemetryHooks = (
       schemaVersion: PREDEFINED_SCHEMA_VERSION,
       userId: getUserId(),
       metadata: getMetadata(),
-      anonymousId,
-      platform,
-      sdk,
+      anonymousId: getAnonymousId(),
+      platform: getPlatform(),
+      sdk: getSdk(),
     };
 
     try {

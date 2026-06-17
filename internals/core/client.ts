@@ -260,9 +260,9 @@ export abstract class Client<
       apiKeyHeader,
       getUserId: this.getUserId,
       getMetadata: this.getMetadata,
-      anonymousId: this.getAnonymousId(),
-      platform: this._getPlatform(),
-      sdk: this._getSdkInfo(),
+      getAnonymousId: this.getAnonymousId,
+      getPlatform: this._getPlatform,
+      getSdk: this._getSdkInfo,
     });
 
     const dispatcherConfig: DispatcherConfig = {

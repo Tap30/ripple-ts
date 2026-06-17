@@ -6,9 +6,8 @@ import {
   type Platform,
   type ScreenPayload,
   type SdkInfo,
-  type ServerPlatform,
 } from "@internals/core";
-import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
+import { PLATFORM_INFO, SDK_INFO } from "./constants.ts";
 
 /**
  * Node.js-specific client configuration
@@ -43,10 +42,7 @@ export class RippleClient<
    * @returns Node SDK information
    */
   protected override _getSdkInfo(): SdkInfo {
-    return {
-      name: SDK_NAME,
-      version: SDK_VERSION,
-    };
+    return SDK_INFO;
   }
 
   /**
@@ -55,9 +51,7 @@ export class RippleClient<
    * @returns Server platform information
    */
   protected _getPlatform(): Platform | null {
-    return {
-      type: "server",
-    } satisfies ServerPlatform;
+    return PLATFORM_INFO;
   }
 
   /**

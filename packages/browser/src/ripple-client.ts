@@ -11,9 +11,9 @@ import {
   type UserTraits,
   type WebPlatform,
 } from "@internals/core";
-import { UAParser } from "ua-parser-js";
-import { SDK_NAME, SDK_VERSION } from "./__sdk_build_info__.ts";
+import { SDK_INFO } from "./constants.ts";
 import { IdentityManager } from "./identity-manager.ts";
+import { calculatePlatformInfo } from "./utils.ts";
 
 /**
  * Browser-specific client configuration
@@ -42,6 +42,7 @@ export class RippleClient<
   readonly #identityManager: IdentityManager;
 
   #appState: AppState = "foreground";
+  #platformInfo: WebPlatform | null = null;
 
   #onVisibilityChange = (): void => {
     /* v8 ignore next -- @preserve */
@@ -66,10 +67,7 @@ export class RippleClient<
    * @returns Web SDK information
    */
   protected override _getSdkInfo(): SdkInfo {
-    return {
-      name: SDK_NAME,
-      version: SDK_VERSION,
-    };
+    return SDK_INFO;
   }
 
   /**
@@ -78,29 +76,7 @@ export class RippleClient<
    * @returns Web platform information
    */
   protected _getPlatform(): Platform | null {
-    if (typeof navigator === "undefined") return null;
-
-    const parser = new UAParser(navigator.userAgent);
-
-    const browser = parser.getBrowser();
-    const device = parser.getDevice();
-    const os = parser.getOS();
-
-    return {
-      type: "web",
-      browser: {
-        name: browser.name?.toLowerCase() || "UNKNOWN",
-        version: browser.version?.toLowerCase() || "UNKNOWN",
-      },
-      device: {
-        name: device.type?.toLowerCase() || "desktop",
-        version: device.vendor?.toLowerCase() || "UNKNOWN",
-      },
-      os: {
-        name: os.name?.toLowerCase() || "UNKNOWN",
-        version: os.version?.toLowerCase() || "UNKNOWN",
-      },
-    } satisfies WebPlatform;
+    return this.#platformInfo;
   }
 
   /**
@@ -111,6 +87,8 @@ export class RippleClient<
     this._userId = this.#identityManager.getUserId();
 
     await super.init();
+
+    this.#platformInfo = calculatePlatformInfo();
 
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", this.#onVisibilityChange);
