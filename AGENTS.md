@@ -134,6 +134,15 @@ pnpm clean          # Clean build artifacts
 - **Coverage**: 100% statements, branches, functions, lines
 - **Structure**: Tests co-located with source files `(\*.test.ts)`
 - **Environments**: `jsdom` for browser, node for Node.js
+- **Do NOT test**: Type-safety features (generics, type inference, compile-time
+  checks). These are validated by the TypeScript compiler, not at runtime.
+- **Concurrency**: Test enqueue-during-flush scenarios. Use the
+  `flush()+track()+flush()` pattern to force batching without relying on
+  `maxPayloadSize: 1`.
+- **Fire-and-forget**: Use `await new Promise(r => setTimeout(r, 0))` to flush
+  microtasks when asserting on fire-and-forget async operations.
+- **One behavior per test**: Each test should verify a single code path or
+  behavior.
 
 ## Code Guidelines
 
