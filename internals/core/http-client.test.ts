@@ -52,6 +52,7 @@ describe("HttpClient", () => {
     it("should send events using fetch", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -77,6 +78,7 @@ describe("HttpClient", () => {
     it("should handle successful response", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -95,6 +97,7 @@ describe("HttpClient", () => {
     it("should handle failed response", async () => {
       const mockResponse = {
         status: 500,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -113,6 +116,7 @@ describe("HttpClient", () => {
     it("should handle JSON parsing error", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockRejectedValue(new Error("Invalid JSON")),
       };
 
@@ -129,9 +133,52 @@ describe("HttpClient", () => {
       expect(result.data).toBeUndefined();
     });
 
+    it("should skip JSON parsing for 204 No Content", async () => {
+      const mockResponse = {
+        status: 204,
+        headers: { get: vi.fn().mockReturnValue(null) },
+        json: vi.fn(),
+      };
+
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
+
+      const result = await adapter.send({
+        endpoint,
+        apiKeyHeader,
+        headers,
+        events: mockEvents,
+      });
+
+      expect(result.status).toBe(204);
+      expect(result.data).toBeUndefined();
+      expect(mockResponse.json).not.toHaveBeenCalled();
+    });
+
+    it("should skip JSON parsing when content-length is 0", async () => {
+      const mockResponse = {
+        status: 200,
+        headers: { get: vi.fn().mockReturnValue("0") },
+        json: vi.fn(),
+      };
+
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response);
+
+      const result = await adapter.send({
+        endpoint,
+        apiKeyHeader,
+        headers,
+        events: mockEvents,
+      });
+
+      expect(result.status).toBe(200);
+      expect(result.data).toBeUndefined();
+      expect(mockResponse.json).not.toHaveBeenCalled();
+    });
+
     it("should use keepalive flag", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -155,6 +202,7 @@ describe("HttpClient", () => {
     it("should handle empty events array", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -180,6 +228,7 @@ describe("HttpClient", () => {
     it("should handle empty headers", async () => {
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -203,6 +252,7 @@ describe("HttpClient", () => {
 
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 
@@ -228,6 +278,7 @@ describe("HttpClient", () => {
 
       const mockResponse = {
         status: 200,
+        headers: { get: vi.fn().mockReturnValue(null) },
         json: vi.fn().mockResolvedValue({}),
       };
 

@@ -957,7 +957,7 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to persist remaining events after send failure",
+        "Failed to persist events to storage",
         expect.objectContaining({ error: "Save error" }),
       );
     });

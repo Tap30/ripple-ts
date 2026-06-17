@@ -55,14 +55,27 @@ describe("MetadataManager", () => {
       });
     });
 
-    it("should return a copy of metadata", () => {
+    it("should return a frozen cached snapshot", () => {
       manager.set("userId", "123");
 
       const metadata1 = manager.getAll();
       const metadata2 = manager.getAll();
 
-      expect(metadata1).not.toBe(metadata2);
-      expect(metadata1).toEqual(metadata2);
+      expect(metadata1).toBe(metadata2);
+      expect(Object.isFrozen(metadata1)).toBe(true);
+    });
+
+    it("should invalidate cache on set", () => {
+      manager.set("userId", "123");
+
+      const before = manager.getAll();
+
+      manager.set("sessionId", "abc");
+
+      const after = manager.getAll();
+
+      expect(before).not.toBe(after);
+      expect(after).toEqual({ userId: "123", sessionId: "abc" });
     });
   });
 

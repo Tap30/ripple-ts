@@ -7,6 +7,10 @@
 export class MetadataManager<TMetadata extends Record<string, unknown>> {
   #metadata: Partial<TMetadata> = {};
 
+  // We have set-once-read-many scenario.
+  // This will prevent unnecessary allocation pressure.
+  #snapshot: Partial<TMetadata> | null = null;
+
   /**
    * Set a metadata value.
    *
@@ -16,6 +20,9 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    */
   public set<K extends keyof TMetadata>(key: K, value: TMetadata[K]): void {
     this.#metadata[key] = value;
+
+    // Cache invalidation
+    this.#snapshot = null;
   }
 
   /**
@@ -26,7 +33,13 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
   public getAll(): Partial<TMetadata> | null {
     if (this.isEmpty()) return null;
 
-    return { ...this.#metadata };
+    if (!this.#snapshot) {
+      this.#snapshot = Object.freeze({
+        ...this.#metadata,
+      });
+    }
+
+    return this.#snapshot;
   }
 
   /**
@@ -43,5 +56,6 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    */
   public clear(): void {
     this.#metadata = {};
+    this.#snapshot = null;
   }
 }

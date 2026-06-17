@@ -29,14 +29,20 @@ export class HttpClient implements HttpAdapter {
 
     let data: unknown;
 
-    try {
-      data = (await response.json()) as unknown;
-      // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
-      // Older iOS Safari versions don't support optional catch binding.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_) {
-      // Ignore JSON parsing errors
-      data = undefined;
+    // Skip JSON parsing for 204 No Content or explicitly empty bodies
+    const contentLength = response.headers.get("content-length");
+    const isEmpty = response.status === 204 || contentLength === "0";
+
+    if (!isEmpty) {
+      try {
+        data = (await response.json()) as unknown;
+        // Use `catch (_) {}` instead of `catch {}` for ES2017 compatibility.
+        // Older iOS Safari versions don't support optional catch binding.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_) {
+        // Ignore JSON parsing errors
+        data = undefined;
+      }
     }
 
     return {

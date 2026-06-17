@@ -18,7 +18,10 @@ export class Mutex {
   #isLocked: boolean = false;
   #disposed: boolean = false;
 
-  #taskQueue: Array<() => void> = [];
+  #taskQueue: Array<{
+    resolve: () => void;
+    reject: (err: Error) => void;
+  }> = [];
 
   /**
    * Indicates whether the mutex is currently locked.
@@ -45,8 +48,8 @@ export class Mutex {
       return Promise.resolve();
     }
 
-    return new Promise<void>(resolve => {
-      this.#taskQueue.push(resolve);
+    return new Promise<void>((resolve, reject) => {
+      this.#taskQueue.push({ resolve, reject });
     });
   }
 
@@ -60,9 +63,9 @@ export class Mutex {
    */
   #releaseLock(): void {
     if (this.#taskQueue.length > 0) {
-      const resolve = this.#taskQueue.shift();
+      const task = this.#taskQueue.shift();
 
-      resolve?.();
+      task?.resolve();
     } else {
       this.#isLocked = false;
     }
@@ -95,8 +98,14 @@ export class Mutex {
   public release(): void {
     this.#disposed = true;
     this.#isLocked = false;
-    this.#taskQueue.forEach(resolve => resolve());
+
+    const queue = this.#taskQueue;
+
     this.#taskQueue = [];
+
+    for (const task of queue) {
+      task.reject(new MutexDisposedError());
+    }
   }
 
   /**

@@ -176,10 +176,7 @@ export class IndexedDBStorage implements StorageAdapter {
     });
   }
 
-  #atomicReadWrite(
-    db: IDBDatabase,
-    transform: (data: StorageData | null) => StorageData,
-  ): Promise<void> {
+  #write(db: IDBDatabase, data: StorageData): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(this.#storeName, "readwrite");
       const store = transaction.objectStore(this.#storeName);
@@ -192,19 +189,10 @@ export class IndexedDBStorage implements StorageAdapter {
       transaction.onabort = () =>
         reject(transaction.error || new Error("Transaction aborted"));
 
-      const getRequest = store.get(this.#key);
+      const request = store.put(data, this.#key);
 
-      getRequest.onerror = () =>
-        reject(new Error(getRequest.error?.message ?? "Failed to read data"));
-
-      getRequest.onsuccess = () => {
-        const data = getRequest.result as StorageData | undefined;
-        const newData = transform(data ?? null);
-        const putRequest = store.put(newData, this.#key);
-
-        putRequest.onerror = () =>
-          reject(putRequest.error ?? new Error("Failed to write data"));
-      };
+      request.onerror = () =>
+        reject(request.error ?? new Error("Failed to write data"));
     });
   }
 
@@ -218,23 +206,13 @@ export class IndexedDBStorage implements StorageAdapter {
     const db = await this.#openDB();
 
     try {
-      await this.#atomicReadWrite(db, () => {
-        return {
-          events,
-          savedAt: Date.now(),
-        };
-      });
+      await this.#write(db, { events, savedAt: Date.now() });
     } catch (error) {
       if (error instanceof StorageQuotaExceededError && events.length > 1) {
         // Drop oldest half and retry
         const reduced = events.slice(-Math.floor(events.length / 2));
 
-        await this.#atomicReadWrite(db, () => {
-          return {
-            events: reduced,
-            savedAt: Date.now(),
-          };
-        });
+        await this.#write(db, { events: reduced, savedAt: Date.now() });
 
         throw new StorageQuotaExceededError(
           reduced.length,

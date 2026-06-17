@@ -98,7 +98,6 @@ export class Buffer<T> {
    * Remove all elements from the buffer.
    */
   public clear(): void {
-    this.#items.fill(undefined);
     this.#head = 0;
     this.#length = 0;
   }

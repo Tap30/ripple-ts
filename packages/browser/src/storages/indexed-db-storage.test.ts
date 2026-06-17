@@ -422,34 +422,16 @@ describe("IndexedDBStorage", () => {
       await expect(savePromise2).rejects.toThrow("Failed to open IndexedDB");
     });
 
-    it("rejects on get error (with and without message)", async () => {
-      for (const [msg, expected] of [
-        ["Get error", "Get error"],
-        [null, "Failed to read data"],
-      ] as const) {
-        const getReq = mockGetReq(mockObjectStore);
-        const promise = adapter.save(mockEvents);
-
-        await resolveOpen(openRequest, mockDB);
-
-        rejectRequest(getReq, msg);
-
-        await expect(promise).rejects.toThrow(expected);
-      }
-    });
-
     it("rejects on put error (with and without message)", async () => {
       for (const [msg, expected] of [
         ["Save error", "Save error"],
         [null, "Failed to write data"],
       ] as const) {
-        const getReq = mockGetReq(mockObjectStore);
         const putReq = mockPutReq(mockObjectStore);
 
         const savePromise = adapter.save(mockEvents);
 
         await resolveOpen(openRequest, mockDB);
-        await resolveGet(getReq, undefined);
 
         rejectRequest(putReq, msg);
 
@@ -478,7 +460,7 @@ describe("IndexedDBStorage", () => {
         "Transaction aborted",
       ],
     ])("rejects on transaction %s", async (_, event, error, expected) => {
-      mockGetReq(mockObjectStore);
+      mockPutReq(mockObjectStore);
       const savePromise = adapter.save(mockEvents);
 
       await resolveOpen(openRequest, mockDB);

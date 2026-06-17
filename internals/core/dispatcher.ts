@@ -237,10 +237,7 @@ export class Dispatcher<
             // On failure, requeue the failed batch + the current event (already
             // dequeued but not yet in any batch). Remaining buffer events are
             // preserved since they haven't been dequeued yet.
-            await this.#requeueBatch(
-              [...batch, event],
-              "Failed to persist remaining events after send failure",
-            );
+            await this.#requeueBatch([...batch, event]);
 
             return;
           }
@@ -273,10 +270,7 @@ export class Dispatcher<
         const success = await this.#sendWithRetry(batch);
 
         if (!success) {
-          await this.#requeueBatch(
-            batch,
-            "Failed to persist remaining events after send failure",
-          );
+          await this.#requeueBatch(batch);
 
           return;
         }
@@ -522,31 +516,12 @@ export class Dispatcher<
    * @param batch The failed batch to re-queue
    * @param errorMessage Error message to log if save fails
    */
-  async #requeueBatch(
-    batch: Event<TMetadata>[],
-    errorMessage: string,
-  ): Promise<void> {
-    const remaining = this.#buffer.toArray();
+  async #requeueBatch(batch: Event<TMetadata>[]): Promise<void> {
+    const merged = [...batch, ...this.#buffer.toArray()];
 
-    this.#buffer.fromArray([...batch, ...remaining]);
+    this.#buffer.fromArray(merged);
 
-    try {
-      await this.#storageMutex.runAtomic(async () => {
-        await this.#storage.save(this.#buffer.toArray());
-      });
-    } catch (err) {
-      if (err instanceof MutexDisposedError) return;
-
-      if (err instanceof StorageQuotaExceededError) {
-        this.#logger.warn(err.message);
-      } else {
-        this.#logger.error(errorMessage, {
-          /* v8 ignore next -- @preserve */
-          error: err instanceof Error ? err.message : String(err),
-          eventsCount: this.#buffer.size(),
-        });
-      }
-    }
+    await this.#persistBuffer();
   }
 
   /**
