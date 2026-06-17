@@ -56,7 +56,7 @@ export class IndexedDBStorage implements StorageAdapter {
   public static async isAvailable(): Promise<boolean> {
     try {
       if (!("indexedDB" in globalThis)) {
-        return await Promise.resolve(false);
+        return Promise.resolve(false);
       }
 
       const testDb = "__ripple_test__";
@@ -85,7 +85,7 @@ export class IndexedDBStorage implements StorageAdapter {
       // Older iOS Safari versions don't support optional catch binding.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_) {
-      return await Promise.resolve(false);
+      return Promise.resolve(false);
     }
   }
 

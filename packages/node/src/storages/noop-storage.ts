@@ -7,14 +7,10 @@ import type { Event as RippleEvent, StorageAdapter } from "@internals/core";
 export class NoOpStorage implements StorageAdapter {
   public async init(): Promise<void> {}
   public async save(_events: RippleEvent[]): Promise<void> {}
+  public async clear(): Promise<void> {}
+  public async close(): Promise<void> {}
 
   public async load(): Promise<RippleEvent[]> {
     return Promise.resolve([]);
-  }
-
-  public async clear(): Promise<void> {}
-
-  public close(): Promise<void> {
-    return Promise.resolve();
   }
 }

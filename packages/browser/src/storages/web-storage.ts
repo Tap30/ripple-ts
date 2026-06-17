@@ -53,12 +53,10 @@ export class WebStorage implements StorageAdapter {
   async #resolve(): Promise<StorageAdapter> {
     const { prefer } = this.#config;
 
-    if (prefer === "local-storage") {
-      if (await LocalStorage.isAvailable()) {
-        return new LocalStorage({
-          key: this.#config.key,
-        });
-      }
+    if (prefer === "local-storage" && (await LocalStorage.isAvailable())) {
+      return new LocalStorage({
+        key: this.#config.key,
+      });
     }
 
     if (prefer === "indexed-db" || !prefer) {

@@ -442,6 +442,7 @@ describe("Dispatcher", () => {
       const onSendFailure = vi.fn();
 
       vi.mocked(http.send).mockResolvedValue({ status: 500 });
+
       const d = new Dispatcher(
         createConfig({
           retryOptions: {
@@ -561,6 +562,7 @@ describe("Dispatcher", () => {
 
     it("fires onRetry hook with backoff delay", async () => {
       vi.useFakeTimers();
+
       const http = createMockHttp();
       const onRetry = vi.fn();
 
@@ -598,7 +600,7 @@ describe("Dispatcher", () => {
       // Enqueue 1 event, then flush. While flush awaits send, enqueue another.
       let sendCount = 0;
 
-      vi.mocked(http.send).mockImplementation(async ctx => {
+      vi.mocked(http.send).mockImplementation(async () => {
         sendCount++;
         if (sendCount === 1) {
           // During first send, enqueue another event

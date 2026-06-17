@@ -58,6 +58,7 @@ export class RippleClient<
    */
   constructor(config: BrowserClientConfig) {
     super(config);
+
     this.#identityManager = new IdentityManager(config.sessionStoreKey);
   }
 
@@ -102,9 +103,9 @@ export class RippleClient<
     userId: string,
     traits: UserTraits,
   ): Promise<void> {
-    await super.identify(userId, traits);
-
     this.#identityManager.setUserId(userId);
+
+    return super.identify(userId, traits);
   }
 
   /**

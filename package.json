@@ -35,7 +35,6 @@
     "test:unit:watch": "run-p test:unit:internals:watch test:unit:workspace:watch",
     "test": "pnpm test:unit",
     "test:watch": "pnpm test:unit:watch",
-    "test:e2e": "echo 'TODO: run all the e2e tests'",
     "build": "run-s build:inject-sdk-info build:packages",
     "build:packages": "pnpm -r run build",
     "build:inject-sdk-info": "tsx scripts/inject-sdk-info",

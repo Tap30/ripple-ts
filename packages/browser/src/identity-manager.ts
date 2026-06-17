@@ -65,6 +65,7 @@ export class IdentityManager {
    */
   public clear(): void {
     this.#anonymousId = null;
+
     sessionStorage.removeItem(this.#storageKey);
     sessionStorage.removeItem(this.#userIdKey);
   }
