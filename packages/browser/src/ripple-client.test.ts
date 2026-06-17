@@ -1,5 +1,5 @@
 import {
-  NoOpLoggerAdapter,
+  NoOpLogger,
   type HttpAdapter,
   type HttpAdapterContext,
   type StorageAdapter,
@@ -8,19 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RippleClient, type BrowserClientConfig } from "./ripple-client.ts";
 
 type TestMetadata = {
-  schemaVersion: string;
-  eventType: string;
-  userId: string;
+  appVersion: string;
 };
 
 type TestEvents = {
   "user.login": { email: string; method: string };
-  "page.view": { url: string; title: string };
-  "button.click": { buttonId: string; location: string };
   test_event: { key: string };
-  user_action: Record<string, unknown>;
   simple_event: Record<string, unknown>;
-  page_view: { page: string };
 };
 
 // Mock UAParser
@@ -35,20 +29,26 @@ vi.mock("ua-parser-js", () => ({
 }));
 
 // Mock SessionManager
-vi.mock("./session-manager.ts", () => ({
-  SessionManager: vi.fn().mockImplementation(function () {
-    let sessionId: string | null = null;
+vi.mock("./identity-manager.ts", () => ({
+  IdentityManager: vi.fn().mockImplementation(function () {
+    let anonymousId: string | null = null;
+    let userId: string | null = null;
     let initCounter = 0;
 
     return {
       init: vi.fn().mockImplementation(() => {
         initCounter++;
-        sessionId = `test-session-id-${initCounter}`;
-        return sessionId;
+        anonymousId = `test-anon-id-${initCounter}`;
+        return anonymousId;
       }),
-      getSessionId: vi.fn().mockImplementation(() => sessionId),
+      getAnonymousId: vi.fn().mockImplementation(() => anonymousId),
+      getUserId: vi.fn().mockImplementation(() => userId),
+      setUserId: vi.fn().mockImplementation((id: string) => {
+        userId = id;
+      }),
       clear: vi.fn().mockImplementation(() => {
-        sessionId = null;
+        anonymousId = null;
+        userId = null;
       }),
     };
   }),
@@ -60,6 +60,7 @@ const mockHttpAdapter: HttpAdapter = {
 };
 
 const mockStorageAdapter: StorageAdapter = {
+  init: vi.fn().mockResolvedValue(undefined),
   save: vi.fn().mockResolvedValue(undefined),
   load: vi.fn().mockResolvedValue([]),
   clear: vi.fn().mockResolvedValue(undefined),
@@ -71,148 +72,93 @@ const mockConfig: BrowserClientConfig = {
   endpoint: "https://api.test.com/events",
   httpAdapter: mockHttpAdapter,
   storageAdapter: mockStorageAdapter,
-  loggerAdapter: new NoOpLoggerAdapter(),
+  loggerAdapter: new NoOpLogger(),
 };
 
 describe("RippleClient", () => {
   let client: RippleClient<TestEvents, TestMetadata>;
-  let clientWithDefaults: RippleClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock window and document
-    Object.defineProperty(global, "window", {
-      value: {
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      },
-      writable: true,
-      configurable: true,
-    });
-
     Object.defineProperty(global, "navigator", {
-      value: {
-        userAgent: "test-agent",
-      },
+      value: { userAgent: "test-agent" },
       writable: true,
       configurable: true,
     });
 
     client = new RippleClient<TestEvents, TestMetadata>(mockConfig);
-
-    clientWithDefaults = new RippleClient(mockConfig);
   });
 
   describe("constructor", () => {
-    it("should create instance with custom adapters", () => {
+    it("should create instance", () => {
       expect(client).toBeInstanceOf(RippleClient);
     });
 
-    it("should create instance with required adapters", () => {
-      const defaultClient = new RippleClient(mockConfig);
-
-      expect(defaultClient).toBeInstanceOf(RippleClient);
-    });
-
-    it("should pass custom sessionStoreKey to SessionManager", async () => {
-      const { SessionManager } = vi.mocked(
-        await import("./session-manager.ts"),
+    it("should pass custom sessionStoreKey to IdentityManager", async () => {
+      const { IdentityManager } = vi.mocked(
+        await import("./identity-manager.ts"),
       );
 
       new RippleClient({
         ...mockConfig,
-        sessionStoreKey: "custom_session_key",
+        sessionStoreKey: "custom_key",
       });
 
-      expect(SessionManager).toHaveBeenCalledWith("custom_session_key");
+      expect(IdentityManager).toHaveBeenCalledWith("custom_key");
     });
 
     it("should use default sessionStoreKey when not provided", async () => {
-      const { SessionManager } = vi.mocked(
-        await import("./session-manager.ts"),
+      const { IdentityManager } = vi.mocked(
+        await import("./identity-manager.ts"),
       );
 
       new RippleClient(mockConfig);
 
-      expect(SessionManager).toHaveBeenCalledWith(undefined);
+      expect(IdentityManager).toHaveBeenCalledWith(undefined);
     });
   });
 
   describe("init", () => {
-    it("should initialize session and load events", async () => {
+    it("should initialize and persist anonymousId", async () => {
+      await client.init();
+
+      expect(client.getAnonymousId()).toMatch(/^test-anon-id-\d+$/);
+    });
+
+    it("should restore events from storage", async () => {
       await client.init();
 
       expect(mockStorageAdapter.load).toHaveBeenCalled();
     });
 
-    it("should handle missing window object", async () => {
-      const originalWindow = global.window;
-
-      delete (global as { window?: Window }).window;
-
-      await client.init();
-
-      expect(mockStorageAdapter.load).toHaveBeenCalled();
-
-      global.window = originalWindow;
-    });
-
-    it("should call super.init", async () => {
-      const superInitSpy = vi.spyOn(
-        Object.getPrototypeOf(Object.getPrototypeOf(client)),
-        "init",
-      );
-
-      await client.init();
-
-      expect(superInitSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("getSessionId", () => {
-    it("should return session ID from session manager", async () => {
-      await client.init();
-      const sessionId = client.getSessionId();
-
-      expect(sessionId).toBe("test-session-id-1");
-    });
-  });
-
-  describe("type safety", () => {
-    it("should support typed metadata", async () => {
-      interface AppMetadata extends Record<string, unknown> {
-        userId: string;
-        sessionId: string;
-        appVersion: string;
-      }
-
-      type AppEvents = {
-        test_event: { key: string };
-      };
-
-      const typedClient = new RippleClient<AppEvents, AppMetadata>({
-        ...mockConfig,
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      });
-
-      await typedClient.init();
-
-      typedClient.setMetadata("userId", "123");
-      typedClient.setMetadata("sessionId", "abc");
-      typedClient.setMetadata("appVersion", "1.0.0");
-
-      expect(typedClient).toBeInstanceOf(RippleClient);
-    });
-  });
-
-  describe("edge cases", () => {
-    it("should handle multiple init calls", async () => {
+    it("should not re-initialize if already initialized", async () => {
       await client.init();
       await client.init();
 
       expect(mockStorageAdapter.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("dispose", () => {
+    it("should clear session manager on dispose", async () => {
+      await client.init();
+      client.dispose();
+
+      expect(client.getAnonymousId()).toBe("");
+    });
+
+    it("should allow re-initialization after dispose", async () => {
+      await client.init();
+      const firstId = client.getAnonymousId();
+
+      client.dispose();
+
+      await client.init();
+      const secondId = client.getAnonymousId();
+
+      expect(secondId).toBeTruthy();
+      expect(secondId).not.toBe(firstId);
     });
 
     it("should handle dispose before init", () => {
@@ -221,64 +167,21 @@ describe("RippleClient", () => {
 
     it("should handle multiple dispose calls", async () => {
       await client.init();
-
       client.dispose();
       client.dispose();
 
       expect(mockStorageAdapter.load).toHaveBeenCalled();
     });
-
-    it("should allow re-initialization after dispose", async () => {
-      // First init
-      await client.init();
-      const firstSessionId = client.getSessionId();
-
-      expect(firstSessionId).toBeTruthy();
-
-      // Dispose
-      client.dispose();
-      expect(client.getSessionId()).toBeNull();
-
-      // Re-init should work
-      await client.init();
-      const secondSessionId = client.getSessionId();
-
-      expect(secondSessionId).toBeTruthy();
-      expect(secondSessionId).not.toBe(firstSessionId);
-    });
-
-    it("should work normally after dispose and re-init", async () => {
-      // First lifecycle
-      await client.init();
-      client.setMetadata("userId", "123");
-
-      // Dispose
-      client.dispose();
-
-      // Re-init and use normally
-      await client.init();
-      client.setMetadata("userId", "456");
-
-      await expect(
-        client.track("page_view", { page: "/home" }),
-      ).resolves.not.toThrow();
-
-      expect(client.getMetadata()).toEqual({ userId: "456" });
-    });
   });
 
   describe("platform detection", () => {
-    it("should include platform info when tracking events", async () => {
+    it("should include web platform info when tracking", async () => {
       await client.init();
-
       await client.track("test_event", { key: "value" });
-
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          endpoint: mockConfig.endpoint,
           events: expect.arrayContaining([
             expect.objectContaining({
               name: "test_event",
@@ -290,8 +193,7 @@ describe("RippleClient", () => {
               },
             }),
           ]) as Array<unknown>,
-          headers: expect.any(Object) as object,
-        } as HttpAdapterContext),
+        } as Partial<HttpAdapterContext>),
       );
     });
 
@@ -309,11 +211,7 @@ describe("RippleClient", () => {
         return this;
       });
 
-      const newClient = new RippleClient({
-        ...mockConfig,
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      });
+      const newClient = new RippleClient<TestEvents, TestMetadata>(mockConfig);
 
       await newClient.init();
       await newClient.track("test_event", { key: "value" });
@@ -321,11 +219,8 @@ describe("RippleClient", () => {
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          endpoint: mockConfig.endpoint,
           events: expect.arrayContaining([
             expect.objectContaining({
-              name: "test_event",
               platform: {
                 type: "web",
                 browser: { name: "UNKNOWN", version: "UNKNOWN" },
@@ -334,21 +229,14 @@ describe("RippleClient", () => {
               },
             }),
           ]) as Array<unknown>,
-          headers: expect.any(Object) as object,
-        } as HttpAdapterContext),
+        } as Partial<HttpAdapterContext>),
       );
     });
 
-    it("should handle missing navigator when tracking events", async () => {
-      const originalNavigator = global.navigator;
-
+    it("should return null platform when navigator is undefined", async () => {
       delete (global as { navigator?: Navigator }).navigator;
 
-      const newClient = new RippleClient({
-        ...mockConfig,
-        httpAdapter: mockHttpAdapter,
-        storageAdapter: mockStorageAdapter,
-      });
+      const newClient = new RippleClient<TestEvents, TestMetadata>(mockConfig);
 
       await newClient.init();
       await newClient.track("test_event", { key: "value" });
@@ -356,88 +244,294 @@ describe("RippleClient", () => {
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          headers: expect.any(Object) as object,
-          endpoint: mockConfig.endpoint,
           events: expect.arrayContaining([
             expect.objectContaining({
               name: "test_event",
               platform: null,
             }),
           ]) as Array<unknown>,
-        } as HttpAdapterContext),
+        } as Partial<HttpAdapterContext>),
       );
-
-      global.navigator = originalNavigator;
     });
   });
 
-  describe("generic metadata", () => {
-    it("should support typed metadata", async () => {
+  describe("tracking", () => {
+    it("should include anonymousId in events", async () => {
       await client.init();
-      await client.track(
-        "user_action",
-        { action: "click" },
-        { schemaVersion: "2.0", eventType: "interaction" },
-      );
+      await client.track("test_event", { key: "value" });
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          headers: expect.any(Object) as object,
-          endpoint: mockConfig.endpoint,
           events: expect.arrayContaining([
             expect.objectContaining({
-              name: "user_action",
-              metadata: { schemaVersion: "2.0", eventType: "interaction" },
+              anonymousId: client.getAnonymousId(),
             }),
           ]) as Array<unknown>,
-        } as HttpAdapterContext),
+        } as Partial<HttpAdapterContext>),
       );
     });
 
-    it("should support default metadata type", async () => {
-      await clientWithDefaults.init();
-      await clientWithDefaults.track(
-        "page_view",
-        { url: "/home" },
-        { customField: "value", version: 1 },
-      );
-      await clientWithDefaults.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          headers: expect.any(Object) as object,
-          endpoint: mockConfig.endpoint,
-          events: expect.arrayContaining([
-            expect.objectContaining({
-              name: "page_view",
-              metadata: { customField: "value", version: 1 },
-            }),
-          ]) as Array<unknown>,
-        } as HttpAdapterContext),
-      );
-    });
-
-    it("should handle null metadata", async () => {
+    it("should support metadata", async () => {
       await client.init();
+      client.setMetadata("appVersion", "2.0.0");
       await client.track("simple_event");
       await client.flush();
 
       expect(mockHttpAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          apiKeyHeader: expect.any(String) as string,
-          headers: expect.any(Object) as object,
-          endpoint: mockConfig.endpoint,
           events: expect.arrayContaining([
             expect.objectContaining({
-              name: "simple_event",
-              metadata: null,
+              metadata: { appVersion: "2.0.0" },
             }),
           ]) as Array<unknown>,
-        } as HttpAdapterContext),
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+  });
+
+  describe("identify", () => {
+    it("should persist userId in sessionStorage", async () => {
+      await client.init();
+      await client.identify("user-456", { email: "u@e.com" });
+
+      expect(client.getUserId()).toBe("user-456");
+    });
+  });
+
+  describe("screen", () => {
+    it("should auto-capture page info", async () => {
+      Object.defineProperty(global, "document", {
+        value: {
+          title: "Test Page",
+          referrer: "https://google.com",
+          querySelector: () => ({ content: "seo, keywords" }),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      Object.defineProperty(global, "location", {
+        value: {
+          href: "https://example.com/path?utm_source=google&utm_medium=cpc",
+          pathname: "/path",
+          search: "?utm_source=google&utm_medium=cpc",
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      await client.screen();
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "Test Page",
+                url: "https://example.com/path?utm_source=google&utm_medium=cpc",
+                pathname: "/path",
+                referrer: "https://google.com",
+                keywords: ["seo", "keywords"],
+                campaign: expect.objectContaining({
+                  source: "google",
+                  medium: "cpc",
+                }) as object,
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+
+    it("should handle undefined document and location", async () => {
+      // @ts-expect-error: mocking global environment for tests
+      delete global.document;
+      // @ts-expect-error: mocking global environment for tests
+      delete global.location;
+
+      await client.init();
+      await client.screen();
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "",
+                url: "",
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+
+    it("should allow overriding auto-captured values", async () => {
+      Object.defineProperty(global, "document", {
+        value: {
+          title: "Auto Title",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      Object.defineProperty(global, "location", {
+        value: { href: "https://auto.com", pathname: "/auto", search: "" },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      await client.screen({
+        title: "Override Title",
+        url: "https://override.com",
+      });
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "screened",
+              payload: expect.objectContaining({
+                title: "Override Title",
+                url: "https://override.com",
+              }) as object,
+            }),
+          ]) as Array<unknown>,
+        } as Partial<HttpAdapterContext>),
+      );
+    });
+  });
+
+  describe("app state tracking", () => {
+    it("should track app_state_changed on visibilitychange", async () => {
+      let visibilityHandler: (() => void) | null = null;
+
+      Object.defineProperty(global, "document", {
+        value: {
+          hidden: false,
+          title: "",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: (_: string, handler: () => void) => {
+            visibilityHandler = handler;
+          },
+          removeEventListener: vi.fn(),
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      const testClient = new RippleClient<TestEvents, TestMetadata>(mockConfig);
+
+      await testClient.init();
+
+      // Simulate going to background
+      Object.defineProperty(global.document, "hidden", {
+        configurable: true,
+        get: () => true,
+      });
+
+      visibilityHandler!();
+
+      // Allow the fire-and-forget track to complete
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await testClient.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "background", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should remove listener on dispose", async () => {
+      const removeListener = vi.fn();
+
+      Object.defineProperty(global, "document", {
+        value: {
+          hidden: false,
+          title: "",
+          referrer: "",
+          querySelector: () => null,
+          addEventListener: vi.fn(),
+          removeEventListener: removeListener,
+        },
+        writable: true,
+        configurable: true,
+      });
+
+      await client.init();
+      client.dispose();
+
+      expect(removeListener).toHaveBeenCalledWith(
+        "visibilitychange",
+        expect.any(Function),
+      );
+    });
+
+    it("should track opened state via appOpened()", async () => {
+      await client.init();
+      client.appOpened();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "opened", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should track closed state via appClosed()", async () => {
+      await client.init();
+      client.appClosed();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "closed", previousState: "foreground" },
+            }),
+          ]) as Array<unknown>,
+        }),
       );
     });
   });

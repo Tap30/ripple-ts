@@ -165,7 +165,7 @@ describe("Mutex", () => {
     expect(results).toEqual(["sync", "async", "sync2"]);
   });
 
-  it("should resolve queued tasks when released", async () => {
+  it("should reject queued tasks when released", async () => {
     const mutex = new Mutex();
     const results: string[] = [];
 
@@ -189,18 +189,24 @@ describe("Mutex", () => {
       await Promise.resolve();
     });
 
+    // Prevent unhandled rejection warnings
+    task2.catch(() => {});
+    task3.catch(() => {});
+
     await new Promise(resolve => {
       setTimeout(resolve, 10);
     });
 
     mutex.release();
 
-    await Promise.all([task1, task2, task3]);
+    await task1;
+    await expect(task2).rejects.toThrow(MutexDisposedError);
+    await expect(task3).rejects.toThrow(MutexDisposedError);
 
     expect(results).toContain("task1");
-    expect(results).toContain("task2");
-    expect(results).toContain("task3");
-    expect(results.length).toBe(3);
+    expect(results).not.toContain("task2");
+    expect(results).not.toContain("task3");
+    expect(results.length).toBe(1);
     expect(mutex.isLocked).toBe(false);
   });
 
@@ -228,7 +234,7 @@ describe("Mutex", () => {
     ).rejects.toThrow("Mutex has been disposed");
   });
 
-  it("should allow queued tasks to complete but reject new ones after disposal", async () => {
+  it("should reject queued tasks and new tasks after disposal", async () => {
     const mutex = new Mutex();
     const results: string[] = [];
 
@@ -246,17 +252,20 @@ describe("Mutex", () => {
       return Promise.resolve();
     });
 
+    // Prevent unhandled rejection warning
+    task2.catch(() => {});
+
     await new Promise(resolve => {
       setTimeout(resolve, 10);
     });
 
     mutex.release();
 
-    await Promise.all([task1, task2]);
+    await task1;
+    await expect(task2).rejects.toThrow(MutexDisposedError);
 
     expect(results).toContain("task1");
-    expect(results).toContain("task2");
-    expect(results.length).toBe(2);
+    expect(results).not.toContain("task2");
 
     await expect(
       mutex.runAtomic(async () => {
@@ -266,7 +275,7 @@ describe("Mutex", () => {
       }),
     ).rejects.toThrow(MutexDisposedError);
 
-    expect(results.length).toBe(2);
+    expect(results.length).toBe(1);
   });
 
   it("should handle disposal with empty queue", async () => {

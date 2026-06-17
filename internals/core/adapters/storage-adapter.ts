@@ -24,6 +24,11 @@ export class StorageQuotaExceededError extends Error {
  */
 export interface StorageAdapter {
   /**
+   * Initialize the storage adapter and prepare resources.
+   */
+  init(): Promise<void>;
+
+  /**
    * Persist events to storage.
    *
    * @param events Array of events to save

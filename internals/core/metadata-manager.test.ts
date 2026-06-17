@@ -41,8 +41,8 @@ describe("MetadataManager", () => {
   });
 
   describe("getAll", () => {
-    it("should return empty object when no metadata set", () => {
-      expect(manager.getAll()).toEqual({});
+    it("should return null when no metadata set", () => {
+      expect(manager.getAll()).toEqual(null);
     });
 
     it("should return all metadata", () => {
@@ -55,14 +55,27 @@ describe("MetadataManager", () => {
       });
     });
 
-    it("should return a copy of metadata", () => {
+    it("should return a frozen cached snapshot", () => {
       manager.set("userId", "123");
 
       const metadata1 = manager.getAll();
       const metadata2 = manager.getAll();
 
-      expect(metadata1).not.toBe(metadata2);
-      expect(metadata1).toEqual(metadata2);
+      expect(metadata1).toBe(metadata2);
+      expect(Object.isFrozen(metadata1)).toBe(true);
+    });
+
+    it("should invalidate cache on set", () => {
+      manager.set("userId", "123");
+
+      const before = manager.getAll();
+
+      manager.set("sessionId", "abc");
+
+      const after = manager.getAll();
+
+      expect(before).not.toBe(after);
+      expect(after).toEqual({ userId: "123", sessionId: "abc" });
     });
   });
 
@@ -75,57 +88,6 @@ describe("MetadataManager", () => {
       manager.set("userId", "123");
 
       expect(manager.isEmpty()).toBe(false);
-    });
-  });
-
-  describe("merge", () => {
-    it("should return null when no shared or event metadata", () => {
-      expect(manager.merge()).toBeNull();
-    });
-
-    it("should return shared metadata when no event metadata", () => {
-      manager.set("userId", "123");
-      manager.set("sessionId", "abc");
-
-      expect(manager.merge()).toEqual({
-        userId: "123",
-        sessionId: "abc",
-      });
-    });
-
-    it("should return event metadata when no shared metadata", () => {
-      const eventMetadata = { schemaVersion: "1.0", eventType: "test" };
-
-      expect(manager.merge(eventMetadata)).toEqual(eventMetadata);
-    });
-
-    it("should merge shared and event metadata", () => {
-      manager.set("userId", "123");
-      manager.set("sessionId", "abc");
-
-      const eventMetadata = { schemaVersion: "1.0", eventType: "test" };
-      const result = manager.merge(eventMetadata);
-
-      expect(result).toEqual({
-        userId: "123",
-        sessionId: "abc",
-        schemaVersion: "1.0",
-        eventType: "test",
-      });
-    });
-
-    it("should prioritize event metadata over shared metadata", () => {
-      manager.set("userId", "123");
-      manager.set("schemaVersion", "0.5");
-
-      const eventMetadata = { schemaVersion: "1.0", eventType: "test" };
-      const result = manager.merge(eventMetadata);
-
-      expect(result).toEqual({
-        userId: "123",
-        schemaVersion: "1.0", // Event metadata takes precedence
-        eventType: "test",
-      });
     });
   });
 });

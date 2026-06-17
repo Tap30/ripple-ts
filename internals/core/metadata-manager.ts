@@ -7,6 +7,10 @@
 export class MetadataManager<TMetadata extends Record<string, unknown>> {
   #metadata: Partial<TMetadata> = {};
 
+  // We have set-once-read-many scenario.
+  // This will prevent unnecessary allocation pressure.
+  #snapshot: Partial<TMetadata> | null = null;
+
   /**
    * Set a metadata value.
    *
@@ -16,6 +20,9 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    */
   public set<K extends keyof TMetadata>(key: K, value: TMetadata[K]): void {
     this.#metadata[key] = value;
+
+    // Cache invalidation
+    this.#snapshot = null;
   }
 
   /**
@@ -23,8 +30,16 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    *
    * @returns All metadata or empty object if none set
    */
-  public getAll(): Partial<TMetadata> {
-    return { ...this.#metadata };
+  public getAll(): Partial<TMetadata> | null {
+    if (this.isEmpty()) return null;
+
+    if (!this.#snapshot) {
+      this.#snapshot = Object.freeze({
+        ...this.#metadata,
+      });
+    }
+
+    return this.#snapshot;
   }
 
   /**
@@ -41,20 +56,6 @@ export class MetadataManager<TMetadata extends Record<string, unknown>> {
    */
   public clear(): void {
     this.#metadata = {};
-  }
-
-  /**
-   * Merge shared metadata with event-specific metadata.
-   *
-   * @param eventMetadata Event-specific metadata
-   * @returns Merged metadata object
-   */
-  public merge(eventMetadata?: Partial<TMetadata>): TMetadata | null {
-    if (this.isEmpty() && !eventMetadata) return null;
-
-    return {
-      ...this.#metadata,
-      ...eventMetadata,
-    } as TMetadata;
+    this.#snapshot = null;
   }
 }

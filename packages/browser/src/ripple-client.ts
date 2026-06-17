@@ -1,35 +1,55 @@
 import {
   Client,
+  PREDEFINED_SCHEMA_VERSION,
+  type AppState,
+  type Campaign,
   type ClientConfig,
   type EventPayload,
   type Platform,
+  type ScreenPayload,
+  type SdkInfo,
+  type UserTraits,
   type WebPlatform,
 } from "@internals/core";
-import { UAParser } from "ua-parser-js";
-import { SessionManager } from "./session-manager.ts";
+import { SDK_INFO } from "./constants.ts";
+import { IdentityManager } from "./identity-manager.ts";
+import { calculatePlatformInfo } from "./utils.ts";
 
 /**
  * Browser-specific client configuration
  */
 export type BrowserClientConfig = ClientConfig & {
   /**
-   * Custom session storage key (default: "ripple_session_id")
+   * Custom session storage key for anonymous ID persistence (default: "ripple_session")
    */
   sessionStoreKey?: string;
 };
 
 /**
  * Ripple SDK client for browser environments.
- * Automatically tracks user sessions tied to browser session lifecycle.
+ * Automatically persists anonymous ID via sessionStorage.
  *
- * @template TEvents The type definition mapping event names to their payloads
+ * @template TCustomEvents Custom event definitions merged with predefined CDP events
  * @template TMetadata The type definition for metadata
  */
 export class RippleClient<
-  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
+  TCustomEvents extends Record<string, EventPayload> = Record<
+    string,
+    EventPayload
+  >,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
-> extends Client<TEvents, TMetadata> {
-  readonly #sessionManager: SessionManager;
+> extends Client<TCustomEvents, TMetadata> {
+  readonly #identityManager: IdentityManager;
+
+  #appState: AppState = "foreground";
+  #platformInfo: WebPlatform | null = null;
+
+  #onVisibilityChange = (): void => {
+    /* v8 ignore next -- @preserve */
+    const newState: AppState = document.hidden ? "background" : "foreground";
+
+    this.#trackAppStateChange(newState);
+  };
 
   /**
    * Create a new RippleClient instance.
@@ -37,13 +57,18 @@ export class RippleClient<
    * @param config Client configuration including required adapters
    */
   constructor(config: BrowserClientConfig) {
-    const finalConfig: ClientConfig = {
-      ...config,
-    };
+    super(config);
 
-    super(finalConfig);
+    this.#identityManager = new IdentityManager(config.sessionStoreKey);
+  }
 
-    this.#sessionManager = new SessionManager(config.sessionStoreKey);
+  /**
+   * Get SDK information for browser environment.
+   *
+   * @returns Web SDK information
+   */
+  protected override _getSdkInfo(): SdkInfo {
+    return SDK_INFO;
   }
 
   /**
@@ -52,55 +77,185 @@ export class RippleClient<
    * @returns Web platform information
    */
   protected _getPlatform(): Platform | null {
-    if (typeof navigator === "undefined") return null;
-
-    const parser = new UAParser(navigator.userAgent);
-
-    const browser = parser.getBrowser();
-    const device = parser.getDevice();
-    const os = parser.getOS();
-
-    return {
-      type: "web",
-      browser: {
-        name: browser.name?.toLowerCase() || "UNKNOWN",
-        version: browser.version?.toLowerCase() || "UNKNOWN",
-      },
-      device: {
-        name: device.type?.toLowerCase() || "desktop",
-        version: device.vendor?.toLowerCase() || "UNKNOWN",
-      },
-      os: {
-        name: os.name?.toLowerCase() || "UNKNOWN",
-        version: os.version?.toLowerCase() || "UNKNOWN",
-      },
-    } satisfies WebPlatform;
+    return this.#platformInfo;
   }
 
   /**
-   * Initialize the client, restore persisted events, and start session tracking.
-   * Should be called before tracking events.
+   * Initialize the client, restore persisted events, and restore anonymous ID.
    */
   public override async init(): Promise<void> {
-    this._sessionId = this.#sessionManager.init();
+    this._anonymousId = this.#identityManager.init();
+    this._userId = this.#identityManager.getUserId();
 
     await super.init();
+
+    this.#platformInfo = calculatePlatformInfo();
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.#onVisibilityChange);
+    }
   }
 
   /**
-   * Get the current session ID.
-   *
-   * @returns The session ID or null if not initialized
+   * Identify a user and persist the userId in sessionStorage.
    */
-  public override getSessionId(): string | null {
-    return this.#sessionManager.getSessionId();
+  public override async identify(
+    userId: string,
+    traits: UserTraits,
+  ): Promise<void> {
+    this.#identityManager.setUserId(userId);
+
+    return super.identify(userId, traits);
+  }
+
+  /**
+   * Track a screen/page view event.
+   * Automatically captures page title, URL, pathname, referrer, and search from the browser.
+   * Provided parameters take precedence over auto-captured values.
+   *
+   * @param payload Optional override for auto-captured screen data
+   */
+  public async screen(payload?: Partial<ScreenPayload>): Promise<void> {
+    const auto: ScreenPayload = {
+      title: this.#extractTitle(),
+      url: this.#extractUrl(),
+      pathname: this.#extractPathname(),
+      referrer: this.#extractReferrer(),
+      search: this.#extractSearch(),
+      keywords: this.#extractKeywords(),
+      campaign: this.#extractCampaign(),
+    };
+
+    return this._trackInternal(
+      "screened",
+      { ...auto, ...payload },
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+
+  /**
+   * Extract url from the documents's `title` field.
+   */
+  #extractTitle(): string {
+    if (typeof document !== "undefined") return document.title;
+
+    return "";
+  }
+
+  /**
+   * Extract url from the location's `href` field.
+   */
+  #extractUrl(): string {
+    if (typeof location !== "undefined") return location.href;
+
+    return "";
+  }
+
+  /**
+   * Extract url from the location's `pathname` field.
+   */
+  #extractPathname(): string | undefined {
+    if (typeof location !== "undefined") return location.pathname;
+
+    return undefined;
+  }
+
+  /**
+   * Extract url from the location's search field.
+   */
+  #extractSearch(): string | undefined {
+    if (typeof location !== "undefined") return location.search;
+
+    return undefined;
+  }
+
+  /**
+   * Extract referrer from the document's `referrer` field.
+   */
+  #extractReferrer(): string | undefined {
+    if (typeof document !== "undefined") return document.referrer;
+
+    return undefined;
+  }
+
+  /**
+   * Track an app opened state change.
+   */
+  public appOpened(): void {
+    this.#trackAppStateChange("opened");
+  }
+
+  /**
+   * Track an app closed state change.
+   */
+  public appClosed(): void {
+    this.#trackAppStateChange("closed");
+  }
+
+  #trackAppStateChange(newState: AppState): void {
+    const previousState = this.#appState;
+
+    this.#appState = newState;
+
+    void this._trackInternal(
+      "app_state_changed",
+      { newState, previousState },
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+
+  /**
+   * Extract keywords from the page's meta keywords tag.
+   */
+  #extractKeywords(): string[] | undefined {
+    if (typeof document === "undefined") return undefined;
+
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="keywords"]',
+    );
+
+    if (!meta?.content) return undefined;
+
+    return meta.content
+      .split(",")
+      .map(k => k.trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * Extract UTM campaign parameters from the current URL.
+   */
+  #extractCampaign(): Campaign | undefined {
+    if (typeof location === "undefined") return undefined;
+
+    const params = new URLSearchParams(location.search);
+    const source = params.get("utm_source");
+    const medium = params.get("utm_medium");
+
+    if (!source || !medium) return undefined;
+
+    return {
+      source,
+      medium,
+      name: params.get("utm_campaign") ?? undefined,
+      term: params.get("utm_term") ?? undefined,
+      content: params.get("utm_content") ?? undefined,
+    };
   }
 
   /**
    * Dispose the client and clean up resources including session management.
    */
   public override dispose(): void {
-    this.#sessionManager.clear();
+    /* v8 ignore next -- @preserve */
+    if (typeof document !== "undefined") {
+      document.removeEventListener(
+        "visibilitychange",
+        this.#onVisibilityChange,
+      );
+    }
+
+    this.#identityManager.clear();
     super.dispose();
   }
 }

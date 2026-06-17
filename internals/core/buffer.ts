@@ -1,39 +1,46 @@
 /**
- * Node in a singly linked list.
- *
- * @template T The type of value stored in the node
- */
-type Node<T> = {
-  value: T;
-  next: Node<T> | null;
-};
-
-/**
- * FIFO queue implementation using a singly linked list.
+ * Fixed-capacity FIFO ring buffer.
+ * When full, new enqueues overwrite the oldest element.
  *
  * @template T The type of elements in the buffer
  */
 export class Buffer<T> {
-  #head: Node<T> | null = null;
-  #tail: Node<T> | null = null;
+  readonly #items: (T | undefined)[];
+  readonly #capacity: number;
+
+  #head = 0;
   #length = 0;
 
   /**
+   * Create a ring buffer with the given capacity.
+   *
+   * @param capacity Maximum number of elements the buffer can hold
+   */
+  constructor(capacity: number) {
+    if (capacity < 1) {
+      throw new Error("Buffer capacity must be at least 1");
+    }
+
+    this.#capacity = capacity;
+    this.#items = new Array<T | undefined>(capacity);
+  }
+
+  /**
    * Add an element to the end of the buffer.
+   * If the buffer is full, the oldest element is evicted.
    *
    * @param value The value to enqueue
    */
   public enqueue(value: T): void {
-    const node: Node<T> = { value, next: null };
+    const tail = (this.#head + this.#length) % this.#capacity;
 
-    if (!this.#tail) {
-      this.#head = this.#tail = node;
+    this.#items[tail] = value;
+
+    if (this.#length === this.#capacity) {
+      this.#head = (this.#head + 1) % this.#capacity;
     } else {
-      this.#tail.next = node;
-      this.#tail = node;
+      this.#length++;
     }
-
-    this.#length++;
   }
 
   /**
@@ -42,14 +49,12 @@ export class Buffer<T> {
    * @returns The dequeued value, or null if buffer is empty
    */
   public dequeue(): T | null {
-    if (!this.#head) return null;
+    if (this.#length === 0) return null;
 
-    const value = this.#head.value;
+    const value = this.#items[this.#head] as T;
 
-    this.#head = this.#head.next;
-
-    if (!this.#head) this.#tail = null;
-
+    this.#items[this.#head] = undefined;
+    this.#head = (this.#head + 1) % this.#capacity;
     this.#length--;
 
     return value;
@@ -58,15 +63,13 @@ export class Buffer<T> {
   /**
    * Convert the buffer to an array.
    *
-   * @returns Array containing all buffer elements in order
+   * @returns Array containing all buffer elements in FIFO order
    */
   public toArray(): T[] {
     const result: T[] = [];
-    let current = this.#head;
 
-    while (current) {
-      result.push(current.value);
-      current = current.next;
+    for (let i = 0; i < this.#length; i++) {
+      result.push(this.#items[(this.#head + i) % this.#capacity] as T);
     }
 
     return result;
@@ -74,15 +77,20 @@ export class Buffer<T> {
 
   /**
    * Populate the buffer from an array.
-   * Clears existing buffer contents first.
+   * Clears existing contents. If the array exceeds capacity, only the
+   * last `capacity` items are kept (newest-win).
    *
    * @param items Array of items to add to the buffer
    */
   public fromArray(items: T[]): void {
     this.clear();
 
-    for (const item of items) {
-      this.enqueue(item);
+    const start =
+      items.length > this.#capacity ? items.length - this.#capacity : 0;
+
+    for (let i = start; i < items.length; i++) {
+      this.#items[this.#length] = items[i];
+      this.#length++;
     }
   }
 
@@ -90,7 +98,7 @@ export class Buffer<T> {
    * Remove all elements from the buffer.
    */
   public clear(): void {
-    this.#head = this.#tail = null;
+    this.#head = 0;
     this.#length = 0;
   }
 

@@ -1,21 +1,35 @@
-export * from "./adapters/fetch-http-adapter.ts";
-export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
+export * from "./storages/noop-storage.ts";
 
 export {
-  ConsoleLoggerAdapter,
+  ConsoleLogger,
+  HttpClient,
   LogLevel,
-  NoOpLoggerAdapter,
-  type ClientConfig,
+  NoOpLogger,
+  type AppState,
+  type BatchOptions,
+  type Category,
+  type Challenge,
+  type Checkout,
+  type Coupon,
   type Event,
   type EventPayload,
   type EventSampler,
   type HttpAdapter,
   type HttpAdapterContext,
   type HttpResponse,
+  type Incentive,
   type LoggerAdapter,
+  type Order,
+  type Payment,
   type Platform,
   type PlatformInfo,
+  type Product,
+  type Referral,
+  type RetryOptions,
   type ServerPlatform,
+  type Shipping,
   type StorageAdapter,
+  type TelemetryHooks,
+  type UserTraits,
 } from "@internals/core";

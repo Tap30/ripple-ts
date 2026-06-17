@@ -3,7 +3,7 @@ import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 /**
  * Default console logger implementation.
  */
-export class ConsoleLoggerAdapter implements LoggerAdapter {
+export class ConsoleLogger implements LoggerAdapter {
   readonly #level: LogLevel;
   readonly #levelOrder = [
     LogLevel.DEBUG,
@@ -58,7 +58,7 @@ export class ConsoleLoggerAdapter implements LoggerAdapter {
 /**
  * No-op logger that discards all log messages.
  */
-export class NoOpLoggerAdapter implements LoggerAdapter {
+export class NoOpLogger implements LoggerAdapter {
   public debug(_message: string, ..._args: unknown[]): void {}
   public info(_message: string, ..._args: unknown[]): void {}
   public warn(_message: string, ..._args: unknown[]): void {}

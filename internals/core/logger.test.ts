@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LogLevel } from "./adapters/logger-adapter.ts";
-import { ConsoleLoggerAdapter, NoOpLoggerAdapter } from "./logger.ts";
+import { ConsoleLogger, NoOpLogger } from "./logger.ts";
 
 describe("Logger", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("ConsoleLoggerAdapter", () => {
+  describe("ConsoleLogger", () => {
     it("should log debug messages when level is DEBUG", () => {
       const consoleSpy = vi
         .spyOn(console, "debug")
         .mockImplementation(() => {});
 
-      const logger = new ConsoleLoggerAdapter(LogLevel.DEBUG);
+      const logger = new ConsoleLogger(LogLevel.DEBUG);
 
       logger.debug("test message", { data: "test" });
 
@@ -24,7 +24,7 @@ describe("Logger", () => {
 
     it("should log info messages when level is INFO or lower", () => {
       const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const logger = new ConsoleLoggerAdapter(LogLevel.INFO);
+      const logger = new ConsoleLogger(LogLevel.INFO);
 
       logger.info("test message", { data: "test" });
 
@@ -35,7 +35,7 @@ describe("Logger", () => {
 
     it("should log warn messages when level is WARN or lower", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const logger = new ConsoleLoggerAdapter(LogLevel.WARN);
+      const logger = new ConsoleLogger(LogLevel.WARN);
 
       logger.warn("test message", { data: "test" });
 
@@ -49,7 +49,7 @@ describe("Logger", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      const logger = new ConsoleLoggerAdapter(LogLevel.ERROR);
+      const logger = new ConsoleLogger(LogLevel.ERROR);
 
       logger.error("test message", { data: "test" });
 
@@ -62,7 +62,7 @@ describe("Logger", () => {
       const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const logger = new ConsoleLoggerAdapter(LogLevel.ERROR);
+      const logger = new ConsoleLogger(LogLevel.ERROR);
 
       logger.debug("debug message");
       logger.info("info message");
@@ -76,7 +76,7 @@ describe("Logger", () => {
     it("should use WARN level by default", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const logger = new ConsoleLoggerAdapter();
+      const logger = new ConsoleLogger();
 
       logger.warn("warn message");
       logger.info("info message");
@@ -90,7 +90,7 @@ describe("Logger", () => {
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const logger = new ConsoleLoggerAdapter(LogLevel.NONE);
+      const logger = new ConsoleLogger(LogLevel.NONE);
 
       logger.debug("debug message");
       logger.info("info message");
@@ -110,7 +110,7 @@ describe("Logger", () => {
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const logger = new NoOpLoggerAdapter();
+      const logger = new NoOpLogger();
 
       logger.debug("debug message");
       logger.info("info message");

@@ -1,5 +1,12 @@
 # AI Agent Documentation
 
+## Memory Bank
+
+The `.memory_bank/` directory contains historical records of important design
+decisions, architectural changes, and tradeoffs. Before working on major
+changes, review relevant memory bank documents to understand the context and
+rationale behind existing decisions.
+
 ## Project Overview
 
 Ripple TypeScript is a high-performance event tracking SDK system with
@@ -11,6 +18,7 @@ TypeScript SDKs for Browser and Node.js environments.
 
 ```txt
 ripple-ts/
+├── .memory_bank/         # Design decisions and architecture history
 ├── packages/
 │   ├── browser/          # Browser SDK (@tapsioss/ripple-browser)
 │   └── node/             # Node.js SDK (@tapsioss/ripple-node)
@@ -26,49 +34,83 @@ ripple-ts/
 - **Dispatcher** - Buffer management, batching, retry logic with race condition
   prevention
 - **Adapters** - Pluggable HTTP, storage, and logger implementations
+- **Event Specs** - Predefined CDP events with full type safety
 
 ### Type Safety
 
 ```ts
-// Define event types mapping
-type AppEvents = {
-  "user.login": { email: string; method: "google" | "email" };
-  "page.view": { url: string; title: string };
+// Define custom event types (optional)
+type CustomEvents = {
+  "custom.event": { customField: string };
 };
 
 // Define metadata type
 type AppMetadata = {
-  userId: string;
-  sessionId: string;
-  schemaVersion: string;
+  appVersion: string;
+  buildNumber: string;
 };
 
-// Create typed client
-const client = new RippleClient<AppEvents, AppMetadata>(config);
+// Create typed client (PredefinedEvents + CustomEvents merged automatically)
+const client = new RippleClient<CustomEvents, AppMetadata>(config);
 
-// Type-safe tracking
-await client.track("user.login", {
-  email: "user@example.com",
-  method: "google",
+// Type-safe tracking with autocomplete for predefined events
+await client.track("product_viewed", {
+  product: {
+    productId: "123",
+    price: { amount: 29.99, currency: "USD" },
+  },
 });
+
+// Custom events with schema versioning
+await client.track("custom.event", { customField: "value" }, "1.0.0");
+
+// Identity and screen tracking
+await client.identify("user-123", { email: "user@example.com" });
+await client.screen({ title: "Product Detail", url: "/product/123" });
+
+// Global metadata
+client.setMetadata({ appVersion: "2.0.0", buildNumber: "456" });
 ```
+
+### Predefined Events
+
+Ripple V2 includes predefined CDP events covering the complete ecommerce funnel:
+
+- **Product Discovery:** `product_viewed`, `product_clicked`,
+  `products_searched`, `product_list_viewed`, `product_list_filtered`
+- **Cart & Wishlist:** `product_added_to_cart`, `cart_viewed`, `cart_emptied`,
+  `product_added_to_wishlist`
+- **Checkout:** `checkout_started`, `checkout_step_viewed`,
+  `checkout_step_completed`
+- **Orders:** `order_completed`, `order_shipped`, `order_refunded`,
+  `order_cancelled`
+- **Payments:** `payment_authorized`, `payment_captured`, `payment_failed`,
+  `payment_refunded`
+- **Coupons & Promotions:** `coupon_applied`, `coupon_denied`,
+  `promotion_viewed`
+
+See `internals/core/event-specs.ts` and `internals/core/types.ts` for type
+definitions.
 
 ## Key Features
 
 - **Type-Safe Event Tracking** - Generic TEvents parameter for compile-time
   safety
+- **Predefined CDP Events** - standard ecommerce events with full type safety
+- **Custom Event Support** - Merge custom events with predefined events
+  seamlessly
 - **Unified Metadata System** - Merges shared and event-specific metadata
 - **Automatic Batching** - Configurable batch size with auto-flush
 - **Dynamic Rebatching** - Automatically rebatches accumulated events during
   flush for optimal throughput
 - **Retry Logic** - Exponential backoff with jitter
-- **Event Persistence** - Automatic storage of unsent events with TTL and buffer
-  limits
+- **Event Persistence** - Automatic storage of unsent events with buffer limits
 - **Storage Availability Detection** - Static `isAvailable()` method on all
   storage adapters for graceful degradation
 - **Race Condition Prevention** - Mutex-protected operations and atomic
   IndexedDB transactions
 - **Custom Adapters** - Pluggable HTTP, storage, and logger implementations
+- **Auto-Capture** - Platform and SDK info automatically populated per event
 
 ## Technology Stack
 
@@ -92,7 +134,15 @@ pnpm clean          # Clean build artifacts
 - **Coverage**: 100% statements, branches, functions, lines
 - **Structure**: Tests co-located with source files `(\*.test.ts)`
 - **Environments**: `jsdom` for browser, node for Node.js
-- **Total**: 180 tests across all packages (140 browser + 40 node)
+- **Do NOT test**: Type-safety features (generics, type inference, compile-time
+  checks). These are validated by the TypeScript compiler, not at runtime.
+- **Concurrency**: Test enqueue-during-flush scenarios. Use the
+  `flush()+track()+flush()` pattern to force batching without relying on
+  `maxPayloadSize: 1`.
+- **Fire-and-forget**: Use `await new Promise(r => setTimeout(r, 0))` to flush
+  microtasks when asserting on fire-and-forget async operations.
+- **One behavior per test**: Each test should verify a single code path or
+  behavior.
 
 ## Code Guidelines
 
@@ -101,6 +151,7 @@ pnpm clean          # Clean build artifacts
 - Private members: `#` prefix (native ES private member syntax)
 - Public methods: Explicit `public` keyword
 - Use `interface` for OOP contracts, `type` for data structures
+- Event names: snake_case (e.g., `product_viewed`, `order_completed`)
 
 ### JSDoc Format
 
@@ -119,7 +170,17 @@ pnpm clean          # Clean build artifacts
 ```ts
 import { RippleClient } from "@tapsioss/ripple-browser";
 
-const client = new RippleClient<AppEvents, AppMetadata>({
+// Optional: define custom events
+type CustomEvents = {
+  "feature.enabled": { featureName: string };
+};
+
+type AppMetadata = {
+  appVersion: string;
+  environment: "prod" | "dev";
+};
+
+const client = new RippleClient<CustomEvents, AppMetadata>({
   apiKey: "your-api-key",
   endpoint: "https://api.example.com/events",
   httpAdapter: new FetchHttpAdapter(),
@@ -127,9 +188,20 @@ const client = new RippleClient<AppEvents, AppMetadata>({
 });
 
 await client.init();
-await client.track("user.login", {
+
+// Set global metadata
+client.setMetadata({ appVersion: "2.0.0", environment: "prod" });
+
+// Identify user
+await client.identify("user-123", {
   email: "user@example.com",
-  method: "google",
+  firstName: "John",
+});
+
+// Track custom events
+await client.track("feature.enabled", { featureName: "dark-mode" }, "1.0.0");
+
+// Flush and cleanup
 });
 await client.flush();
 client.dispose(); // Clean up when done
@@ -141,3 +213,5 @@ client.dispose(); // Clean up when done
 2. Ensure 100% test coverage
 3. Run `pnpm check:lint` and `pnpm test` before committing
 4. Follow commit convention: `feat:`, `fix:`, `docs:`, etc.
+5. Review `.memory_bank/` for context on design decisions
+6. Document major architectural changes in `.memory_bank/`

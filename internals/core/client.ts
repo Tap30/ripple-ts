@@ -1,11 +1,35 @@
 import { type HttpAdapter } from "./adapters/http-adapter.ts";
 import { LogLevel, type LoggerAdapter } from "./adapters/logger-adapter.ts";
 import { type StorageAdapter } from "./adapters/storage-adapter.ts";
-import { Dispatcher, type DispatcherConfig } from "./dispatcher.ts";
-import { ConsoleLoggerAdapter } from "./logger.ts";
+import {
+  Dispatcher,
+  type BatchOptions,
+  type DispatcherConfig,
+  type RetryOptions,
+} from "./dispatcher.ts";
+import {
+  PREDEFINED_SCHEMA_VERSION,
+  type ClickedPayload,
+  type ViewedPayload,
+} from "./event-specs.ts";
+import { EventsNamespace } from "./events-namespace.ts";
+import { HttpClient } from "./http-client.ts";
+import { ConsoleLogger } from "./logger.ts";
 import { MetadataManager } from "./metadata-manager.ts";
 import { Mutex } from "./mutex.ts";
-import type { Event, EventPayload, Platform } from "./types.ts";
+import {
+  createTelemetryHooks,
+  type TelemetryHooks,
+  type TelemetryOptions,
+} from "./telemetry.ts";
+import type {
+  Event,
+  EventPayload,
+  Platform,
+  SdkInfo,
+  UserTraits,
+} from "./types.ts";
+import { IdGenerator } from "./utils.ts";
 
 /**
  * Function to sample events before they are enqueued.
@@ -13,6 +37,8 @@ import type { Event, EventPayload, Platform } from "./types.ts";
 export type EventSampler<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > = (event: Event<TMetadata>) => boolean;
+
+export type { BatchOptions, RetryOptions };
 
 /**
  * Configuration for the Ripple client.
@@ -31,32 +57,33 @@ export type ClientConfig = {
    */
   apiKeyHeader?: string;
   /**
-   * Interval in milliseconds between automatic flushes (default: `5000`).
+   * Batching options controlling flush interval, batch size, and payload size limits.
    */
-  flushInterval?: number;
+  batchOptions?: BatchOptions;
   /**
-   * Maximum number of events before auto-flush (default: `10`).
+   * Retry options controlling retry attempts, delays, and backoff strategy.
    */
-  maxBatchSize?: number;
+  retryOptions?: RetryOptions;
   /**
-   * Maximum retry attempts for failed requests (default: `3`).
-   */
-  maxRetries?: number;
-  /**
-   * Maximum number of events to persist to storage (optional).
+   * Maximum number of events the in-memory buffer can hold (default: `50`).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
   maxBufferSize?: number;
   /**
-   * HTTP adapter for sending events.
+   * Per-event time-to-live in milliseconds.
+   * Events older than this (based on `issuedAt`) are dropped at flush time.
    */
-  httpAdapter: HttpAdapter;
+  eventTtl?: number;
+  /**
+   * HTTP adapter for sending events (default: built-in `HttpClient`).
+   */
+  httpAdapter?: HttpAdapter;
   /**
    * Storage adapter for persisting events.
    */
   storageAdapter: StorageAdapter;
   /**
-   * Logger adapter for SDK internal logging (default: `ConsoleLoggerAdapter` with `WARN` level).
+   * Logger adapter for SDK internal logging (default: `ConsoleLogger` with `WARN` level).
    */
   loggerAdapter?: LoggerAdapter;
   /**
@@ -64,25 +91,46 @@ export type ClientConfig = {
    * Return `true` to keep the event, `false` to drop it.
    */
   eventSampler?: EventSampler;
+  /**
+   * Telemetry hooks for production monitoring (fire-and-forget).
+   */
+  hooks?: TelemetryHooks;
+  /**
+   * Automatic telemetry reporting configuration.
+   * When enabled, the SDK sends internal metrics to the specified endpoint.
+   */
+  telemetryOptions?: TelemetryOptions;
 };
 
 /**
  * Abstract base class for Ripple SDK clients.
  * Provides core event tracking functionality with type-safe metadata management.
  *
- * @template TEvents The type definition mapping event names to their payloads
+ * @template TCustomEvents Custom event definitions merged with predefined CDP events
  * @template TMetadata The type definition for metadata
  */
 export abstract class Client<
-  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
+  TCustomEvents extends Record<string, EventPayload> = Record<
+    string,
+    EventPayload
+  >,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
   protected readonly _metadataManager: MetadataManager<TMetadata>;
   protected readonly _dispatcher: Dispatcher<TMetadata>;
+  protected readonly _storage: StorageAdapter;
   protected readonly _logger: LoggerAdapter;
   protected readonly _sampler: EventSampler;
 
-  protected _sessionId: string | null = null;
+  readonly #hooks: TelemetryHooks;
+
+  /**
+   * Typed namespace for predefined CDP events.
+   */
+  public readonly events: EventsNamespace;
+
+  protected _anonymousId: string;
+  protected _userId: string | null = null;
 
   readonly #initMutex = new Mutex();
 
@@ -95,10 +143,8 @@ export abstract class Client<
    * @param config Client configuration including adapters
    */
   constructor(config: ClientConfig) {
-    if (!config.httpAdapter || !config.storageAdapter) {
-      throw new Error(
-        "Both `httpAdapter` and `storageAdapter` must be provided in `config`.",
-      );
+    if (!config.storageAdapter) {
+      throw new Error("`storageAdapter` must be provided in `config`.");
     }
 
     if (!config.apiKey) {
@@ -109,16 +155,59 @@ export abstract class Client<
       throw new Error("`endpoint` must be provided in `config`.");
     }
 
-    if (config.flushInterval !== undefined && config.flushInterval <= 0) {
-      throw new Error("`flushInterval` must be a positive number.");
+    if (
+      config.batchOptions?.interval !== undefined &&
+      config.batchOptions.interval <= 0
+    ) {
+      throw new Error("`batchOptions.interval` must be a positive number.");
     }
 
-    if (config.maxBatchSize !== undefined && config.maxBatchSize <= 0) {
-      throw new Error("`maxBatchSize` must be a positive number.");
+    if (
+      config.batchOptions?.size !== undefined &&
+      config.batchOptions.size <= 0
+    ) {
+      throw new Error("`batchOptions.size` must be a positive number.");
     }
 
-    if (config.maxRetries !== undefined && config.maxRetries < 0) {
-      throw new Error("`maxRetries` must be a non-negative number.");
+    if (
+      config.batchOptions?.maxPayloadSize !== undefined &&
+      config.batchOptions.maxPayloadSize <= 0
+    ) {
+      throw new Error(
+        "`batchOptions.maxPayloadSize` must be a positive number.",
+      );
+    }
+
+    if (
+      config.retryOptions?.maxAttempts !== undefined &&
+      config.retryOptions.maxAttempts < 0
+    ) {
+      throw new Error(
+        "`retryOptions.maxAttempts` must be a non-negative number.",
+      );
+    }
+
+    if (
+      config.retryOptions?.minDelay !== undefined &&
+      config.retryOptions.minDelay <= 0
+    ) {
+      throw new Error("`retryOptions.minDelay` must be a positive number.");
+    }
+
+    if (
+      config.retryOptions?.maxDelay !== undefined &&
+      config.retryOptions.maxDelay <= 0
+    ) {
+      throw new Error("`retryOptions.maxDelay` must be a positive number.");
+    }
+
+    if (
+      config.retryOptions?.backoffFactor !== undefined &&
+      config.retryOptions.backoffFactor <= 0
+    ) {
+      throw new Error(
+        "`retryOptions.backoffFactor` must be a positive number.",
+      );
     }
 
     if (config.maxBufferSize !== undefined && config.maxBufferSize <= 0) {
@@ -132,28 +221,95 @@ export abstract class Client<
       throw new Error("`eventSampler` must be a function.");
     }
 
-    this._sampler = config.eventSampler ?? (() => true);
-    this._logger =
-      config.loggerAdapter ?? new ConsoleLoggerAdapter(LogLevel.WARN);
+    const {
+      apiKey,
+      endpoint,
+      storageAdapter,
+      httpAdapter = new HttpClient(),
+      hooks = {},
+      eventSampler = () => true,
+      maxBufferSize = 50,
+      eventTtl = null,
+      telemetryOptions = null,
+      apiKeyHeader = "X-API-Key",
+      loggerAdapter = new ConsoleLogger(LogLevel.WARN),
+    } = config;
+
+    const {
+      interval: batchInterval = 10000,
+      maxPayloadSize: batchMaxPayloadSize = 64 * 1024,
+      size: batchSize = 10,
+    } = config.batchOptions ?? {};
+
+    const {
+      backoffFactor: retryBackoffFactor = 2,
+      maxAttempts: retryMaxAttempts = 3,
+      maxDelay: retryMaxDelay = 360000,
+      minDelay: retryMinDelay = 1000,
+    } = config.retryOptions ?? {};
+
+    this._sampler = eventSampler;
+    this._anonymousId = this._generateAnonymousId();
+    this._logger = loggerAdapter;
+    this.events = new EventsNamespace(this);
     this._metadataManager = new MetadataManager<TMetadata>();
+    this._storage = storageAdapter;
+
+    this.#hooks = createTelemetryHooks(hooks, telemetryOptions, {
+      apiKey,
+      apiKeyHeader,
+      getUserId: this.getUserId,
+      getMetadata: this.getMetadata,
+      getAnonymousId: this.getAnonymousId,
+      getPlatform: this._getPlatform,
+      getSdk: this._getSdkInfo,
+    });
 
     const dispatcherConfig: DispatcherConfig = {
-      apiKey: config.apiKey,
-      endpoint: config.endpoint,
-      apiKeyHeader: config.apiKeyHeader ?? "X-API-Key",
-      flushInterval: config.flushInterval ?? 5000,
-      maxBatchSize: config.maxBatchSize ?? 10,
-      maxRetries: config.maxRetries ?? 3,
-      maxBufferSize: config.maxBufferSize ?? Number.MAX_SAFE_INTEGER,
-      loggerAdapter: this._logger,
+      apiKey,
+      endpoint,
+      apiKeyHeader,
+      maxBufferSize,
+      eventTtl,
+      batchOptions: {
+        interval: batchInterval,
+        size: batchSize,
+        maxPayloadSize: batchMaxPayloadSize,
+      },
+      retryOptions: {
+        maxAttempts: retryMaxAttempts,
+        minDelay: retryMinDelay,
+        maxDelay: retryMaxDelay,
+        backoffFactor: retryBackoffFactor,
+      },
+      hooks: this.#hooks,
+      logger: this._logger,
     };
 
     this._dispatcher = new Dispatcher<TMetadata>(
       dispatcherConfig,
-      config.httpAdapter,
-      config.storageAdapter,
+      httpAdapter,
+      storageAdapter,
     );
   }
+
+  /**
+   * Generate a unique anonymous ID for this client instance.
+   * Can be overridden by subclasses to provide custom ID generation or persistence.
+   *
+   * @returns A unique anonymous identifier string
+   */
+  protected _generateAnonymousId(): string {
+    return IdGenerator.generate();
+  }
+
+  /**
+   * Get SDK information for the current runtime.
+   * Must be implemented by runtime-specific clients.
+   *
+   * @returns SDK information
+   */
+  protected abstract _getSdkInfo(): SdkInfo;
 
   /**
    * Get platform information for the current runtime.
@@ -164,36 +320,98 @@ export abstract class Client<
   protected abstract _getPlatform(): Platform | null;
 
   /**
+   * Identify a user and associate traits with their profile.
+   *
+   * @param userId The authenticated user's unique identifier
+   * @param traits User profile attributes (e.g., name, email)
+   */
+  public async identify(userId: string, traits: UserTraits): Promise<void> {
+    this._userId = userId;
+
+    return this._trackInternal(
+      "user_identified",
+      { userId, traits },
+      PREDEFINED_SCHEMA_VERSION,
+    );
+  }
+
+  /**
+   * Track a click interaction on a UI element.
+   *
+   * @param payload Click event data including element identifier
+   */
+  public async clicked(payload: ClickedPayload): Promise<void> {
+    return this._trackInternal("clicked", payload, PREDEFINED_SCHEMA_VERSION);
+  }
+
+  /**
+   * Track a view impression of a UI element.
+   *
+   * @param payload View event data including element identifier
+   */
+  public async viewed(payload: ViewedPayload): Promise<void> {
+    return this._trackInternal("viewed", payload, PREDEFINED_SCHEMA_VERSION);
+  }
+
+  /**
+   * Internal method for tracking predefined/internal events without generic constraints.
+   * Used by convenience methods.
+   *
+   * @param name Event name
+   * @param payload Event payload
+   * @param schemaVersion Schema version
+   */
+  protected async _trackInternal(
+    name: string,
+    payload: EventPayload,
+    schemaVersion: string,
+  ): Promise<void> {
+    return this.track(
+      name,
+      payload as TCustomEvents[keyof TCustomEvents],
+      schemaVersion,
+    );
+  }
+
+  /**
    * Track an event.
    * Automatically initializes the client if not already initialized.
    *
    * @param name Event name/identifier
    * @param payload Event data payload
-   * @param metadata Event-specific metadata
+   * @param schemaVersion Event schema version
    */
-  public async track<K extends keyof TEvents>(
+  public async track<K extends keyof TCustomEvents>(
     name: K,
-    payload?: TEvents[K],
-    metadata?: Partial<TMetadata>,
+    payload?: TCustomEvents[K],
+    schemaVersion?: string,
   ): Promise<void> {
     if (this.#disposed) {
       this._logger.warn("Cannot track event: Client has been disposed");
 
-      return Promise.resolve();
+      return;
     }
 
     await this.init();
 
     const event: Event<TMetadata> = {
+      eventId: IdGenerator.generate(),
+      anonymousId: this._anonymousId,
+      userId: this._userId,
       name: name as string,
-      metadata: this._metadataManager.merge(metadata),
+      schemaVersion: schemaVersion ?? null,
       payload: payload ?? null,
       issuedAt: Date.now(),
-      sessionId: this._sessionId,
+      metadata: this.getMetadata(),
+      sdk: this._getSdkInfo(),
       platform: this._getPlatform(),
     };
 
-    if (!this._sampler(event)) return;
+    if (!this._sampler(event)) {
+      this.#hooks.onDrop?.({ eventCount: 1, reason: "sampled" });
+
+      return;
+    }
 
     return this._dispatcher.enqueue(event);
   }
@@ -216,19 +434,28 @@ export abstract class Client<
   /**
    * Get all current metadata.
    *
-   * @returns All metadata or empty object if none set
+   * @returns All metadata or null if none set
    */
-  public getMetadata(): Partial<TMetadata> {
+  public getMetadata(): Partial<TMetadata> | null {
     return this._metadataManager.getAll();
   }
 
   /**
-   * Get the current session ID.
+   * Get the anonymous ID.
    *
-   * @returns Current session ID or null if not set
+   * @returns Anonymous ID
    */
-  public getSessionId(): string | null {
-    return this._sessionId;
+  public getAnonymousId(): string {
+    return this._anonymousId;
+  }
+
+  /**
+   * Get the user ID.
+   *
+   * @returns User ID or null if not set
+   */
+  public getUserId(): string | null {
+    return this._userId;
   }
 
   /**
@@ -240,19 +467,19 @@ export abstract class Client<
 
   /**
    * Initialize the client and restore persisted events.
-   * Must be called before tracking events.
    */
   public async init(): Promise<void> {
-    if (this.#initialized) return await Promise.resolve();
+    if (this.#initialized) return;
 
     if (this.#disposed) {
       this.#disposed = false;
       this.#initMutex.reset();
     }
 
-    await this.#initMutex.runAtomic(async () => {
-      if (this.#initialized) return await Promise.resolve();
+    return this.#initMutex.runAtomic(async () => {
+      if (this.#initialized) return;
 
+      await this._storage.init();
       await this._dispatcher.restore();
 
       this.#initialized = true;
@@ -267,8 +494,10 @@ export abstract class Client<
     this._dispatcher.dispose();
     this._metadataManager.clear();
     this.#initMutex.release();
+
+    this._userId = null;
     this.#disposed = true;
-    this._sessionId = null;
+    this._anonymousId = "";
     this.#initialized = false;
   }
 }

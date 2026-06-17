@@ -1,25 +1,38 @@
-export * from "./adapters/fetch-http-adapter.ts";
-export * from "./adapters/indexed-db-adapter.ts";
-export * from "./adapters/local-storage-adapter.ts";
-export * from "./adapters/noop-storage-adapter.ts";
 export * from "./ripple-client.ts";
+export * from "./storages/noop-storage.ts";
+export * from "./storages/web-storage.ts";
 
 export {
-  ConsoleLoggerAdapter,
+  ConsoleLogger,
+  HttpClient,
   LogLevel,
-  NoOpLoggerAdapter,
+  NoOpLogger,
   StorageQuotaExceededError,
-  type ClientConfig,
+  type AppState,
+  type BatchOptions,
+  type Category,
+  type Challenge,
+  type Checkout,
+  type Coupon,
   type Event,
   type EventPayload,
   type EventSampler,
   type HttpAdapter,
   type HttpAdapterContext,
   type HttpResponse,
+  type Incentive,
   type LoggerAdapter,
   type NativePlatform,
+  type Order,
+  type Payment,
   type Platform,
   type PlatformInfo,
+  type Product,
+  type Referral,
+  type RetryOptions,
+  type Shipping,
   type StorageAdapter,
+  type TelemetryHooks,
+  type UserTraits,
   type WebPlatform,
 } from "@internals/core";

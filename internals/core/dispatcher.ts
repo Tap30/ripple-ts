@@ -5,9 +5,50 @@ import {
   type StorageAdapter,
 } from "./adapters/storage-adapter.ts";
 import { Buffer } from "./buffer.ts";
-import { Mutex } from "./mutex.ts";
+import { Mutex, MutexDisposedError } from "./mutex.ts";
+import type { TelemetryHooks } from "./telemetry.ts";
 import type { Event } from "./types.ts";
 import { calculateBackoff, delay, DelayAbortedError } from "./utils.ts";
+
+/**
+ * Batching configuration.
+ */
+export type BatchOptions = {
+  /**
+   * Interval in milliseconds between automatic flushes (default: `10000`).
+   */
+  interval?: number;
+  /**
+   * Maximum number of events per batch before auto-flush (default: `10`).
+   */
+  size?: number;
+  /**
+   * Maximum total serialized payload size in bytes per batch before auto-flush (default: `65536` — 64 KB).
+   */
+  maxPayloadSize?: number;
+};
+
+/**
+ * Retry configuration.
+ */
+export type RetryOptions = {
+  /**
+   * Maximum number of retry attempts per request (default: `3`).
+   */
+  maxAttempts?: number;
+  /**
+   * Minimum delay in milliseconds before the first retry (default: `1000`).
+   */
+  minDelay?: number;
+  /**
+   * Maximum delay in milliseconds between retries (default: `360000`).
+   */
+  maxDelay?: number;
+  /**
+   * Multiplicative factor applied to the delay on each retry (default: `2`).
+   */
+  backoffFactor?: number;
+};
 
 /**
  * Configuration for the Dispatcher.
@@ -26,26 +67,32 @@ export type DispatcherConfig = {
    */
   endpoint: string;
   /**
-   * Interval in milliseconds between automatic flushes
+   * Batching options
    */
-  flushInterval: number;
+  batchOptions: Required<BatchOptions>;
   /**
-   * Maximum number of events before auto-flush
+   * Retry options
    */
-  maxBatchSize: number;
-  /**
-   * Maximum retry attempts for failed requests
-   */
-  maxRetries: number;
+  retryOptions: Required<RetryOptions>;
   /**
    * Logger for internal logging
    */
-  loggerAdapter: LoggerAdapter;
+  logger: LoggerAdapter;
   /**
    * Maximum size of the in-memory event buffer (optional).
    * When limit is exceeded, oldest events are evicted using FIFO policy.
    */
   maxBufferSize: number;
+  /**
+   * Per-event time-to-live in milliseconds.
+   * Events older than this are filtered out at flush time.
+   * `null` means no expiry.
+   */
+  eventTtl: number | null;
+  /**
+   * Telemetry hooks for monitoring.
+   */
+  hooks: TelemetryHooks;
 };
 
 /**
@@ -58,41 +105,45 @@ export type DispatcherConfig = {
 export class Dispatcher<
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
 > {
-  #buffer = new Buffer<Event<TMetadata>>();
-  #timer: ReturnType<typeof setTimeout> | null = null;
+  #buffer!: Buffer<Event<TMetadata>>;
   #flushMutex = new Mutex();
-  #disposed = false;
+  #storageMutex = new Mutex();
   #retryAbortController = new AbortController();
 
+  #timer: ReturnType<typeof setTimeout> | null = null;
+
+  #disposed = false;
+
   readonly #config: DispatcherConfig;
-  readonly #httpAdapter: HttpAdapter;
-  readonly #storageAdapter: StorageAdapter;
+  readonly #httpClient: HttpAdapter;
+  readonly #storage: StorageAdapter;
   readonly #logger: LoggerAdapter;
 
   /**
    * Create a new Dispatcher instance.
    *
    * @param config Dispatcher configuration
-   * @param httpAdapter HTTP adapter for sending events
-   * @param storageAdapter Storage adapter for persisting events
+   * @param httpClient HTTP adapter for sending events
+   * @param storage Storage adapter for persisting events
    */
   constructor(
     config: DispatcherConfig,
-    httpAdapter: HttpAdapter,
-    storageAdapter: StorageAdapter,
+    httpClient: HttpAdapter,
+    storage: StorageAdapter,
   ) {
     // Validate configuration
-    if (config.maxBufferSize < config.maxBatchSize) {
+    if (config.maxBufferSize < config.batchOptions.size) {
       throw new Error(
-        `Invalid configuration: maxBufferSize (${config.maxBufferSize}) must be >= maxBatchSize (${config.maxBatchSize}). ` +
+        `Invalid configuration: maxBufferSize (${config.maxBufferSize}) must be >= batchOptions.size (${config.batchOptions.size}). ` +
           `The batch size will never be reached and events will be dropped unnecessarily.`,
       );
     }
 
     this.#config = config;
-    this.#httpAdapter = httpAdapter;
-    this.#storageAdapter = storageAdapter;
-    this.#logger = config.loggerAdapter;
+    this.#httpClient = httpClient;
+    this.#storage = storage;
+    this.#logger = config.logger;
+    this.#buffer = new Buffer<Event<TMetadata>>(config.maxBufferSize);
   }
 
   /**
@@ -105,27 +156,18 @@ export class Dispatcher<
     if (this.#disposed) {
       this.#logger.warn("Cannot enqueue event: Dispatcher has been disposed");
 
-      return Promise.resolve();
+      return;
     }
 
     this.#buffer.enqueue(event);
+    this.#config.hooks.onEnqueue?.({ bufferSize: this.#buffer.size() });
 
-    try {
-      const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
+    // Fire-and-forget: the in-memory buffer is the source of truth here.
+    // Persistence is a best-effort durability snapshot; callers shouldn't
+    // block on disk I/O in the hot path.
+    void this.#persistBuffer();
 
-      await this.#storageAdapter.save(eventsToSave);
-    } catch (err) {
-      if (err instanceof StorageQuotaExceededError) {
-        this.#logger.warn(err.message);
-      } else {
-        this.#logger.error("Failed to persist events to storage", {
-          error: err instanceof Error ? err.message : String(err),
-          queueSize: this.#buffer.size(),
-        });
-      }
-    }
-
-    if (this.#buffer.size() >= this.#config.maxBatchSize) {
+    if (this.#buffer.size() >= this.#config.batchOptions.size) {
       await this.flush();
     } else {
       this.#scheduleFlush();
@@ -136,9 +178,14 @@ export class Dispatcher<
    * Immediately flush all queued events.
    * Cancels any scheduled flush.
    * Uses mutex to prevent concurrent flush operations.
-   * Events are sent in batches according to `maxBatchSize` (dynamic rebatching).
    */
   public async flush(): Promise<void> {
+    /*
+      Drains the buffer incrementally via dequeue(), building and sending one
+      batch at a time. This streaming approach avoids allocating intermediate
+      arrays (no toArray + filterExpired + createBatches), keeping peak memory
+      at ~1 batch size regardless of total buffer contents.
+    */
     await this.#flushMutex.runAtomic(async () => {
       if (this.#timer) {
         clearTimeout(this.#timer);
@@ -147,34 +194,88 @@ export class Dispatcher<
 
       if (this.#buffer.isEmpty()) return;
 
-      const allEvents = this.#buffer.toArray();
+      const { size, maxPayloadSize } = this.#config.batchOptions;
+      const ttl = this.#config.eventTtl;
+      const now = ttl !== null ? Date.now() : 0;
 
-      this.#buffer.clear();
+      let totalEvents = 0;
+      let totalBatches = 0;
+      let droppedCount = 0;
 
-      for (let i = 0; i < allEvents.length; i += this.#config.maxBatchSize) {
-        const batch = allEvents.slice(i, i + this.#config.maxBatchSize);
+      let batch: Event<TMetadata>[] = [];
+      let batchPayloadSize = 0;
 
-        await this.#sendWithRetry(batch);
+      // Drain the buffer one event at a time. For each event:
+      // 1. Filter expired events inline (no separate pass)
+      // 2. Check if adding it would overflow the current batch
+      // 3. If overflow: send the current batch, then start a new one
+      while (!this.#buffer.isEmpty()) {
+        const event = this.#buffer.dequeue()!;
+
+        // Inline TTL filtering — skip expired events without allocating a filtered array
+        if (ttl !== null && now - event.issuedAt > ttl) {
+          droppedCount++;
+
+          continue;
+        }
+
+        const eventSize = JSON.stringify(event).length;
+
+        // Batch boundary: send current batch when adding this event would
+        // exceed either the count limit or payload size limit
+        if (
+          batch.length > 0 &&
+          (batch.length >= size ||
+            batchPayloadSize + eventSize > maxPayloadSize)
+        ) {
+          totalEvents += batch.length;
+          totalBatches++;
+
+          const success = await this.#sendWithRetry(batch);
+
+          if (!success) {
+            // On failure, requeue the failed batch + the current event (already
+            // dequeued but not yet in any batch). Remaining buffer events are
+            // preserved since they haven't been dequeued yet.
+            await this.#requeueBatch([...batch, event]);
+
+            return;
+          }
+
+          batch = [];
+          batchPayloadSize = 0;
+        }
+
+        batch.push(event);
+        batchPayloadSize += eventSize;
+      }
+
+      if (droppedCount > 0) {
+        this.#config.hooks.onDrop?.({
+          eventCount: droppedCount,
+          reason: "expired",
+        });
+      }
+
+      // Send the trailing batch (events that didn't trigger an overflow)
+      if (batch.length > 0) {
+        totalEvents += batch.length;
+        totalBatches++;
+
+        this.#config.hooks.onFlush?.({
+          eventCount: totalEvents,
+          batchCount: totalBatches,
+        });
+
+        const success = await this.#sendWithRetry(batch);
+
+        if (!success) {
+          await this.#requeueBatch(batch);
+
+          return;
+        }
       }
     });
-  }
-
-  /**
-   * Apply persisted buffer limit using FIFO eviction.
-   *
-   * Note: With the validation requiring maxBufferSize >= maxBatchSize,
-   * this limit is primarily enforced during restore() when loading
-   * persisted events that may exceed the buffer limit.
-   *
-   * @param events Events to apply limit to
-   * @returns Events after applying limit
-   */
-  #applyBufferLimit(events: Event<TMetadata>[]): Event<TMetadata>[] {
-    if (events.length > this.#config.maxBufferSize) {
-      return events.slice(-this.#config.maxBufferSize);
-    }
-
-    return events;
   }
 
   /**
@@ -182,13 +283,14 @@ export class Dispatcher<
    *
    * @param events Events to send
    * @param attempt Current retry attempt number
+   * @returns Whether the send was successful (or non-retryable)
    */
   async #sendWithRetry(
     events: Event<TMetadata>[],
     attempt: number = 0,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
-      const response = await this.#httpAdapter.send({
+      const response = await this.#httpClient.send({
         events,
         endpoint: this.#config.endpoint,
         headers: {
@@ -198,9 +300,9 @@ export class Dispatcher<
         apiKeyHeader: this.#config.apiKeyHeader,
       });
 
-      await this.#handleResponse(response, events, attempt);
+      return await this.#handleResponse(response, events, attempt);
     } catch (err) {
-      await this.#handleNetworkError(err, events, attempt);
+      return await this.#handleNetworkError(err, events, attempt);
     }
   }
 
@@ -210,23 +312,40 @@ export class Dispatcher<
    * @param response HTTP response
    * @param events Events that were sent
    * @param attempt Current retry attempt
+   * @returns Whether the request was successful (or non-retryable)
    */
   async #handleResponse(
     response: { status: number },
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (response.status >= 200 && response.status < 300) {
-      await this.#clearStorage("Failed to clear storage after successful send");
+      // Awaited: storage must reflect the drained buffer before flush
+      // completes, otherwise a crash + restore would re-send these events.
+      await this.#persistBuffer();
+
+      this.#config.hooks.onSendSuccess?.({
+        batchSize: events.length,
+        status: response.status,
+      });
+
+      return true;
     } else if (response.status >= 400 && response.status < 500) {
       this.#logger.warn("4xx client error, dropping events", {
         status: response.status,
         eventsCount: events.length,
       });
 
-      await this.#clearStorage("Failed to clear storage after 4xx error");
+      await this.#persistBuffer();
+
+      this.#config.hooks.onDrop?.({
+        eventCount: events.length,
+        reason: "client_error",
+      });
+
+      return true;
     } else if (response.status >= 500) {
-      await this.#handleServerError(response.status, events, attempt);
+      return await this.#handleServerError(response.status, events, attempt);
     } else {
       // 1xx, 3xx: Unexpected status codes, treat as client error and drop
       this.#logger.warn("Unexpected status code, dropping events", {
@@ -234,9 +353,9 @@ export class Dispatcher<
         eventsCount: events.length,
       });
 
-      await this.#clearStorage(
-        "Failed to clear storage after unexpected status",
-      );
+      await this.#persistBuffer();
+
+      return true;
     }
   }
 
@@ -246,28 +365,39 @@ export class Dispatcher<
    * @param status HTTP status code
    * @param events Events to retry
    * @param attempt Current retry attempt
+   * @returns Whether the retry eventually succeeded
    */
   async #handleServerError(
     status: number,
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
-    if (attempt < this.#config.maxRetries) {
+  ): Promise<boolean> {
+    if (attempt < this.#config.retryOptions.maxAttempts) {
       this.#logger.warn("5xx server error, retrying", {
         status,
         attempt: attempt + 1,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
       });
 
       try {
-        await delay(
-          calculateBackoff(attempt),
-          this.#retryAbortController.signal,
+        const backoffDelay = calculateBackoff(
+          attempt,
+          this.#config.retryOptions.minDelay,
+          this.#config.retryOptions.maxDelay,
+          this.#config.retryOptions.backoffFactor,
         );
-        await this.#sendWithRetry(events, attempt + 1);
+
+        this.#config.hooks.onRetry?.({
+          attempt: attempt + 1,
+          delay: backoffDelay,
+        });
+
+        await delay(backoffDelay, this.#retryAbortController.signal);
+
+        return await this.#sendWithRetry(events, attempt + 1);
       } catch (err) {
         /* v8 ignore next -- @preserve */
-        if (err instanceof DelayAbortedError) return;
+        if (err instanceof DelayAbortedError) return false;
 
         /* v8 ignore next -- @preserve */
         throw err;
@@ -275,14 +405,17 @@ export class Dispatcher<
     } else {
       this.#logger.error("5xx server error, max retries reached", {
         status,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         eventsCount: events.length,
       });
 
-      await this.#requeueEvents(
-        events,
-        "Failed to persist events after max retries",
-      );
+      this.#config.hooks.onSendFailure?.({
+        batchSize: events.length,
+        error: `5xx: ${status}`,
+        attempt,
+      });
+
+      return false;
     }
   }
 
@@ -292,96 +425,103 @@ export class Dispatcher<
    * @param err Error that occurred
    * @param events Events to retry
    * @param attempt Current retry attempt
+   * @returns Whether the retry eventually succeeded
    */
   async #handleNetworkError(
     err: unknown,
     events: Event<TMetadata>[],
     attempt: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     /* v8 ignore next -- @preserve */
-    if (err instanceof DelayAbortedError) return;
+    if (err instanceof DelayAbortedError) return false;
 
     this.#logger.error("Network error occurred", { err });
 
-    if (attempt < this.#config.maxRetries) {
+    if (attempt < this.#config.retryOptions.maxAttempts) {
       this.#logger.warn("Network error, retrying", {
         attempt: attempt + 1,
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         error: err instanceof Error ? err.message : String(err),
       });
 
       try {
-        await delay(
-          calculateBackoff(attempt),
-          this.#retryAbortController.signal,
+        const backoffDelay = calculateBackoff(
+          attempt,
+          this.#config.retryOptions.minDelay,
+          this.#config.retryOptions.maxDelay,
+          this.#config.retryOptions.backoffFactor,
         );
-        await this.#sendWithRetry(events, attempt + 1);
+
+        this.#config.hooks.onRetry?.({
+          attempt: attempt + 1,
+          delay: backoffDelay,
+        });
+
+        await delay(backoffDelay, this.#retryAbortController.signal);
+
+        return await this.#sendWithRetry(events, attempt + 1);
       } catch (delayErr) {
         /* v8 ignore next -- @preserve */
-        if (delayErr instanceof DelayAbortedError) return;
+        if (delayErr instanceof DelayAbortedError) return false;
 
         /* v8 ignore next -- @preserve */
         throw delayErr;
       }
     } else {
       this.#logger.error("Network error, max retries reached", {
-        maxRetries: this.#config.maxRetries,
+        maxRetries: this.#config.retryOptions.maxAttempts,
         eventsCount: events.length,
         /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
       });
 
-      await this.#requeueEvents(
-        events,
-        "Failed to persist events after network error",
-      );
-    }
-  }
-
-  /**
-   * Clear storage and log errors if clearing fails.
-   *
-   * @param errorMessage Error message to log on failure
-   */
-  async #clearStorage(errorMessage: string): Promise<void> {
-    try {
-      await this.#storageAdapter.clear();
-    } catch (err) {
-      this.#logger.error(errorMessage, {
+      this.#config.hooks.onSendFailure?.({
+        batchSize: events.length,
+        /* v8 ignore next -- @preserve */
         error: err instanceof Error ? err.message : String(err),
+        attempt,
       });
+
+      return false;
     }
   }
 
   /**
-   * Re-queue events and persist to storage.
-   *
-   * @param events Events to re-queue
-   * @param errorMessage Error message to log if save fails
+   * Persist current buffer state to storage.
+   * Serialized via mutex to prevent stale overwrites.
    */
-  async #requeueEvents(
-    events: Event<TMetadata>[],
-    errorMessage: string,
-  ): Promise<void> {
-    const currentBuffer = this.#buffer.toArray();
-
-    this.#buffer.fromArray([...events, ...currentBuffer]);
-
+  async #persistBuffer(): Promise<void> {
     try {
-      const eventsToSave = this.#applyBufferLimit(this.#buffer.toArray());
-
-      await this.#storageAdapter.save(eventsToSave);
+      await this.#storageMutex.runAtomic(async () => {
+        await this.#storage.save(this.#buffer.toArray());
+      });
     } catch (err) {
+      /* v8 ignore next -- @preserve */
+      if (err instanceof MutexDisposedError) return;
+
       if (err instanceof StorageQuotaExceededError) {
         this.#logger.warn(err.message);
       } else {
-        this.#logger.error(errorMessage, {
-          /* v8 ignore next -- @preserve */
+        this.#logger.error("Failed to persist events to storage", {
           error: err instanceof Error ? err.message : String(err),
-          eventsCount: this.#buffer.size(),
+          queueSize: this.#buffer.size(),
         });
       }
     }
+  }
+
+  /**
+   * Re-queue a failed batch plus any remaining buffered events and persist to storage.
+   *
+   * @param batch The failed batch to re-queue
+   * @param errorMessage Error message to log if save fails
+   */
+  async #requeueBatch(batch: Event<TMetadata>[]): Promise<void> {
+    const merged = [...batch, ...this.#buffer.toArray()];
+
+    this.#buffer.fromArray(merged);
+
+    await this.#persistBuffer();
   }
 
   /**
@@ -393,7 +533,7 @@ export class Dispatcher<
 
     this.#timer = setTimeout(() => {
       void this.flush();
-    }, this.#config.flushInterval);
+    }, this.#config.batchOptions.interval);
   }
 
   /**
@@ -402,6 +542,7 @@ export class Dispatcher<
   #reset(): void {
     this.#disposed = false;
     this.#flushMutex.reset();
+    this.#storageMutex.reset();
     this.#retryAbortController = new AbortController();
   }
 
@@ -413,10 +554,9 @@ export class Dispatcher<
     this.#reset();
 
     try {
-      const stored = await this.#storageAdapter.load();
-      const limited = this.#applyBufferLimit(stored as Event<TMetadata>[]);
+      const stored = await this.#storage.load();
 
-      this.#buffer.fromArray(limited);
+      this.#buffer.fromArray(stored as Event<TMetadata>[]);
 
       if (this.#buffer.size() > 0) {
         this.#scheduleFlush();
@@ -443,6 +583,7 @@ export class Dispatcher<
 
     this.#buffer.clear();
     this.#flushMutex.release();
-    void this.#storageAdapter.close();
+    this.#storageMutex.release();
+    void this.#storage.close();
   }
 }

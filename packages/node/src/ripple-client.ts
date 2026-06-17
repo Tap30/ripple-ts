@@ -1,10 +1,13 @@
 import {
   Client,
+  PREDEFINED_SCHEMA_VERSION,
   type ClientConfig,
   type EventPayload,
   type Platform,
-  type ServerPlatform,
+  type ScreenPayload,
+  type SdkInfo,
 } from "@internals/core";
+import { PLATFORM_INFO, SDK_INFO } from "./constants.ts";
 
 /**
  * Node.js-specific client configuration
@@ -14,24 +17,32 @@ export type NodeClientConfig = ClientConfig;
 /**
  * Ripple SDK client for Node.js environments.
  *
- * @template TEvents The type definition mapping event names to their payloads
+ * @template TCustomEvents Custom event definitions merged with predefined CDP events
  * @template TMetadata The type definition for metadata
  */
 export class RippleClient<
-  TEvents extends Record<string, EventPayload> = Record<string, EventPayload>,
+  TCustomEvents extends Record<string, EventPayload> = Record<
+    string,
+    EventPayload
+  >,
   TMetadata extends Record<string, unknown> = Record<string, unknown>,
-> extends Client<TEvents, TMetadata> {
+> extends Client<TCustomEvents, TMetadata> {
   /**
    * Create a new RippleClient instance.
    *
    * @param config Client configuration including required adapters
    */
   constructor(config: NodeClientConfig) {
-    const finalConfig: ClientConfig = {
-      ...config,
-    };
+    super(config);
+  }
 
-    super(finalConfig);
+  /**
+   * Get SDK information for node environment.
+   *
+   * @returns Node SDK information
+   */
+  protected override _getSdkInfo(): SdkInfo {
+    return SDK_INFO;
   }
 
   /**
@@ -40,8 +51,16 @@ export class RippleClient<
    * @returns Server platform information
    */
   protected _getPlatform(): Platform | null {
-    return {
-      type: "server",
-    } satisfies ServerPlatform;
+    return PLATFORM_INFO;
+  }
+
+  /**
+   * Track a screen/page view event.
+   *
+   * @param payload Screen event data (required in Node.js)
+   * @param schemaVersion Event schema version
+   */
+  public async screen(payload: ScreenPayload): Promise<void> {
+    return this._trackInternal("screened", payload, PREDEFINED_SCHEMA_VERSION);
   }
 }

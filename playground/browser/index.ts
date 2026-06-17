@@ -1,47 +1,46 @@
 import {
-  ConsoleLoggerAdapter,
-  FetchHttpAdapter,
-  IndexedDBAdapter,
+  ConsoleLogger,
   LogLevel,
   RippleClient,
+  WebStorage,
 } from "@tapsioss/ripple-browser";
 
-const client = new RippleClient({
+type CustomEvents = {
+  button_click: Record<string, unknown>;
+  user_action: { action: string; target: string; timestamp: number };
+  form_submit: { formId: string; fields: number };
+  batch_event: { index: number };
+  rebatch_event: { index: number; timestamp: number };
+  refresh_test: { beforeRefresh: boolean };
+  metadata_test: Record<string, unknown>;
+};
+
+const client = new RippleClient<CustomEvents>({
   endpoint: "http://localhost:3000/events",
   apiKey: "test-api-key",
-  maxBatchSize: 5,
-  maxRetries: 3,
-  flushInterval: 5000,
+  batchOptions: { size: 5, interval: 5000 },
+  retryOptions: { maxAttempts: 3 },
   sessionStoreKey: "my_app_session",
-  httpAdapter: new FetchHttpAdapter(),
-  storageAdapter: new IndexedDBAdapter(),
-  loggerAdapter: new ConsoleLoggerAdapter(LogLevel.DEBUG),
+  storageAdapter: new WebStorage(),
+  loggerAdapter: new ConsoleLogger(LogLevel.DEBUG),
 });
 
 await client.init();
 
 const createButton = (props: {
   label: string;
-  onClick: (event: MouseEvent) => void;
+  onClick: () => void;
   variant?: "primary" | "secondary" | "danger";
 }): HTMLButtonElement => {
-  const { label, onClick, variant = "primary" } = props;
-
   const btn = document.createElement("button");
 
-  btn.textContent = label;
+  btn.textContent = props.label;
   btn.style.cssText = `
-    margin: 5px;
-    padding: 10px 15px;
-    font-size: 14px;
-    cursor: pointer;
-    border: none;
-    border-radius: 4px;
-    background: ${variant === "danger" ? "#dc3545" : variant === "secondary" ? "#6c757d" : "#007bff"};
-    color: white;
+    margin: 5px; padding: 10px 15px; font-size: 14px; cursor: pointer;
+    border: none; border-radius: 4px; color: white;
+    background: ${props.variant === "danger" ? "#dc3545" : props.variant === "secondary" ? "#6c757d" : "#007bff"};
   `;
-
-  btn.addEventListener("click", onClick);
+  btn.addEventListener("click", props.onClick);
 
   return btn;
 };
@@ -49,283 +48,225 @@ const createButton = (props: {
 const createSection = (title: string): HTMLDivElement => {
   const section = document.createElement("div");
 
-  section.style.cssText = `
-    margin: 20px 0;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  `;
+  section.style.cssText =
+    "margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px;";
 
   const heading = document.createElement("h3");
 
   heading.textContent = title;
-  heading.style.cssText = "margin-top: 0;";
   section.appendChild(heading);
 
   return section;
 };
 
-const createLog = (): {
-  element: HTMLDivElement;
-  log: (message: string) => void;
-  clear: () => void;
-} => {
-  const logDiv = document.createElement("div");
+const logDiv = document.createElement("div");
 
-  logDiv.style.cssText = `
-    margin: 10px 0;
-    padding: 10px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 12px;
-  `;
+logDiv.style.cssText =
+  "padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;";
+document.body.appendChild(logDiv);
 
-  const log = (message: string): void => {
-    const entry = document.createElement("div");
+const log = (msg: string) => {
+  const entry = document.createElement("div");
 
-    entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    logDiv.appendChild(entry);
-    logDiv.scrollTop = logDiv.scrollHeight;
-  };
-
-  const clear = (): void => {
-    logDiv.innerHTML = "";
-  };
-
-  return { element: logDiv, log, clear };
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logDiv.appendChild(entry);
+  logDiv.scrollTop = logDiv.scrollHeight;
 };
 
-const logger = createLog();
+// Predefined Events Section
+const predefinedSection = createSection(
+  "Predefined CDP Events (client.events.*)",
+);
 
-document.body.appendChild(logger.element);
+document.body.appendChild(predefinedSection);
 
-const basicSection = createSection("Basic Event Tracking");
+predefinedSection.appendChild(
+  createButton({
+    label: "Product Viewed",
+    onClick: () => {
+      void client.events
+        .productViewed({
+          product: {
+            productId: "p-123",
+            price: { amount: 29.99, currency: "USD" },
+          },
+        })
+        .then(() => log("events.productViewed tracked"));
+    },
+  }),
+);
 
-document.body.appendChild(basicSection);
+predefinedSection.appendChild(
+  createButton({
+    label: "Order Completed",
+    onClick: () => {
+      void client.events
+        .orderCompleted({
+          order: {
+            orderId: "ord-456",
+            products: [
+              { productId: "p-123", price: { amount: 29.99, currency: "USD" } },
+            ],
+            totalValue: { amount: 34.99, currency: "USD" },
+          },
+        })
+        .then(() => log("events.orderCompleted tracked"));
+    },
+  }),
+);
 
-const trackSimpleBtn = createButton({
-  label: "Track Simple Event",
-  onClick: () => {
-    void (async () => {
-      await client.track("button_click");
-      logger.log("Tracked: button_click");
-    })();
-  },
-});
+predefinedSection.appendChild(
+  createButton({
+    label: "Payment Captured",
+    onClick: () => {
+      void client.events
+        .paymentCaptured({
+          payment: {
+            paymentId: "pay-1",
+            order: {
+              orderId: "ord-456",
+              products: [
+                {
+                  productId: "p-123",
+                  price: { amount: 29.99, currency: "USD" },
+                },
+              ],
+              totalValue: { amount: 34.99, currency: "USD" },
+            },
+            method: "credit_card",
+            value: { amount: 34.99, currency: "USD" },
+          },
+        })
+        .then(() => log("events.paymentCaptured tracked"));
+    },
+  }),
+);
 
-const trackWithPayloadBtn = createButton({
-  label: "Track Event with Payload",
-  onClick: () => {
-    void (async () => {
-      await client.track("user_action", {
-        action: "click",
-        target: "button",
-        timestamp: Date.now(),
-      });
-      logger.log("Tracked: user_action with payload");
-    })();
-  },
-});
+// Convenience Methods Section
+const convenienceSection = createSection("Convenience Methods");
 
-const trackWithMetadataBtn = createButton({
-  label: "Track Event with Metadata",
-  onClick: () => {
-    void (async () => {
-      await client.track(
-        "form_submit",
-        { formId: "contact-form", fields: 5 },
-        {
-          schemaVersion: "1.0.0",
-          eventType: "user_interaction",
-          source: "web",
-        },
-      );
-      logger.log("Tracked: form_submit with typed metadata");
-    })();
-  },
-});
+document.body.appendChild(convenienceSection);
 
-const trackWithCustomMetadataBtn = createButton({
-  label: "Track with Custom Metadata",
-  onClick: () => {
-    void (async () => {
-      await client.track(
-        "purchase_completed",
-        { orderId: "order-123", amount: 99.99 },
-        {
-          schemaVersion: "2.1.0",
-          eventType: "conversion",
-          source: "checkout_page",
-          experimentId: "exp-456",
-          timestamp: Date.now(),
-        },
-      );
-      logger.log("Tracked: purchase_completed with rich metadata");
-    })();
-  },
-});
+convenienceSection.appendChild(
+  createButton({
+    label: "Identify User",
+    onClick: () => {
+      void client
+        .identify("user-123", { email: "user@example.com", firstName: "John" })
+        .then(() => log("identify() tracked"));
+    },
+  }),
+);
 
-basicSection.appendChild(trackSimpleBtn);
-basicSection.appendChild(trackWithPayloadBtn);
-basicSection.appendChild(trackWithMetadataBtn);
-basicSection.appendChild(trackWithCustomMetadataBtn);
+convenienceSection.appendChild(
+  createButton({
+    label: "Click Event",
+    onClick: () => {
+      void client
+        .clicked({ elementId: "buy-btn", elementType: "button" })
+        .then(() => log("clicked() tracked"));
+    },
+  }),
+);
 
-const metadataSection = createSection("Metadata Management");
+convenienceSection.appendChild(
+  createButton({
+    label: "Screen (Auto-Capture)",
+    onClick: () => {
+      void client.screen().then(() => log("screen() tracked (auto-captured)"));
+    },
+  }),
+);
 
-document.body.appendChild(metadataSection);
+convenienceSection.appendChild(
+  createButton({
+    label: "Open App",
+    onClick: () => {
+      client.appOpened();
+      log("appOpened() tracked");
+    },
+  }),
+);
 
-const setMetadataBtn = createButton({
-  label: "Set Metadata",
-  onClick: () => {
-    const random = Math.random().toString(36).substring(7);
+convenienceSection.appendChild(
+  createButton({
+    label: "Close App",
+    onClick: () => {
+      client.appClosed();
+      log("appClosed() tracked");
+    },
+  }),
+);
 
-    client.setMetadata(`key_${random}`, `value_${random}`);
-    logger.log(`Set metadata: key_${random}`);
-  },
-});
+// Custom Events Section
+const customSection = createSection("Custom Events (client.track)");
 
-const trackWithSharedMetadataBtn = createButton({
-  label: "Track with Shared Metadata",
-  onClick: () => {
-    void (async () => {
-      await client.track("metadata_test");
-      logger.log("Tracked event with shared metadata");
-    })();
-  },
-});
+document.body.appendChild(customSection);
 
-metadataSection.appendChild(setMetadataBtn);
-metadataSection.appendChild(trackWithSharedMetadataBtn);
+customSection.appendChild(
+  createButton({
+    label: "Track Custom Event",
+    onClick: () => {
+      void client
+        .track("form_submit", { formId: "contact", fields: 5 }, "1.0.0")
+        .then(() => log("track() custom event with schemaVersion"));
+    },
+  }),
+);
 
-const batchSection = createSection("Batch and Flush");
+// Batch Section
+const batchSection = createSection("Batch & Flush");
 
 document.body.appendChild(batchSection);
 
-const trackMultipleBtn = createButton({
-  label: "Track 10 Events (Batch Test)",
-  onClick: () => {
-    void (async () => {
-      for (let i = 0; i < 10; i++) {
-        await client.track("batch_event", { index: i });
-      }
+batchSection.appendChild(
+  createButton({
+    label: "Track 10 Events",
+    onClick: () => {
+      void (async () => {
+        for (let i = 0; i < 10; i++)
+          await client.track("batch_event", { index: i });
+        log("Tracked 10 events (auto-flush at size 5)");
+      })();
+    },
+  }),
+);
 
-      logger.log("Tracked 10 events (should auto-flush at batch size 5)");
-    })();
-  },
-});
+batchSection.appendChild(
+  createButton({
+    label: "Manual Flush",
+    onClick: () => {
+      void client.flush().then(() => log("Flushed"));
+    },
+    variant: "secondary",
+  }),
+);
 
-const trackRebatchBtn = createButton({
-  label: "Test Dynamic Rebatching (25 Events)",
-  onClick: () => {
-    void (async () => {
-      logger.log("Simulating offline accumulation with 25 events...");
-
-      for (let i = 0; i < 25; i++) {
-        await client.track("rebatch_event", {
-          index: i,
-          timestamp: Date.now(),
-        });
-      }
-
-      logger.log(
-        "Tracked 25 events - flush will rebatch into 5 batches of 5 events each",
-      );
-      logger.log("Check Network tab to see multiple batch requests");
-    })();
-  },
-});
-
-const manualFlushBtn = createButton({
-  label: "Manual Flush",
-  onClick: () => {
-    void (async () => {
-      await client.flush();
-      logger.log("Manually flushed events");
-    })();
-  },
-  variant: "secondary",
-});
-
-batchSection.appendChild(trackMultipleBtn);
-batchSection.appendChild(trackRebatchBtn);
-batchSection.appendChild(manualFlushBtn);
-
-const unloadSection = createSection("Page Unload");
-
-document.body.appendChild(unloadSection);
-
-const testRefreshBtn = createButton({
-  label: "Track & Refresh Page",
-  onClick: () => {
-    void (async () => {
-      await client.track("refresh_test", { beforeRefresh: true });
-      logger.log("Tracked event. Refreshing in 1 second...");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    })();
-  },
-});
-
-unloadSection.appendChild(testRefreshBtn);
-
-const errorSection = createSection("Error Handling");
-
-document.body.appendChild(errorSection);
-
-const testRetryBtn = createButton({
-  label: "Test Retry Logic (Invalid Endpoint)",
-  onClick: () => {
-    void (async () => {
-      const errorClient = new RippleClient({
-        endpoint: "http://localhost:9999/invalid",
-        apiKey: "test-key",
-        maxRetries: 2,
-        httpAdapter: new FetchHttpAdapter(),
-        storageAdapter: new IndexedDBAdapter(),
-        loggerAdapter: new ConsoleLoggerAdapter(LogLevel.WARN),
-      });
-
-      await errorClient.init();
-      await errorClient.track("error_test", { shouldFail: true });
-      logger.log(
-        "Tracked event to invalid endpoint (check console for retries)",
-      );
-    })();
-  },
-});
-
-errorSection.appendChild(testRetryBtn);
-
-const lifecycleSection = createSection("Lifecycle Management");
+// Lifecycle Section
+const lifecycleSection = createSection("Lifecycle");
 
 document.body.appendChild(lifecycleSection);
 
-const disposeBtn = createButton({
-  label: "Dispose Client",
-  onClick: () => {
-    client.dispose();
-    logger.log("Client disposed (event listeners removed)");
-  },
-  variant: "danger",
-});
+lifecycleSection.appendChild(
+  createButton({
+    label: "Dispose",
+    onClick: () => {
+      client.dispose();
+      log("Disposed");
+    },
+    variant: "danger",
+  }),
+);
 
-const clearLogBtn = createButton({
-  label: "Clear Log",
-  onClick: () => {
-    logger.clear();
-  },
-  variant: "secondary",
-});
+lifecycleSection.appendChild(
+  createButton({
+    label: "Clear Log",
+    onClick: () => {
+      logDiv.innerHTML = "";
+    },
+    variant: "secondary",
+  }),
+);
 
-lifecycleSection.appendChild(disposeBtn);
-lifecycleSection.appendChild(clearLogBtn);
-
-// Initial log
-logger.log("Browser playground initialized");
-logger.log("Client ready with IndexedDB storage");
-logger.log("Open DevTools Network tab to see requests");
+log("Browser playground initialized");
+log(`Anonymous ID: ${client.getAnonymousId()}`);
