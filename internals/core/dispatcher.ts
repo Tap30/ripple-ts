@@ -162,20 +162,10 @@ export class Dispatcher<
     this.#buffer.enqueue(event);
     this.#config.hooks.onEnqueue?.({ bufferSize: this.#buffer.size() });
 
-    await this.#storageMutex.runAtomic(async () => {
-      try {
-        await this.#storage.save(this.#buffer.toArray());
-      } catch (err) {
-        if (err instanceof StorageQuotaExceededError) {
-          this.#logger.warn(err.message);
-        } else {
-          this.#logger.error("Failed to persist events to storage", {
-            error: err instanceof Error ? err.message : String(err),
-            queueSize: this.#buffer.size(),
-          });
-        }
-      }
-    });
+    // Fire-and-forget: the in-memory buffer is the source of truth here.
+    // Persistence is a best-effort durability snapshot; callers shouldn't
+    // block on disk I/O in the hot path.
+    void this.#persistBuffer();
 
     if (this.#buffer.size() >= this.#config.batchOptions.size) {
       await this.flush();
@@ -336,7 +326,9 @@ export class Dispatcher<
     attempt: number,
   ): Promise<boolean> {
     if (response.status >= 200 && response.status < 300) {
-      await this.#clearStorage("Failed to clear storage after successful send");
+      // Awaited: storage must reflect the drained buffer before flush
+      // completes, otherwise a crash + restore would re-send these events.
+      await this.#persistBuffer();
 
       this.#config.hooks.onSendSuccess?.({
         batchSize: events.length,
@@ -350,7 +342,7 @@ export class Dispatcher<
         eventsCount: events.length,
       });
 
-      await this.#clearStorage("Failed to clear storage after 4xx error");
+      await this.#persistBuffer();
 
       this.#config.hooks.onDrop?.({
         eventCount: events.length,
@@ -367,9 +359,7 @@ export class Dispatcher<
         eventsCount: events.length,
       });
 
-      await this.#clearStorage(
-        "Failed to clear storage after unexpected status",
-      );
+      await this.#persistBuffer();
 
       return true;
     }
@@ -503,22 +493,26 @@ export class Dispatcher<
   }
 
   /**
-   * Clear storage and log errors if clearing fails.
-   *
-   * @param errorMessage Error message to log on failure
+   * Persist current buffer state to storage.
+   * Serialized via mutex to prevent stale overwrites.
    */
-  async #clearStorage(errorMessage: string): Promise<void> {
+  async #persistBuffer(): Promise<void> {
     try {
       await this.#storageMutex.runAtomic(async () => {
-        await this.#storage.clear();
+        await this.#storage.save(this.#buffer.toArray());
       });
     } catch (err) {
       /* v8 ignore next -- @preserve */
       if (err instanceof MutexDisposedError) return;
 
-      this.#logger.error(errorMessage, {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      if (err instanceof StorageQuotaExceededError) {
+        this.#logger.warn(err.message);
+      } else {
+        this.#logger.error("Failed to persist events to storage", {
+          error: err instanceof Error ? err.message : String(err),
+          queueSize: this.#buffer.size(),
+        });
+      }
     }
   }
 

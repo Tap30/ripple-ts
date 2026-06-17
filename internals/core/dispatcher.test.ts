@@ -83,7 +83,7 @@ describe("Dispatcher", () => {
   });
 
   describe("enqueue", () => {
-    it("should add event to buffer and persist", async () => {
+    it("should add event to buffer and persist (fire-and-forget)", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const config = createConfig();
@@ -94,10 +94,12 @@ describe("Dispatcher", () => {
       });
 
       await dispatcher.enqueue(createEvent("test"));
-
-      expect(storageAdapter.save).toHaveBeenCalledWith([
-        expect.objectContaining({ name: "test" }),
-      ]);
+      // Fire-and-forget: allow persist to complete
+      await vi.waitFor(() => {
+        expect(storageAdapter.save).toHaveBeenCalledWith([
+          expect.objectContaining({ name: "test" }),
+        ]);
+      });
     });
 
     it("should trigger auto-flush when batch size reached", async () => {
@@ -177,7 +179,7 @@ describe("Dispatcher", () => {
   });
 
   describe("flush", () => {
-    it("should send queued events and clear storage", async () => {
+    it("should send queued events and persist buffer state", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const dispatcher = new Dispatcher(
@@ -191,7 +193,8 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(httpAdapter.send).toHaveBeenCalled();
-      expect(storageAdapter.clear).toHaveBeenCalled();
+      // After successful send, persists current (empty) buffer
+      expect(storageAdapter.save).toHaveBeenLastCalledWith([]);
     });
 
     it("should do nothing if buffer is empty", async () => {
@@ -385,7 +388,8 @@ describe("Dispatcher", () => {
         "4xx client error, dropping events",
         expect.any(Object),
       );
-      expect(storageAdapter.clear).toHaveBeenCalled();
+      // Persists current (empty) buffer instead of clearing
+      expect(storageAdapter.save).toHaveBeenLastCalledWith([]);
     });
 
     it("should drop events on unexpected status codes (3xx)", async () => {
@@ -414,7 +418,8 @@ describe("Dispatcher", () => {
         "Unexpected status code, dropping events",
         expect.any(Object),
       );
-      expect(storageAdapter.clear).toHaveBeenCalled();
+      // Persists current (empty) buffer instead of clearing
+      expect(storageAdapter.save).toHaveBeenLastCalledWith([]);
     });
 
     it("should retry on exception", async () => {
@@ -826,11 +831,13 @@ describe("Dispatcher", () => {
       });
 
       await dispatcher.enqueue(createEvent("event1"));
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to persist events to storage",
-        expect.objectContaining({ error: "Save error", queueSize: 1 }),
-      );
+      // Fire-and-forget: wait for persist to complete
+      await vi.waitFor(() => {
+        expect(errorSpy).toHaveBeenCalledWith(
+          "Failed to persist events to storage",
+          expect.objectContaining({ error: "Save error", queueSize: 1 }),
+        );
+      });
     });
 
     it("should log warning when StorageQuotaExceededError during enqueue", async () => {
@@ -852,13 +859,15 @@ describe("Dispatcher", () => {
       });
 
       await dispatcher.enqueue(createEvent("event1"));
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Storage quota exceeded"),
-      );
+      // Fire-and-forget: wait for persist to complete
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Storage quota exceeded"),
+        );
+      });
     });
 
-    it("should log error when clear fails after successful send", async () => {
+    it("should log error when persist fails after successful send", async () => {
       const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
@@ -866,9 +875,11 @@ describe("Dispatcher", () => {
       const storageAdapter = createMockStorageAdapter();
       const config = createConfig({ logger });
 
-      vi.mocked(storageAdapter.clear).mockRejectedValue(
-        new Error("Clear error"),
-      );
+      // First save (fire-and-forget from enqueue) succeeds,
+      // second save (persist after flush) fails
+      vi.mocked(storageAdapter.save)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("Save error"));
 
       const dispatcher = createDispatcher({
         config,
@@ -880,12 +891,12 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to clear storage after successful send",
-        expect.objectContaining({ error: "Clear error" }),
+        "Failed to persist events to storage",
+        expect.objectContaining({ error: "Save error" }),
       );
     });
 
-    it("should log error when clear fails after 4xx error", async () => {
+    it("should log error when persist fails after 4xx error", async () => {
       const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
@@ -894,9 +905,11 @@ describe("Dispatcher", () => {
       const config = createConfig({ logger });
 
       vi.mocked(httpAdapter.send).mockResolvedValue({ status: 400 });
-      vi.mocked(storageAdapter.clear).mockRejectedValue(
-        new Error("Clear error"),
-      );
+      // First save (fire-and-forget from enqueue) succeeds,
+      // second save (persist after flush) fails
+      vi.mocked(storageAdapter.save)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("Save error"));
 
       const dispatcher = createDispatcher({
         config,
@@ -908,8 +921,8 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to clear storage after 4xx error",
-        expect.objectContaining({ error: "Clear error" }),
+        "Failed to persist events to storage",
+        expect.objectContaining({ error: "Save error" }),
       );
     });
 
@@ -1004,14 +1017,16 @@ describe("Dispatcher", () => {
       });
 
       await dispatcher.enqueue(createEvent("event1"));
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to persist events to storage",
-        expect.objectContaining({ error: "string error" }),
-      );
+      // Fire-and-forget: wait for persist to complete
+      await vi.waitFor(() => {
+        expect(errorSpy).toHaveBeenCalledWith(
+          "Failed to persist events to storage",
+          expect.objectContaining({ error: "string error" }),
+        );
+      });
     });
 
-    it("should handle non-Error objects in clear errors", async () => {
+    it("should handle non-Error objects in persist errors after send", async () => {
       const logger = new NoOpLogger();
       const errorSpy = vi.spyOn(logger, "error");
 
@@ -1019,7 +1034,11 @@ describe("Dispatcher", () => {
       const storageAdapter = createMockStorageAdapter();
       const config = createConfig({ logger });
 
-      vi.mocked(storageAdapter.clear).mockRejectedValue("string error");
+      // First save (fire-and-forget from enqueue) succeeds,
+      // second save (persist after flush) fails with non-Error
+      vi.mocked(storageAdapter.save)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce("string error");
 
       const dispatcher = createDispatcher({
         config,
@@ -1031,7 +1050,7 @@ describe("Dispatcher", () => {
       await dispatcher.flush();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to clear storage after successful send",
+        "Failed to persist events to storage",
         expect.objectContaining({ error: "string error" }),
       );
     });
@@ -1056,22 +1075,26 @@ describe("Dispatcher", () => {
         await dispatcher.enqueue(createEvent(`event${i}`));
       }
 
-      const lastCall = vi.mocked(storageAdapter.save).mock
-        .lastCall![0] as Array<{ name: string }>;
+      // Wait for fire-and-forget persists to settle
+      await vi.waitFor(() => {
+        const lastCall = vi.mocked(storageAdapter.save).mock
+          .lastCall![0] as Array<{ name: string }>;
 
-      expect(lastCall).toHaveLength(5);
-      expect(lastCall[0]?.name).toBe("event21");
-      expect(lastCall[4]?.name).toBe("event25");
+        expect(lastCall).toHaveLength(5);
+        expect(lastCall[0]?.name).toBe("event21");
+        expect(lastCall[4]?.name).toBe("event25");
+      });
     });
 
     it("should apply limit when buffer exceeds maxBufferSize", async () => {
       const httpAdapter = createMockHttpAdapter();
       const storageAdapter = createMockStorageAdapter();
       const config = createConfig({
-        batchOptions: { interval: 5000, size: 10, maxPayloadSize: 65536 },
-        maxBufferSize: 12,
+        batchOptions: { interval: 5000, size: 13, maxPayloadSize: 65536 },
+        maxBufferSize: 13,
       });
 
+      // Load 15 events — buffer capacity is 13, so oldest 2 are evicted
       const persistedEvents = Array.from({ length: 15 }, (_, i) =>
         createEvent(`persisted${i + 1}`),
       );
@@ -1085,14 +1108,26 @@ describe("Dispatcher", () => {
       });
 
       await dispatcher.restore();
-      await dispatcher.enqueue(createEvent("new1"));
+      // Buffer now has 13 events (persisted3..persisted15)
+      // Enqueue triggers flush since 13 >= batchSize(13), so instead
+      // just verify via flush that eviction happened
+      await dispatcher.flush();
 
-      const lastCall = vi.mocked(storageAdapter.save).mock
-        .lastCall![0] as Array<{ name: string }>;
+      expect(httpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({ name: "persisted3" }),
+            expect.objectContaining({ name: "persisted15" }),
+          ]) as Array<unknown>,
+        }),
+      );
 
-      expect(lastCall).toHaveLength(12);
-      expect(lastCall[0]?.name).toBe("persisted5");
-      expect(lastCall[11]?.name).toBe("new1");
+      const sentEvents = vi.mocked(httpAdapter.send).mock.calls[0]![0]
+        .events as Array<{ name: string }>;
+
+      expect(sentEvents).toHaveLength(13);
+      expect(sentEvents[0]?.name).toBe("persisted3");
+      expect(sentEvents[12]?.name).toBe("persisted15");
     });
   });
 
