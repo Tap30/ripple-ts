@@ -51,7 +51,8 @@ are always available — no need to include them in your custom type map.
 ```
 
 All predefined events (`product_viewed`, `order_completed`, etc.) are available
-with full autocomplete and type checking out of the box.
+with full autocomplete and type checking out of the box (via `client.events`
+namespace).
 
 ## `track()` API
 
@@ -61,9 +62,27 @@ Per-event metadata has been removed from `track()`. Use `setMetadata()` for
 global metadata instead.
 
 ```diff
--await client.track("event", payload, { schemaVersion: "1.0", source: "web" });
+-await client.track("event", payload, { schemaVersion: "1", source: "web" });
 +client.setMetadata("source", "web");
-+await client.track("event", payload, "1.0");
++await client.track("event", payload, "1");
+```
+
+## Schema Versioning
+
+### New: `client.events.*` namespace
+
+Use typed methods for predefined CDP events — schema version is auto-managed:
+
+```ts
+await client.events.productViewed({ product: { ... } });
+await client.events.orderCompleted({ order: { ... } });
+await client.events.checkoutStarted({ checkout: { ... } });
+```
+
+### Custom events still use explicit `schemaVersion`
+
+```ts
+await client.track("custom.event", { foo: "bar" }, "2");
 ```
 
 ## Event Structure
@@ -82,7 +101,7 @@ global metadata instead.
 
 | Field       | Migration                            |
 | ----------- | ------------------------------------ |
-| `sessionId` | Moved to platform-specific (browser) |
+| `sessionId` | `anonymousId` has the same intention |
 
 ## New Convenience Methods
 
@@ -94,9 +113,6 @@ await client.identify("user-123", { email: "user@example.com" });
 await client.clicked({ elementId: "btn-signup", elementType: "button" });
 await client.viewed({ elementId: "hero-banner" });
 ```
-
-These are shorthand for `client.track("user_identified", ...)`,
-`client.track("clicked", ...)`, and `client.track("viewed", ...)`.
 
 ## Adapters
 
@@ -205,35 +221,7 @@ const client = new RippleClient({
   },
   telemetryOptions: {
     disabled: false,
-    endpoint: "https://telemetry.example.com/sdk",
+    endpoint: "https://track.example.com/telemetry",
   },
 });
-```
-
-## Schema Versioning
-
-### `schemaVersion` removed from convenience methods
-
-`identify()`, `clicked()`, `viewed()`, and `screen()` no longer accept
-`schemaVersion`. The SDK auto-manages it.
-
-```diff
--await client.identify("user-123", { email: "..." }, "1.0.0");
-+await client.identify("user-123", { email: "..." });
-```
-
-### New: `client.events.*` namespace
-
-Use typed methods for predefined CDP events — schema version is auto-managed:
-
-```ts
-await client.events.productViewed({ product: { ... } });
-await client.events.orderCompleted({ order: { ... } });
-await client.events.checkoutStarted({ checkout: { ... } });
-```
-
-### Custom events still use explicit `schemaVersion`
-
-```ts
-await client.track("custom.event", { foo: "bar" }, "2.0.0");
 ```
