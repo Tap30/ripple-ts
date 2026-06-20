@@ -1,5 +1,31 @@
 # @tapsioss/ripple-browser
 
+## 2.1.0
+### Minor Changes
+
+
+
+- [`591d1e2`](https://github.com/Tap30/ripple-ts/commit/591d1e23a2fec0955d2cd9ea3a575999778282ce) Thanks [@mimshins](https://github.com/mimshins)! - Add missing `customProperties` to event specs.
+
+
+### Patch Changes
+
+
+
+- [`63a7602`](https://github.com/Tap30/ripple-ts/commit/63a76025ebb9e13b40ffa250a4237e233f804501) Thanks [@mimshins](https://github.com/mimshins)! - Refactor cart-related event payloads to use a new `Cart` type and fix `Shipping.price` type.
+  
+  **Changes:**
+  
+  - `CartModificationPayload`: replaced `cartId?: string` with `cart: Cart`.
+  - `CartViewedPayload`: replaced `cartId?: string` and `products: Product[]` with `cart: Cart`.
+  - `CartEmptiedPayload`: replaced `cartId?: string` and `products: Product[]` with `cart: Cart`.
+  - `Shipping.price`: changed from `number` to `Money`.
+  
+  **Added:**
+  
+  - New `Cart` type with `cartId` and `products` fields.
+  - Exported `Cart` type from both browser and node packages.
+
 ## 2.0.0
 ### Major Changes
 
