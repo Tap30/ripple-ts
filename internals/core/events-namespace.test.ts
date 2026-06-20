@@ -44,6 +44,7 @@ import {
 } from "./event-specs.ts";
 import { EventsNamespace } from "./events-namespace.ts";
 import type {
+  Cart,
   Challenge,
   Checkout,
   Coupon,
@@ -103,6 +104,10 @@ describe("EventsNamespace", () => {
 
     const challenge: Challenge = {
       challengeId: "",
+    };
+
+    const cart: Cart = {
+      products: [],
     };
 
     const methods: [string, string, Record<string, unknown>][] = [
@@ -167,23 +172,15 @@ describe("EventsNamespace", () => {
       [
         "productAddedToCart",
         "product_added_to_cart",
-        { product } satisfies CartModificationPayload,
+        { product, cart } satisfies CartModificationPayload,
       ],
       [
         "productRemovedFromCart",
         "product_removed_from_cart",
-        { product } satisfies CartModificationPayload,
+        { product, cart } satisfies CartModificationPayload,
       ],
-      [
-        "cartViewed",
-        "cart_viewed",
-        { products: [] } satisfies CartViewedPayload,
-      ],
-      [
-        "cartEmptied",
-        "cart_emptied",
-        { products: [] } satisfies CartEmptiedPayload,
-      ],
+      ["cartViewed", "cart_viewed", { cart } satisfies CartViewedPayload],
+      ["cartEmptied", "cart_emptied", { cart } satisfies CartEmptiedPayload],
       [
         "checkoutStarted",
         "checkout_started",

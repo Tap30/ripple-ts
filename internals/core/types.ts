@@ -192,6 +192,10 @@ export type Address = {
      */
     long: number;
   };
+  /**
+   * Custom additional properties.
+   */
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
@@ -249,6 +253,10 @@ export type Coupon = {
    * Internal ID of the coupon.
    */
   id?: string;
+  /**
+   * Custom additional properties.
+   */
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
@@ -443,6 +451,10 @@ export type Payment = {
    * The order associated with this payment.
    */
   order?: Order;
+  /**
+   * Custom additional properties.
+   */
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
@@ -497,6 +509,10 @@ export type Cart = {
    * The current list of products in the cart.
    */
   products: Product[];
+  /**
+   * Custom additional properties.
+   */
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
@@ -639,6 +655,10 @@ export type UserTraits = {
      */
     timezone?: string;
   };
+  /**
+   * Custom additional properties.
+   */
+  customProperties?: Record<string, Primitive>;
 };
 
 /**
