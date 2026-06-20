@@ -1,6 +1,7 @@
 import type {
   AppState,
   Campaign,
+  Cart,
   Category,
   Challenge,
   Checkout,
@@ -216,9 +217,9 @@ export type ProductWishlistPayload = {
  */
 export type CartModificationPayload = {
   /**
-   * The unique identifier for the cart.
+   * The cart being modified.
    */
-  cartId?: string;
+  cart: Cart;
   /**
    * The UI location from where the modification occurred.
    */
@@ -268,13 +269,9 @@ export type ProductReviewedPayload = {
  */
 export type CartViewedPayload = {
   /**
-   * The unique identifier for the cart.
+   * The cart being viewed.
    */
-  cartId?: string;
-  /**
-   * The current list of products in the cart.
-   */
-  products: Product[];
+  cart: Cart;
   /**
    * Custom additional properties.
    */
@@ -286,13 +283,9 @@ export type CartViewedPayload = {
  */
 export type CartEmptiedPayload = {
   /**
-   * The unique identifier for the cart.
+   * The cart being emptied.
    */
-  cartId?: string;
-  /**
-   * The list of products that were cleared.
-   */
-  products: Product[];
+  cart: Cart;
   /**
    * Custom additional properties.
    */

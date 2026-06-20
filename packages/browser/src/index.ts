@@ -10,6 +10,7 @@ export {
   StorageQuotaExceededError,
   type AppState,
   type BatchOptions,
+  type Cart,
   type Category,
   type Challenge,
   type Checkout,

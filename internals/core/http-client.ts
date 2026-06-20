@@ -16,8 +16,8 @@ export class HttpClient implements HttpAdapter {
    * @param context Request context including endpoint, events, and headers
    * @returns Promise resolving to HTTP response
    */
-  public async send(ctx: HttpAdapterContext): Promise<HttpResponse> {
-    const { events, endpoint, headers } = ctx;
+  public async send(context: HttpAdapterContext): Promise<HttpResponse> {
+    const { events, endpoint, headers } = context;
     const body = JSON.stringify({ events });
 
     const response = await fetch(endpoint, {

@@ -201,7 +201,7 @@ export type Shipping = {
   /**
    * Cost of shipping.
    */
-  price: number;
+  price: Money;
   /**
    * Shipping method name (e.g., "Standard", "Next Day").
    */
@@ -483,6 +483,20 @@ export type Reward = {
    * The unit of the reward (e.g., "points", "dollars").
    */
   unit: string;
+};
+
+/**
+ * Represents a shopping cart.
+ */
+export type Cart = {
+  /**
+   * The unique identifier for the cart.
+   */
+  cartId?: string;
+  /**
+   * The current list of products in the cart.
+   */
+  products: Product[];
 };
 
 /**
