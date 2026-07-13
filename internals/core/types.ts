@@ -587,6 +587,32 @@ export type Referral = {
 export type AppState = "opened" | "closed" | "foreground" | "background";
 
 /**
+ * User address trait.
+ */
+export type UserAddressTrait = {
+  /**
+   * City name.
+   */
+  city?: string;
+  /**
+   * Country code or name.
+   */
+  country?: string;
+  /**
+   * State or province.
+   */
+  state?: string;
+  /**
+   * Street address.
+   */
+  street?: string;
+  /**
+   * User's timezone.
+   */
+  timezone?: string;
+};
+
+/**
  * User profile attributes.
  */
 export type UserTraits = {
@@ -633,28 +659,7 @@ export type UserTraits = {
   /**
    * User's physical address details.
    */
-  address?: {
-    /**
-     * City name.
-     */
-    city?: string;
-    /**
-     * Country code or name.
-     */
-    country?: string;
-    /**
-     * State or province.
-     */
-    state?: string;
-    /**
-     * Street address.
-     */
-    street?: string;
-    /**
-     * User's timezone.
-     */
-    timezone?: string;
-  };
+  addresses?: UserAddressTrait[];
   /**
    * Custom additional properties.
    */
