@@ -258,11 +258,11 @@ export abstract class Client<
     this.#hooks = createTelemetryHooks(hooks, telemetryOptions, {
       apiKey,
       apiKeyHeader,
-      getUserId: this.getUserId,
-      getMetadata: this.getMetadata,
-      getAnonymousId: this.getAnonymousId,
-      getPlatform: this._getPlatform,
-      getSdk: this._getSdkInfo,
+      getUserId: this.getUserId.bind(this),
+      getMetadata: this.getMetadata.bind(this),
+      getAnonymousId: this.getAnonymousId.bind(this),
+      getPlatform: this._getPlatform.bind(this),
+      getSdk: this._getSdkInfo.bind(this),
     });
 
     const dispatcherConfig: DispatcherConfig = {
