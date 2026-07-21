@@ -1,5 +1,12 @@
 # @tapsioss/ripple-node
 
+## 2.1.1
+### Patch Changes
+
+
+
+- [#43](https://github.com/Tap30/ripple-ts/pull/43) [`a2123e9`](https://github.com/Tap30/ripple-ts/commit/a2123e99b9540b1f8c575e1db3ac748fb6eac0a2) Thanks [@mimshins](https://github.com/mimshins)! - Resolve `undefined` reference of `this`.
+
 ## 2.1.0
 ### Minor Changes
 
