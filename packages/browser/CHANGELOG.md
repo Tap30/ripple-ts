@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.1.2
+### Patch Changes
+
+
+
+- [`ca6985f`](https://github.com/Tap30/ripple-ts/commit/ca6985f0ac407e7b09d8b8cb5b2739b610e9e4e4) Thanks [@mimshins](https://github.com/mimshins)! - Expose `PredefinedEvents` and `SdkInfo` types.
+
 ## 2.1.1
 ### Patch Changes
 
