@@ -123,6 +123,7 @@ export abstract class Client<
   protected readonly _sampler: EventSampler;
 
   readonly #hooks: TelemetryHooks;
+  readonly #telemetryDispose: () => void;
 
   /**
    * Typed namespace for predefined CDP events.
@@ -255,15 +256,19 @@ export abstract class Client<
     this._metadataManager = new MetadataManager<TMetadata>();
     this._storage = storageAdapter;
 
-    this.#hooks = createTelemetryHooks(hooks, telemetryOptions, {
-      apiKey,
-      apiKeyHeader,
-      getUserId: this.getUserId.bind(this),
-      getMetadata: this.getMetadata.bind(this),
-      getAnonymousId: this.getAnonymousId.bind(this),
-      getPlatform: this._getPlatform.bind(this),
-      getSdk: this._getSdkInfo.bind(this),
-    });
+    const { hooks: mergedHooks, dispose: telemetryDispose } =
+      createTelemetryHooks(hooks, telemetryOptions, {
+        apiKey,
+        apiKeyHeader,
+        getUserId: this.getUserId.bind(this),
+        getMetadata: this.getMetadata.bind(this),
+        getAnonymousId: this.getAnonymousId.bind(this),
+        getPlatform: this._getPlatform.bind(this),
+        getSdk: this._getSdkInfo.bind(this),
+      });
+
+    this.#hooks = mergedHooks;
+    this.#telemetryDispose = telemetryDispose;
 
     const dispatcherConfig: DispatcherConfig = {
       apiKey,
@@ -491,6 +496,7 @@ export abstract class Client<
    * Cancels scheduled flushes and clears all references for memory cleanup.
    */
   public dispose(): void {
+    this.#telemetryDispose();
     this._dispatcher.dispose();
     this._metadataManager.clear();
     this.#initMutex.release();
