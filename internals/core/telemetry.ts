@@ -1,6 +1,17 @@
+import { Buffer } from "./buffer.ts";
 import { PREDEFINED_SCHEMA_VERSION } from "./event-specs.ts";
 import type { Event, Platform, SdkInfo } from "./types.ts";
 import { IdGenerator } from "./utils.ts";
+
+/**
+ * Maximum number of telemetry events buffered before oldest are evicted.
+ */
+const TELEMETRY_BUFFER_CAPACITY = 50;
+
+/**
+ * Default flush interval in milliseconds (10 seconds).
+ */
+const DEFAULT_FLUSH_INTERVAL = 10 * 1000;
 
 /**
  * Information provided to the onFlush hook.
@@ -80,6 +91,19 @@ export type TelemetryOptions = {
    * Endpoint to send telemetry data to.
    */
   endpoint: string;
+  /**
+   * Interval in milliseconds between automatic telemetry flushes.
+   * Defaults to 10000 (10 seconds).
+   */
+  flushInterval?: number;
+};
+
+/**
+ * Result of creating telemetry hooks, including a dispose function for cleanup.
+ */
+export type TelemetryHooksResult = {
+  hooks: TelemetryHooks;
+  dispose: () => void;
 };
 
 type CustomTelemetryEventMap = {
@@ -103,17 +127,27 @@ type ClientContext = {
 
 /**
  * Creates a merged hooks object that wraps user hooks with auto-telemetry reporting.
- * If telemetry is disabled or not configured, returns user hooks as-is.
+ * Telemetry events are buffered in a ring buffer and flushed periodically.
+ * If telemetry is disabled or not configured, returns user hooks as-is with a no-op dispose.
  */
 export const createTelemetryHooks = (
   userHooks: TelemetryHooks,
   options: TelemetryOptions | null,
   clientCtx: ClientContext,
-): TelemetryHooks => {
+): TelemetryHooksResult => {
   /* v8 ignore start -- @preserve */
-  const { disabled = false, endpoint } = options ?? {};
+  const {
+    endpoint,
+    disabled = false,
+    flushInterval = DEFAULT_FLUSH_INTERVAL,
+  } = options ?? {};
 
-  if (!endpoint || disabled) return userHooks;
+  if (!endpoint || disabled) {
+    return {
+      hooks: userHooks,
+      dispose: () => {},
+    };
+  }
 
   const {
     apiKey,
@@ -124,6 +158,38 @@ export const createTelemetryHooks = (
     getMetadata,
     getUserId,
   } = clientCtx;
+
+  const buffer = new Buffer<Event>(TELEMETRY_BUFFER_CAPACITY);
+
+  const flushBuffer = (): void => {
+    if (buffer.isEmpty()) return;
+
+    const events = buffer.toArray();
+
+    buffer.clear();
+
+    try {
+      fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [apiKeyHeader]: apiKey,
+        },
+        body: JSON.stringify(events),
+        keepalive: true,
+      }).catch(() => {});
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
+      // Fire-and-forget — never throw
+    }
+  };
+
+  const intervalId = setInterval(flushBuffer, flushInterval);
+
+  const dispose = (): void => {
+    clearInterval(intervalId);
+    flushBuffer();
+  };
 
   const report = <K extends keyof CustomTelemetryEventMap>(
     type: K,
@@ -142,23 +208,10 @@ export const createTelemetryHooks = (
       sdk: getSdk(),
     };
 
-    try {
-      fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [apiKeyHeader]: apiKey,
-        },
-        body: JSON.stringify(event),
-        keepalive: true,
-      }).catch(() => {});
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_) {
-      // Fire-and-forget — never throw
-    }
+    buffer.enqueue(event);
   };
 
-  return {
+  const hooks: TelemetryHooks = {
     onFlush: info => {
       report("sdk_event_flush", info);
 
@@ -190,5 +243,7 @@ export const createTelemetryHooks = (
       userHooks.onEnqueue?.(info);
     },
   };
+
+  return { hooks, dispose };
   /* v8 ignore stop */
 };
