@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.2.0
+### Minor Changes
+
+
+
+- [#46](https://github.com/Tap30/ripple-ts/pull/46) [`4230b8c`](https://github.com/Tap30/ripple-ts/commit/4230b8c1ac6ae59d8eabd5c05a24eb3b88a0b7a0) Thanks [@mimshins](https://github.com/mimshins)! - Add batching to internal telemetry reporting. Telemetry events are now buffered in a ring buffer (capacity 50) and flushed periodically instead of sending one HTTP request per event. A new `flushInterval` option is available in `TelemetryOptions` (defaults to 10 seconds). Data loss on crash is acceptable — no persistence layer is used.
+
 ## 2.1.2
 ### Patch Changes
 
