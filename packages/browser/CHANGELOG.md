@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.2.1
+### Patch Changes
+
+
+
+- [`8abdb02`](https://github.com/Tap30/ripple-ts/commit/8abdb021dae2fa90ac58ff89619e9e508eec1741) Thanks [@mimshins](https://github.com/mimshins)! - Update telemetry body to send events as `{ events: events }` stringified object.
+
 ## 2.2.0
 ### Minor Changes
 
