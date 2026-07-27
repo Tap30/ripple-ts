@@ -175,7 +175,7 @@ export const createTelemetryHooks = (
           "Content-Type": "application/json",
           [apiKeyHeader]: apiKey,
         },
-        body: JSON.stringify(events),
+        body: JSON.stringify({ events }),
         keepalive: true,
       }).catch(() => {});
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
