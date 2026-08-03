@@ -6,6 +6,7 @@ export {
   HttpClient,
   LogLevel,
   NoOpLogger,
+  isPredefinedEvent,
   type AppState,
   type BatchOptions,
   type Cart,

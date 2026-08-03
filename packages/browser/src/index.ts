@@ -8,6 +8,7 @@ export {
   LogLevel,
   NoOpLogger,
   StorageQuotaExceededError,
+  isPredefinedEvent,
   type AppState,
   type BatchOptions,
   type Cart,

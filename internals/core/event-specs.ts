@@ -6,6 +6,7 @@ import type {
   Challenge,
   Checkout,
   Coupon,
+  Event,
   Filter,
   Incentive,
   Money,
@@ -939,4 +940,85 @@ export type PredefinedEvents = {
   challenge_started: ChallengeStartedPayload;
   challenge_completed: ChallengeCompletedPayload;
   challenge_step_completed: ChallengeStepCompletedPayload;
+};
+
+const PREDEFINED_EVENT_NAMES = [
+  "user_identified",
+  "screened",
+  "app_state_changed",
+  "clicked",
+  "viewed",
+  "product_clicked",
+  "product_viewed",
+  "product_shared",
+  "products_searched",
+  "product_list_viewed",
+  "product_list_filtered",
+  "product_reviewed",
+  "product_added_to_wishlist",
+  "product_removed_from_wishlist",
+  "product_added_to_cart",
+  "product_removed_from_cart",
+  "cart_viewed",
+  "cart_emptied",
+  "checkout_started",
+  "checkout_step_viewed",
+  "checkout_step_completed",
+  "order_completed",
+  "order_failed",
+  "order_cancelled",
+  "order_shipped",
+  "order_refunded",
+  "order_updated",
+  "order_product_fulfilled",
+  "order_product_returned",
+  "order_fulfillment_status_updated",
+  "order_reviewed",
+  "coupon_entered",
+  "coupon_removed",
+  "coupon_denied",
+  "promotion_viewed",
+  "promotion_clicked",
+  "payment_authorized",
+  "payment_captured",
+  "payment_failed",
+  "payment_refunded",
+  "referral_shared",
+  "referral_applied",
+  "incentive_granted",
+  "incentive_redeemed",
+  "incentive_claimed",
+  "incentive_expired",
+  "challenge_started",
+  "challenge_completed",
+  "challenge_step_completed",
+] as const satisfies ReadonlyArray<keyof PredefinedEvents>;
+
+const PREDEFINED_EVENT_NAME_SET: ReadonlySet<
+  (typeof PREDEFINED_EVENT_NAMES)[number]
+> = new Set(PREDEFINED_EVENT_NAMES);
+
+type _AssertAllKeysPresent =
+  Exclude<
+    keyof PredefinedEvents,
+    (typeof PREDEFINED_EVENT_NAMES)[number]
+  > extends never
+    ? true
+    : never;
+const _allKeysPresent: _AssertAllKeysPresent = true;
+
+void _allKeysPresent;
+
+/**
+ * Type guard that checks whether an event corresponds to a predefined CDP event.
+ *
+ * @param event The event to check
+ * @returns True if the event name is a predefined CDP event
+ */
+export const isPredefinedEvent = (
+  event: Event,
+): event is Event & { name: keyof PredefinedEvents } => {
+  return PREDEFINED_EVENT_NAME_SET.has(
+    event.name as (typeof PREDEFINED_EVENT_NAMES)[number],
+  );
 };
