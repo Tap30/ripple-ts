@@ -112,7 +112,6 @@ type CustomTelemetryEventMap = {
   sdk_event_send_failure: SendFailureInfo;
   sdk_event_retry: RetryInfo;
   sdk_event_drop: DropInfo;
-  sdk_event_enqueue: EnqueueInfo;
 };
 
 type ClientContext = {
@@ -238,8 +237,6 @@ export const createTelemetryHooks = (
       userHooks.onDrop?.(info);
     },
     onEnqueue: info => {
-      report("sdk_event_enqueue", info);
-
       userHooks.onEnqueue?.(info);
     },
   };
