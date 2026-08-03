@@ -1,5 +1,19 @@
 # @tapsioss/ripple-browser
 
+## 2.3.0
+### Minor Changes
+
+
+
+- [`077cd97`](https://github.com/Tap30/ripple-ts/commit/077cd97cea1eb1772658d76de6ba9c969ac7a073) Thanks [@mimshins](https://github.com/mimshins)! - Add and export `isPredefinedEvent` utility function.
+
+
+### Patch Changes
+
+
+
+- [`755dd63`](https://github.com/Tap30/ripple-ts/commit/755dd639d41f4112a98c1471c92ee255193ac920) Thanks [@mimshins](https://github.com/mimshins)! - Remove `sdk_event_enqueue` telemetry report.
+
 ## 2.2.1
 ### Patch Changes
 
