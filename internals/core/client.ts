@@ -412,11 +412,7 @@ export abstract class Client<
       platform: this._getPlatform(),
     };
 
-    if (!this._sampler(event)) {
-      this.#hooks.onDrop?.({ eventCount: 1, reason: "sampled" });
-
-      return;
-    }
+    if (!this._sampler(event)) return;
 
     return this._dispatcher.enqueue(event);
   }
