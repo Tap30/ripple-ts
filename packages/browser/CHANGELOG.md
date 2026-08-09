@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.3.1
+### Patch Changes
+
+
+
+- [`38b50a4`](https://github.com/Tap30/ripple-ts/commit/38b50a475c2f3fbe5bcebe58aae3f890ac21e570) Thanks [@mimshins](https://github.com/mimshins)! - Prevent `onDrop` telemetry report on sampler.
+
 ## 2.3.0
 ### Minor Changes
 
