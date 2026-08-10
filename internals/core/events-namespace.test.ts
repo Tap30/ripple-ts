@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
 import type { Client } from "./client.ts";
 import {
   PREDEFINED_SCHEMA_VERSION,
@@ -60,10 +61,18 @@ const createMockClient = () =>
     track: vi.fn().mockResolvedValue(undefined),
   }) as unknown as Client;
 
+const createMockLogger = (): LoggerAdapter => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+});
+
 describe("EventsNamespace", () => {
   it("should support all event categories", async () => {
     const client = createMockClient();
-    const events = new EventsNamespace(client);
+    const logger = createMockLogger();
+    const events = new EventsNamespace(client, logger);
 
     const product: Product = {
       price: { amount: 0, currency: "" },
@@ -354,5 +363,40 @@ describe("EventsNamespace", () => {
         PREDEFINED_SCHEMA_VERSION,
       );
     }
+  });
+
+  it("should emit deprecation warning when appStateChanged is called with 'background'", async () => {
+    const client = createMockClient();
+    const logger = createMockLogger();
+    const events = new EventsNamespace(client, logger);
+
+    await events.appStateChanged({ newState: "background" });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[Ripple] AppState "background" is deprecated. Use "opened" or "closed" instead.',
+    );
+  });
+
+  it("should emit deprecation warning when appStateChanged is called with 'foreground'", async () => {
+    const client = createMockClient();
+    const logger = createMockLogger();
+    const events = new EventsNamespace(client, logger);
+
+    await events.appStateChanged({ newState: "foreground" });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[Ripple] AppState "foreground" is deprecated. Use "opened" or "closed" instead.',
+    );
+  });
+
+  it("should not emit deprecation warning for 'opened' or 'closed' states", async () => {
+    const client = createMockClient();
+    const logger = createMockLogger();
+    const events = new EventsNamespace(client, logger);
+
+    await events.appStateChanged({ newState: "opened" });
+    await events.appStateChanged({ newState: "closed" });
+
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

@@ -252,7 +252,7 @@ export abstract class Client<
     this._sampler = eventSampler;
     this._anonymousId = this._generateAnonymousId();
     this._logger = loggerAdapter;
-    this.events = new EventsNamespace(this);
+    this.events = new EventsNamespace(this, this._logger);
     this._metadataManager = new MetadataManager<TMetadata>();
     this._storage = storageAdapter;
 
