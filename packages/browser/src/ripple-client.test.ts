@@ -417,7 +417,57 @@ describe("RippleClient", () => {
   });
 
   describe("app state tracking", () => {
-    it("should track app_state_changed on visibilitychange", async () => {
+    it("should track opened state via appOpened()", async () => {
+      await client.init();
+      client.appOpened();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "opened", previousState: "closed" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should track closed state via appClosed()", async () => {
+      await client.init();
+      client.appOpened();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      client.appClosed();
+
+      await new Promise(r => {
+        setTimeout(r, 0);
+      });
+
+      await client.flush();
+
+      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              name: "app_state_changed",
+              payload: { newState: "closed", previousState: "opened" },
+            }),
+          ]) as Array<unknown>,
+        }),
+      );
+    });
+
+    it("should not automatically track visibility changes", async () => {
       let visibilityHandler: (() => void) | null = null;
 
       Object.defineProperty(global, "document", {
@@ -439,100 +489,8 @@ describe("RippleClient", () => {
 
       await testClient.init();
 
-      // Simulate going to background
-      Object.defineProperty(global.document, "hidden", {
-        configurable: true,
-        get: () => true,
-      });
-
-      visibilityHandler!();
-
-      // Allow the fire-and-forget track to complete
-      await new Promise(r => {
-        setTimeout(r, 0);
-      });
-
-      await testClient.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({
-              name: "app_state_changed",
-              payload: { newState: "background", previousState: "foreground" },
-            }),
-          ]) as Array<unknown>,
-        }),
-      );
-    });
-
-    it("should remove listener on dispose", async () => {
-      const removeListener = vi.fn();
-
-      Object.defineProperty(global, "document", {
-        value: {
-          hidden: false,
-          title: "",
-          referrer: "",
-          querySelector: () => null,
-          addEventListener: vi.fn(),
-          removeEventListener: removeListener,
-        },
-        writable: true,
-        configurable: true,
-      });
-
-      await client.init();
-      client.dispose();
-
-      expect(removeListener).toHaveBeenCalledWith(
-        "visibilitychange",
-        expect.any(Function),
-      );
-    });
-
-    it("should track opened state via appOpened()", async () => {
-      await client.init();
-      client.appOpened();
-
-      await new Promise(r => {
-        setTimeout(r, 0);
-      });
-
-      await client.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({
-              name: "app_state_changed",
-              payload: { newState: "opened", previousState: "foreground" },
-            }),
-          ]) as Array<unknown>,
-        }),
-      );
-    });
-
-    it("should track closed state via appClosed()", async () => {
-      await client.init();
-      client.appClosed();
-
-      await new Promise(r => {
-        setTimeout(r, 0);
-      });
-
-      await client.flush();
-
-      expect(mockHttpAdapter.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({
-              name: "app_state_changed",
-              payload: { newState: "closed", previousState: "foreground" },
-            }),
-          ]) as Array<unknown>,
-        }),
-      );
+      // visibilitychange listener should not be registered
+      expect(visibilityHandler).toBeNull();
     });
   });
 });

@@ -41,15 +41,8 @@ export class RippleClient<
 > extends Client<TCustomEvents, TMetadata> {
   readonly #identityManager: IdentityManager;
 
-  #appState: AppState = "foreground";
+  #appState: AppState = "closed";
   #platformInfo: WebPlatform | null = null;
-
-  #onVisibilityChange = (): void => {
-    /* v8 ignore next -- @preserve */
-    const newState: AppState = document.hidden ? "background" : "foreground";
-
-    this.#trackAppStateChange(newState);
-  };
 
   /**
    * Create a new RippleClient instance.
@@ -90,10 +83,6 @@ export class RippleClient<
     await super.init();
 
     this.#platformInfo = calculatePlatformInfo();
-
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", this.#onVisibilityChange);
-    }
   }
 
   /**
@@ -247,14 +236,6 @@ export class RippleClient<
    * Dispose the client and clean up resources including session management.
    */
   public override dispose(): void {
-    /* v8 ignore next -- @preserve */
-    if (typeof document !== "undefined") {
-      document.removeEventListener(
-        "visibilitychange",
-        this.#onVisibilityChange,
-      );
-    }
-
     this.#identityManager.clear();
     super.dispose();
   }

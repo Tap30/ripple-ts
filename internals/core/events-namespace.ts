@@ -1,3 +1,4 @@
+import type { LoggerAdapter } from "./adapters/logger-adapter.ts";
 import type { Client } from "./client.ts";
 import {
   PREDEFINED_SCHEMA_VERSION,
@@ -48,13 +49,24 @@ import {
  */
 export class EventsNamespace {
   readonly #client: Client;
+  readonly #logger: LoggerAdapter;
 
-  constructor(client: Client) {
+  constructor(client: Client, logger: LoggerAdapter) {
     this.#client = client;
+    this.#logger = logger;
   }
 
   // App State
   appStateChanged(payload: AppStateChangedPayload) {
+    if (
+      payload.newState === "background" ||
+      payload.newState === "foreground"
+    ) {
+      this.#logger.warn(
+        `AppState "${payload.newState}" is deprecated. Use "opened" or "closed" instead.`,
+      );
+    }
+
     return this.#client.track(
       "app_state_changed",
       payload,
