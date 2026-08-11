@@ -582,7 +582,12 @@ export type Referral = {
 };
 
 /**
- * Application state enum.
+ * Application state values.
+ *
+ * - `"opened"` — The application has been opened.
+ * - `"closed"` — The application has been closed.
+ * - `"foreground"` — The application moved to foreground. **@deprecated** No longer auto-tracked by the browser SDK. Use programmatically if needed.
+ * - `"background"` — The application moved to background. **@deprecated** No longer auto-tracked by the browser SDK. Use programmatically if needed.
  */
 export type AppState = "opened" | "closed" | "foreground" | "background";
 
