@@ -1,5 +1,17 @@
 # @tapsioss/ripple-browser
 
+## 2.3.2
+### Patch Changes
+
+
+
+- [#51](https://github.com/Tap30/ripple-ts/pull/51) [`83fb22c`](https://github.com/Tap30/ripple-ts/commit/83fb22c2c1b22fb4a14fa3d3a82721fd168b83e3) Thanks [@amir78729](https://github.com/amir78729)! - Deprecate "background" and "foreground" app state values
+  
+  - Removed automatic background/foreground tracking via `visibilitychange` listener in the browser SDK.
+  - The `appOpened()` and `appClosed()` methods remain as the recommended way to track app lifecycle.
+  - Users can still programmatically call `client.events.appStateChanged()` with "background" or "foreground", but a deprecation warning will be logged.
+  - The initial app state is now `"closed"` instead of `"foreground"`.
+
 ## 2.3.1
 ### Patch Changes
 
