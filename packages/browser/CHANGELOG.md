@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.3.3
+### Patch Changes
+
+
+
+- [#53](https://github.com/Tap30/ripple-ts/pull/53) [`a6ab4e0`](https://github.com/Tap30/ripple-ts/commit/a6ab4e0572ec1ecc13d93844820b4890d05b4b68) Thanks [@amir78729](https://github.com/amir78729)! - Add optional campaign attribution to supported predefined event payloads.
+
 ## 2.3.2
 ### Patch Changes
 
