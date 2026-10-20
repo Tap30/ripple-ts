@@ -131,6 +131,7 @@ export type ViewedPayload = {
    * The title of the element, if applicable.
    */
   elementTitle?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -145,6 +146,7 @@ export type ProductClickedPayload = {
    * The product that was clicked.
    */
   product: Product;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -159,6 +161,7 @@ export type ProductViewedPayload = {
    * The product that was viewed.
    */
   product: Product;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -229,6 +232,7 @@ export type CartModificationPayload = {
    * The product being added or removed.
    */
   product: Product;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -259,6 +263,7 @@ export type ProductReviewedPayload = {
    * Body text of the review.
    */
   body?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -273,6 +278,7 @@ export type CartViewedPayload = {
    * The cart being viewed.
    */
   cart: Cart;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -287,6 +293,7 @@ export type CartEmptiedPayload = {
    * The cart being emptied.
    */
   cart: Cart;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -301,6 +308,7 @@ export type CheckoutStartedPayload = {
    * The checkout session details.
    */
   checkout: Checkout;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -315,6 +323,7 @@ export type CheckoutStepPayload = {
    * The checkout session details at this step.
    */
   checkout: Checkout;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -329,6 +338,7 @@ export type OrderCompletedPayload = {
    * The finalized order details.
    */
   order: Order;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -365,6 +375,7 @@ export type OrderCancelledPayload = {
    * Who cancelled the order (e.g., "customer", "admin", "system").
    */
   issuer?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -459,6 +470,7 @@ export type OrderUpdatedPayload = {
    * The reason for the update.
    */
   reason?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -515,6 +527,7 @@ export type OrderReviewedPayload = {
    * The full text body of the review.
    */
   body?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -529,6 +542,7 @@ export type ProductsSearchedPayload = {
    * The raw text query submitted by the user.
    */
   query: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -555,6 +569,7 @@ export type ProductListViewedPayload = {
    * The products currently visible in the list.
    */
   products: Product[];
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -585,6 +600,7 @@ export type ProductListFilteredPayload = {
    * The resulting products after filtering/sorting.
    */
   products: Product[];
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -603,6 +619,7 @@ export type CouponEnteredRemovedPayload = {
    * The checkout session context.
    */
   checkout: Checkout;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -643,6 +660,7 @@ export type PromotionPayload = {
    * Human-readable title of the promotion.
    */
   promotionTitle?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -787,6 +805,7 @@ export type IncentiveRedeemedPayload = {
    * Descriptive title of the redeemer.
    */
   redeemerTitle?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -809,6 +828,7 @@ export type IncentiveClaimedPayload = {
    * Descriptive title of the source.
    */
   sourceTitle?: string;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
@@ -837,6 +857,7 @@ export type ChallengeStartedPayload = {
    * The challenge that was started.
    */
   challenge: Challenge;
+  campaign?: Campaign;
   /**
    * Custom additional properties.
    */
