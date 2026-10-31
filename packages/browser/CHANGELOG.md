@@ -1,5 +1,12 @@
 # @tapsioss/ripple-browser
 
+## 2.3.4
+### Patch Changes
+
+
+
+- [#56](https://github.com/Tap30/ripple-ts/pull/56) [`c6f660c`](https://github.com/Tap30/ripple-ts/commit/c6f660cbea45f781ec14b29ba4b5e3e2a8c9c3c6) Thanks [@amir78729](https://github.com/amir78729)! - Add optional campaign attribution to the `clicked` event payload.
+
 ## 2.3.3
 ### Patch Changes
 
