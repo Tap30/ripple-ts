@@ -567,14 +567,30 @@ describe("Client", () => {
       });
 
       await client.init();
-      await client.clicked({ elementId: "btn-1", elementType: "button" });
+      await client.clicked({
+        elementId: "btn-1",
+        elementType: "button",
+        campaign: {
+          source: "newsletter",
+          medium: "email",
+          name: "spring-sale",
+        },
+      });
 
       const savedEvents = vi.mocked(storageAdapter.save).mock
         .calls[0]?.[0] as Event<TestMetadata>[];
 
       expect(savedEvents[0]).toMatchObject({
         name: "clicked",
-        payload: { elementId: "btn-1", elementType: "button" },
+        payload: {
+          elementId: "btn-1",
+          elementType: "button",
+          campaign: {
+            source: "newsletter",
+            medium: "email",
+            name: "spring-sale",
+          },
+        },
       });
     });
   });

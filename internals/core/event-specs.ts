@@ -110,6 +110,10 @@ export type ClickedPayload = {
    */
   elementTitle?: string;
   /**
+   * Parsed UTM campaign parameters.
+   */
+  campaign?: Campaign;
+  /**
    * Custom additional properties.
    */
   customProperties?: Record<string, Primitive>;
